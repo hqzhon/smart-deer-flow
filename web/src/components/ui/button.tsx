@@ -51,8 +51,9 @@ function Button({
     <Comp
       data-slot="button"
       className={cn(
-        buttonVariants({ variant, size, className }),
+        buttonVariants({ variant, size }),
         "cursor-pointer active:scale-105",
+        className
       )}
       {...props}
     />

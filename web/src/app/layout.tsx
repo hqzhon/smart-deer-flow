@@ -7,11 +7,12 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
 
-import { ThemeProviderWrapper } from "~/components/deer-flow/theme-provider-wrapper";
-import { loadConfig } from "~/core/api/config";
+import ConfigProvider from "~/components/deer-flow/config-provider";
+import { ThemeProviderWrapper } from "~/components/deer-flow/theme-provider-wrapper"; 
 import { env } from "~/env";
 
 import { Toaster } from "../components/deer-flow/toaster";
+
 
 export const metadata: Metadata = {
   title: "🦌 DeerFlow",
@@ -28,11 +29,10 @@ const geist = Geist({
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const conf = await loadConfig();
+
   return (
     <html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
       <head>
-        <script>{`window.__deerflowConfig = ${JSON.stringify(conf)}`}</script>
         {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
           https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}
         <Script id="markdown-it-fix" strategy="beforeInteractive">
@@ -45,9 +45,11 @@ export default async function RootLayout({
           `}
         </Script>
       </head>
-      <body className="bg-app">
-        <ThemeProviderWrapper>{children}</ThemeProviderWrapper>
-        <Toaster />
+      <body className="bg-app" suppressHydrationWarning>
+        <ConfigProvider>
+          <ThemeProviderWrapper>{children}</ThemeProviderWrapper>
+          <Toaster />
+        </ConfigProvider>
         {
           // NO USER BEHAVIOR TRACKING OR PRIVATE DATA COLLECTION BY DEFAULT
           //
