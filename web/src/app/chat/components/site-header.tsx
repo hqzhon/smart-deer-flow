@@ -1,5 +1,6 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
+"use client";
 
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import dynamic from "next/dynamic";
@@ -12,7 +13,7 @@ const StarCounter = dynamic(() => import("./star-counter").then(mod => mod.StarC
   ssr: false
 });
 
-export async function SiteHeader() {
+export function SiteHeader() {
   return (
     <header className="supports-backdrop-blur:bg-background/80 bg-background/40 sticky top-0 left-0 z-40 flex h-15 w-full flex-col items-center backdrop-blur-lg">
       <div className="container flex h-15 items-center justify-between px-3">
