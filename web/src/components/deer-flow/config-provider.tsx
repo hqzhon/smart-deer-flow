@@ -1,8 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import type { ReactNode } from "react";
 import { loadConfig } from "~/core/api/config";
 
-export default function ConfigProvider({ children }) {
+interface ConfigProviderProps {
+  children: ReactNode;
+}
+
+export default function ConfigProvider({ children }: ConfigProviderProps) {
 
   useEffect(() => {
     async function fetchConfig() {
