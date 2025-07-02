@@ -24,6 +24,7 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Skeleton } from "~/components/ui/skeleton";
+import { AgentConfigManager } from "~/core/config/agents";
 import { findMCPTool } from "~/core/mcp";
 import type { ToolCallRuntime } from "~/core/messages";
 import { useMessage, useStore } from "~/core/store";
@@ -72,7 +73,7 @@ export function ResearchActivitiesBlock({
 function ActivityMessage({ messageId }: { messageId: string }) {
   const message = useMessage(messageId);
   if (message?.agent && message.content) {
-    if (message.agent !== "reporter" && message.agent !== "planner") {
+    if (AgentConfigManager.shouldDisplayInActivity(message.agent)) {
       return (
         <div className="px-4 py-2">
           <Markdown animated checkLinkCredibility>
