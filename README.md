@@ -186,10 +186,10 @@ SEARCH_API=tavily
   - Enhanced graph builder with improved error handling and model management
 
 - ⚡ **Parallel Execution**
-  - Advanced parallel task execution with intelligent message buffering
-  - Smart message ordering and visual indicators for concurrent operations
-  - Optimized performance with configurable parallel task limits
-  - Enhanced error recovery and rate limiting mechanisms
+  - **Advanced parallel task execution with intelligent message buffering**
+  - **Smart message ordering and visual indicators for concurrent operations**
+  - **Optimized performance with configurable parallel task limits**
+  - **Enhanced error recovery and rate limiting mechanisms**
 
 ### Tools and MCP Integrations
 
@@ -221,13 +221,13 @@ SEARCH_API=tavily
 
   - Supports interactive modification of research plans using natural language
   - Supports auto-acceptance of research plans
-  - Advanced collaboration systems with consensus mechanisms and role bidding
+  - **Advanced collaboration systems with consensus mechanisms and role bidding**
 
 - 📝 **Report Post-Editing**
   - Supports Notion-like block editing
   - Allows AI refinements, including AI-assisted polishing, sentence shortening, and expansion
   - Powered by [tiptap](https://tiptap.dev/)
-  - Enhanced content processing with intelligent truncation and summarization
+  - **Enhanced content processing with intelligent truncation and summarization**
 
 ### Content Creation
 
