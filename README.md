@@ -1,4 +1,4 @@
-# 🦌 DeerFlow
+# 🦌 SmartDeerFlow
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,7 +10,7 @@
 
 > Originated from Open Source, give back to Open Source.
 
-**DeerFlow** (**D**eep **E**xploration and **E**fficient **R**esearch **Flow**) is a community-driven Deep Research framework that builds upon the incredible work of the open source community. Our goal is to combine language models with specialized tools for tasks like web search, crawling, and Python code execution, while giving back to the community that made this possible.
+**SmartDeerFlow** is a community-driven Deep Research framework forked from [DeerFlow](https://github.com/bytedance/deer-flow), combining language models with specialized tools for tasks like web search, crawling, and Python code execution, while contributing back to the open-source community with enhanced features and optimizations.
 
 Currently, DeerFlow has officially entered the [FaaS Application Center of Volcengine](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/market). Users can experience it online through the [experience link](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/market/deerflow/?channel=github&source=deerflow) to intuitively feel its powerful functions and convenient operations. At the same time, to meet the deployment needs of different users, DeerFlow supports one-click deployment based on Volcengine. Click the [deployment link](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/application/create?templateId=683adf9e372daa0008aaed5c&channel=github&source=deerflow) to quickly complete the deployment process and start an efficient research journey.
 
