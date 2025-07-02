@@ -75,6 +75,10 @@ def _create_llm_use_conf(
 
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
+    
+    # Remove token_limits as it's not a valid parameter for ChatOpenAI/ChatDeepSeek
+    # token_limits is used by ContentProcessor for intelligent content processing
+    merged_conf.pop("token_limits", None)
 
     # Create custom HTTP client if SSL verification is disabled
     if not verify_ssl:

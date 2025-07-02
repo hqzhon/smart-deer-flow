@@ -5,6 +5,16 @@ import asyncio
 import logging
 from src.graph import build_graph
 
+# Import collaboration modules
+try:
+    from src.collaboration.role_bidding import RoleBiddingSystem, TaskRequirement, TaskType, create_default_agents
+    from src.collaboration.human_loop import HumanLoopController
+    from src.collaboration.consensus_system import ConflictResolutionSystem
+    COLLABORATION_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Collaboration modules not available: {e}")
+    COLLABORATION_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Default level is INFO
@@ -29,6 +39,7 @@ async def run_agent_workflow_async(
     max_plan_iterations: int = 1,
     max_step_num: int = 3,
     enable_background_investigation: bool = True,
+    enable_collaboration: bool = True,
 ):
     """Run the agent workflow asynchronously with the given user input.
 
@@ -49,17 +60,39 @@ async def run_agent_workflow_async(
         enable_debug_logging()
 
     logger.info(f"Starting async workflow with user input: {user_input}")
+    
+    # Initialize collaboration systems if available
+    collaboration_systems = None
+    if COLLABORATION_AVAILABLE and enable_collaboration:
+        collaboration_systems = {
+            "role_bidding": RoleBiddingSystem(),
+            "human_loop": HumanLoopController(),
+            "conflict_resolution": ConflictResolutionSystem()
+        }
+        
+        # Register default agents
+        try:
+            for agent in create_default_agents():
+                collaboration_systems["role_bidding"].register_agent(agent)
+            logger.info("Collaboration systems initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize collaboration systems: {e}")
+            collaboration_systems = None
+    
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],
         "auto_accepted_plan": True,
         "enable_background_investigation": enable_background_investigation,
+        "enable_collaboration": enable_collaboration and collaboration_systems is not None,
+        "collaboration_systems": collaboration_systems,
     }
     config = {
         "configurable": {
             "thread_id": "default",
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": max_step_num,
+            "enable_collaboration": enable_collaboration and collaboration_systems is not None,
             "mcp_settings": {
                 "servers": {
                     "mcp-github-trending": {

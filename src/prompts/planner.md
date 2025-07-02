@@ -160,7 +160,7 @@ interface Step {
   need_search: boolean; // Must be explicitly set for each step
   title: string;
   description: string; // Specify exactly what data to collect. If the user input contains a link, please retain the full Markdown format when necessary.
-  step_type: "research" | "processing"; // Indicates the nature of the step
+  step_type: "research" | "processing"; // REQUIRED: Must be set to either "research" or "processing" for each step
 }
 
 interface Plan {
@@ -174,6 +174,7 @@ interface Plan {
 
 # Notes
 
+- **CRITICAL**: Every step MUST include the `step_type` field set to either "research" or "processing"
 - Focus on information gathering in research steps - delegate all calculations to processing steps
 - Ensure each step has a clear, specific data point or information to collect
 - Create a comprehensive data collection plan that covers the most critical aspects within {{ max_step_num }} steps
@@ -181,7 +182,7 @@ interface Plan {
 - Never settle for minimal information - the goal is a comprehensive, detailed final report
 - Limited or insufficient information will lead to an inadequate final report
 - Carefully assess each step's web search or retrieve from URL requirement based on its nature:
-  - Research steps (`need_search: true`) for gathering information
-  - Processing steps (`need_search: false`) for calculations and data processing
+  - Research steps (`step_type: "research"`, `need_search: true`) for gathering information
+  - Processing steps (`step_type: "processing"`, `need_search: false`) for calculations and data processing
 - Default to gathering more information unless the strictest sufficient context criteria are met
 - Always use the language specified by the locale = **{{ locale }}**.

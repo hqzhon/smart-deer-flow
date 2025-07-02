@@ -7,6 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
+from src.llms.error_handler import safe_llm_call
 from src.prompts.template import env, apply_prompt_template
 from src.prompt_enhancer.graph.state import PromptEnhancerState
 
@@ -39,7 +40,12 @@ def prompt_enhancer_node(state: PromptEnhancerState):
         )
 
         # Get the response from the model
-        response = model.invoke(messages)
+        response = safe_llm_call(
+            model.invoke,
+            messages,
+            operation_name="Prompt Enhancer",
+            context="Enhancing user prompt"
+        )
 
         # Clean up the response - remove any extra formatting or comments
         enhanced_prompt = response.content.strip()

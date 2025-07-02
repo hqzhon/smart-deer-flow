@@ -9,6 +9,7 @@ from langchain_core.runnables import RunnableConfig
 
 from src.rag.retriever import Resource
 from src.config.report_style import ReportStyle
+from src.utils.content_processor import ModelTokenLimits
 
 
 @dataclass(kw_only=True)
@@ -24,7 +25,20 @@ class Configuration:
     mcp_settings: dict = None  # MCP settings, including dynamic loaded tools
     report_style: str = ReportStyle.ACADEMIC.value  # Report style
     enable_deep_thinking: bool = False  # Whether to enable deep thinking
+    enable_parallel_execution: bool = True  # Whether to enable parallel step execution
+    max_parallel_tasks: int = 3  # Maximum number of parallel tasks
+    max_context_steps_parallel: int = 5  # Maximum number of context steps in parallel execution
+    
+    enable_smart_chunking: bool = True  # Whether to enable smart content chunking
+    enable_content_summarization: bool = True  # Whether to enable content summarization
+    chunk_strategy: str = "auto"  # Chunking strategy: "auto", "sentences", "paragraphs"
+    summary_type: str = "comprehensive"  # Summary type: "comprehensive", "key_points", "abstract"
+    model_token_limits: dict[str, ModelTokenLimits] = field(default_factory=dict)  # Model token limits
+    basic_model: Optional[Any] = None  # Basic model instance
+    reasoning_model: Optional[Any] = None  # Reasoning model instance
 
+    _current_instance: Optional["Configuration"] = None
+    
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
@@ -38,4 +52,11 @@ class Configuration:
             for f in fields(cls)
             if f.init
         }
-        return cls(**{k: v for k, v in values.items() if v})
+        instance = cls(**{k: v for k, v in values.items() if v})
+        cls._current_instance = instance  # Store current instance
+        return instance
+    
+    @classmethod
+    def get_current(cls) -> Optional["Configuration"]:
+        """Get the current Configuration instance."""
+        return cls._current_instance

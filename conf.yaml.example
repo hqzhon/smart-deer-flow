@@ -11,6 +11,13 @@ BASIC_MODEL:
   model: "doubao-1-5-pro-32k-250115"
   api_key: xxxx
   # verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+  
+  # Token limit configuration (for smart content processing)
+  token_limits:
+    input_limit: 32000      # Input token limit
+    output_limit: 4096      # Output token limit
+    context_window: 32000   # Context window size
+    safety_margin: 0.8      # Safety margin (actual usage limit = limit * safety margin)
  
 # Reasoning model is optional.
 # Uncomment the following settings if you want to use reasoning model
@@ -20,3 +27,20 @@ BASIC_MODEL:
 #   base_url: https://ark-cn-beijing.bytedance.net/api/v3
 #   model: "doubao-1-5-thinking-pro-m-250428"
 #   api_key: xxxx
+#   # Token limit configuration (optional)
+#   token_limits:
+#     input_limit: 32000
+#     output_limit: 8192
+#     context_window: 32000
+#     safety_margin: 0.8
+
+# Smart content processing configuration
+# Used to solve large model token limit issues
+CONTENT_PROCESSING:
+  enable_smart_chunking: true          # Enable smart chunking
+  enable_content_summarization: true   # Enable content summarization
+  chunk_strategy: "auto"               # Chunking strategy: auto, sentences, paragraphs
+  summary_type: "comprehensive"        # Summary type: comprehensive, key_points, abstract
+
+# Search configuration
+max_search_results: 3  # Maximum number of search results

@@ -20,6 +20,7 @@ def ask(
     max_plan_iterations=1,
     max_step_num=3,
     enable_background_investigation=True,
+    enable_collaboration=True,
 ):
     """Run the agent workflow with the given question.
 
@@ -29,6 +30,7 @@ def ask(
         max_plan_iterations: Maximum number of plan iterations
         max_step_num: Maximum number of steps in a plan
         enable_background_investigation: If True, performs web search before planning to enhance context
+        enable_collaboration: If True, enables collaboration features (role bidding, human loop, conflict resolution)
     """
     asyncio.run(
         run_agent_workflow_async(
@@ -37,6 +39,7 @@ def ask(
             max_plan_iterations=max_plan_iterations,
             max_step_num=max_step_num,
             enable_background_investigation=enable_background_investigation,
+            enable_collaboration=enable_collaboration,
         )
     )
 
@@ -46,6 +49,7 @@ def main(
     max_plan_iterations=1,
     max_step_num=3,
     enable_background_investigation=True,
+    enable_collaboration=True,
 ):
     """Interactive mode with built-in questions.
 
@@ -54,6 +58,7 @@ def main(
         debug: If True, enables debug level logging
         max_plan_iterations: Maximum number of plan iterations
         max_step_num: Maximum number of steps in a plan
+        enable_collaboration: If True, enables collaboration features
     """
     # First select language
     language = inquirer.select(
@@ -93,6 +98,7 @@ def main(
         max_plan_iterations=max_plan_iterations,
         max_step_num=max_step_num,
         enable_background_investigation=enable_background_investigation,
+        enable_collaboration=enable_collaboration,
     )
 
 

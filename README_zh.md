@@ -2,9 +2,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-[English](./README.md) | [简体中文](./README_zh.md) | [日本語](./README_ja.md) | [Deutsch](./README_de.md) | [Español](./README_es.md) | [Русский](./README_ru.md) |[Portuguese](./README_pt.md)
-
+[English](./README.md) | [简体中文](./README_zh.md)
 > 源于开源，回馈开源。
 
 **DeerFlow**（**D**eep **E**xploration and **E**fficient **R**esearch **Flow**）是一个社区驱动的深度研究框架，它建立在开源社区的杰出工作基础之上。我们的目标是将语言模型与专业工具（如网络搜索、爬虫和 Python 代码执行）相结合，同时回馈使这一切成为可能的社区。
@@ -178,6 +176,7 @@ SEARCH_API=tavily
   - 支持开源模型如 Qwen
   - 兼容 OpenAI 的 API 接口
   - 多层 LLM 系统适用于不同复杂度的任务
+  - 增强的图构建器，具有改进的错误处理和模型管理功能
 
 ### 工具和 MCP 集成
 
@@ -191,12 +190,22 @@ SEARCH_API=tavily
   - 扩展私有域访问、知识图谱、网页浏览等能力
   - 促进多样化研究工具和方法的集成
 
+### 并行执行
+
+- ⚡ **高级并行任务执行**
+  - 具有智能消息缓冲的高级并行任务执行
+  - 并发操作的智能消息排序和视觉指示器
+  - 具有可配置并行任务限制的优化性能
+  - 增强的错误恢复和速率限制机制
+
 ### 人机协作
 
 - 🧠 **人在环中**
 
   - 支持使用自然语言交互式修改研究计划
   - 支持自动接受研究计划
+  - 具有共识机制和角色竞标的高级协作系统
+  - 具有智能截断和摘要的增强内容处理
 
 - 📝 **报告后期编辑**
   - 支持类 Notion 的块编辑

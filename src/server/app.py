@@ -83,6 +83,9 @@ async def chat_stream(request: ChatRequest):
             request.enable_background_investigation,
             request.report_style,
             request.enable_deep_thinking,
+            request.enable_collaboration,
+            request.enable_parallel_execution,
+            request.max_parallel_tasks,
         ),
         media_type="text/event-stream",
     )
@@ -101,7 +104,16 @@ async def _astream_workflow_generator(
     enable_background_investigation: bool,
     report_style: ReportStyle,
     enable_deep_thinking: bool,
+    enable_collaboration: bool,
+    enable_parallel_execution: bool,
+    max_parallel_tasks: int,
 ):
+    import asyncio
+    from src.llms.error_handler import LLMErrorHandler
+    
+    error_handler = LLMErrorHandler()
+    max_retries = 3
+    
     input_ = {
         "messages": messages,
         "plan_iterations": 0,
@@ -114,82 +126,122 @@ async def _astream_workflow_generator(
     }
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
-        # add the last message to the resume message
+        # Add the last message to the resume message
         if messages:
             resume_msg += f" {messages[-1]['content']}"
         input_ = Command(resume=resume_msg)
-    async for agent, _, event_data in graph.astream(
-        input_,
-        config={
-            "thread_id": thread_id,
-            "resources": resources,
-            "max_plan_iterations": max_plan_iterations,
-            "max_step_num": max_step_num,
-            "max_search_results": max_search_results,
-            "mcp_settings": mcp_settings,
-            "report_style": report_style.value,
-            "enable_deep_thinking": enable_deep_thinking,
-        },
-        stream_mode=["messages", "updates"],
-        subgraphs=True,
-    ):
-        if isinstance(event_data, dict):
-            if "__interrupt__" in event_data:
-                yield _make_event(
-                    "interrupt",
-                    {
-                        "thread_id": thread_id,
-                        "id": event_data["__interrupt__"][0].ns[0],
-                        "role": "assistant",
-                        "content": event_data["__interrupt__"][0].value,
-                        "finish_reason": "interrupt",
-                        "options": [
-                            {"text": "Edit plan", "value": "edit_plan"},
-                            {"text": "Start research", "value": "accepted"},
-                        ],
-                    },
+    
+    # Retry mechanism to handle Rate Limiting errors
+    for attempt in range(max_retries + 1):
+        try:
+            async for agent, _, event_data in graph.astream(
+                input_,
+                config={
+                    "thread_id": thread_id,
+                    "resources": resources,
+                    "max_plan_iterations": max_plan_iterations,
+                    "max_step_num": max_step_num,
+                    "max_search_results": max_search_results,
+                    "mcp_settings": mcp_settings,
+                    "report_style": report_style.value,
+                    "enable_deep_thinking": enable_deep_thinking,
+                    "enable_collaboration": enable_collaboration,
+                    "enable_parallel_execution": enable_parallel_execution,
+                    "max_parallel_tasks": max_parallel_tasks,
+                },
+                stream_mode=["messages", "updates"],
+                subgraphs=True,
+            ):
+                if isinstance(event_data, dict):
+                    if "__interrupt__" in event_data:
+                        yield _make_event(
+                            "interrupt",
+                            {
+                                "thread_id": thread_id,
+                                "id": event_data["__interrupt__"][0].ns[0],
+                                "role": "assistant",
+                                "content": event_data["__interrupt__"][0].value,
+                                "finish_reason": "interrupt",
+                                "options": [
+                                    {"text": "Edit plan", "value": "edit_plan"},
+                                    {"text": "Start research", "value": "accepted"},
+                                ],
+                            },
+                        )
+                    continue
+                message_chunk, message_metadata = cast(
+                    tuple[BaseMessage, dict[str, any]], event_data
                 )
-            continue
-        message_chunk, message_metadata = cast(
-            tuple[BaseMessage, dict[str, any]], event_data
-        )
-        event_stream_message: dict[str, any] = {
-            "thread_id": thread_id,
-            "agent": agent[0].split(":")[0],
-            "id": message_chunk.id,
-            "role": "assistant",
-            "content": message_chunk.content,
-        }
-        if message_chunk.additional_kwargs.get("reasoning_content"):
-            event_stream_message["reasoning_content"] = message_chunk.additional_kwargs[
-                "reasoning_content"
-            ]
-        if message_chunk.response_metadata.get("finish_reason"):
-            event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
-                "finish_reason"
-            )
-        if isinstance(message_chunk, ToolMessage):
-            # Tool Message - Return the result of the tool call
-            event_stream_message["tool_call_id"] = message_chunk.tool_call_id
-            yield _make_event("tool_call_result", event_stream_message)
-        elif isinstance(message_chunk, AIMessageChunk):
-            # AI Message - Raw message tokens
-            if message_chunk.tool_calls:
-                # AI Message - Tool Call
-                event_stream_message["tool_calls"] = message_chunk.tool_calls
-                event_stream_message["tool_call_chunks"] = (
-                    message_chunk.tool_call_chunks
-                )
-                yield _make_event("tool_calls", event_stream_message)
-            elif message_chunk.tool_call_chunks:
-                # AI Message - Tool Call Chunks
-                event_stream_message["tool_call_chunks"] = (
-                    message_chunk.tool_call_chunks
-                )
-                yield _make_event("tool_call_chunks", event_stream_message)
+                # Only use name field for concurrent messages (with name field and not ToolMessage)
+                # Other messages use original agent logic
+                if not isinstance(message_chunk, ToolMessage) and hasattr(message_chunk, 'name') and message_chunk.name:
+                    message_agent = message_chunk.name
+                else:
+                    message_agent = agent[0].split(":")[0]
+                event_stream_message: dict[str, any] = {
+                    "thread_id": thread_id,
+                    "agent": message_agent,
+                    "id": message_chunk.id,
+                    "role": "assistant",
+                    "content": message_chunk.content,
+                }
+                if message_chunk.additional_kwargs.get("reasoning_content"):
+                    event_stream_message["reasoning_content"] = message_chunk.additional_kwargs[
+                        "reasoning_content"
+                    ]
+                if message_chunk.response_metadata.get("finish_reason"):
+                    event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
+                        "finish_reason"
+                    )
+                if isinstance(message_chunk, ToolMessage):
+                    # Tool Message - Return the result of the tool call
+                    event_stream_message["tool_call_id"] = message_chunk.tool_call_id
+                    yield _make_event("tool_call_result", event_stream_message)
+                elif isinstance(message_chunk, AIMessageChunk):
+                    # AI Message - Raw message tokens
+                    if message_chunk.tool_calls:
+                        # AI Message - Tool Call
+                        event_stream_message["tool_calls"] = message_chunk.tool_calls
+                        event_stream_message["tool_call_chunks"] = (
+                            message_chunk.tool_call_chunks
+                        )
+                        yield _make_event("tool_calls", event_stream_message)
+                    elif message_chunk.tool_call_chunks:
+                        # AI Message - Tool Call Chunks
+                        event_stream_message["tool_call_chunks"] = (
+                            message_chunk.tool_call_chunks
+                        )
+                        yield _make_event("tool_call_chunks", event_stream_message)
+                    else:
+                        # AI Message - Raw message tokens
+                        yield _make_event("message_chunk", event_stream_message)
+            # Successfully completed, break out of retry loop
+            return
+        except Exception as e:
+            error_message = str(e)
+            error_type = error_handler.classify_error(error_message)
+            
+            # Check if it's a Rate Limiting error
+            if error_handler.should_retry_error(error_type) and attempt < max_retries:
+                wait_time = 2 ** attempt  # Exponential backoff
+                logger.warning(f"Rate limiting detected (attempt {attempt + 1}/{max_retries + 1}): {error_message}")
+                logger.info(f"Retrying in {wait_time} seconds...")
+                await asyncio.sleep(wait_time)
+                continue
             else:
-                # AI Message - Raw message tokens
-                yield _make_event("message_chunk", event_stream_message)
+                # If it's a Rate Limiting error but max retries reached, log error but don't send to frontend
+                if error_handler.should_retry_error(error_type):
+                    logger.error(f"Rate limiting error after {max_retries} retries, giving up: {error_message}")
+                    # Send a generic error message to frontend without exposing Rate Limiting details
+                    yield _make_event("error", {
+                        "thread_id": thread_id,
+                        "error": "Service temporarily unavailable, please try again later."
+                    })
+                    return
+                else:
+                    # Other types of errors, re-raise
+                    logger.error(f"Non-retryable error in workflow: {error_message}")
+                    raise
 
 
 def _make_event(event_type: str, data: dict[str, any]):

@@ -9,6 +9,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
+from src.llms.error_handler import safe_llm_call
 from src.prompts.template import get_prompt_template
 
 from .state import PPTState
@@ -19,11 +20,14 @@ logger = logging.getLogger(__name__)
 def ppt_composer_node(state: PPTState):
     logger.info("Generating ppt content...")
     model = get_llm_by_type(AGENT_LLM_MAP["ppt_composer"])
-    ppt_content = model.invoke(
+    ppt_content = safe_llm_call(
+        model.invoke,
         [
             SystemMessage(content=get_prompt_template("ppt/ppt_composer")),
             HumanMessage(content=state["input"]),
         ],
+        operation_name="PPT Composer",
+        context="Generating PPT content"
     )
     logger.info(f"ppt_content: {ppt_content}")
     # save the ppt content in a temp file

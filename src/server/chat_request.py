@@ -65,6 +65,15 @@ class ChatRequest(BaseModel):
     enable_deep_thinking: Optional[bool] = Field(
         False, description="Whether to enable deep thinking"
     )
+    enable_collaboration: Optional[bool] = Field(
+        True, description="Whether to enable collaboration features (role bidding, human loop, conflict resolution)"
+    )
+    enable_parallel_execution: Optional[bool] = Field(
+        True, description="Whether to enable parallel execution of research steps"
+    )
+    max_parallel_tasks: Optional[int] = Field(
+        2, description="Maximum number of parallel tasks to execute simultaneously"
+    )
 
 
 class TTSRequest(BaseModel):

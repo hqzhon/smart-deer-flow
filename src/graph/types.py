@@ -21,3 +21,5 @@ class State(MessagesState):
     auto_accepted_plan: bool = False
     enable_background_investigation: bool = True
     background_investigation_results: str = None
+    enable_collaboration: bool = True
+    collaboration_systems: dict = None
