@@ -29,8 +29,16 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     if (message.toolCalls) {
       message.toolCalls.forEach((toolCall) => {
         if (toolCall.argsChunks?.length) {
-          toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
-          delete toolCall.argsChunks;
+          const argsString = toolCall.argsChunks.join("");
+          try {
+            toolCall.args = JSON.parse(argsString);
+            delete toolCall.argsChunks;
+          } catch (parseError) {
+            console.error('Failed to parse tool call args:', argsString, parseError);
+            // Keep empty object as fallback to maintain type compatibility
+            toolCall.args = {};
+            delete toolCall.argsChunks;
+          }
         }
       });
     }

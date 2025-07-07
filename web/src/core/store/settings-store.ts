@@ -55,18 +55,22 @@ export const loadSettings = () => {
   }
   const json = localStorage.getItem(SETTINGS_KEY);
   if (json) {
-    const settings = JSON.parse(json);
-    for (const key in DEFAULT_SETTINGS.general) {
-      if (!(key in settings.general)) {
-        settings.general[key as keyof SettingsState["general"]] =
-          DEFAULT_SETTINGS.general[key as keyof SettingsState["general"]];
-      }
-    }
-
     try {
-      useSettingsStore.setState(settings);
-    } catch (error) {
-      console.error(error);
+      const settings = JSON.parse(json);
+      for (const key in DEFAULT_SETTINGS.general) {
+        if (!(key in settings.general)) {
+          settings.general[key as keyof SettingsState["general"]] =
+            DEFAULT_SETTINGS.general[key as keyof SettingsState["general"]];
+        }
+      }
+
+      try {
+        useSettingsStore.setState(settings);
+      } catch (error) {
+        console.error(error);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse settings from localStorage:', json, parseError);
     }
   }
 };

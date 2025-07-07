@@ -556,7 +556,12 @@ function PodcastCard({
   message: Message;
 }) {
   const data = useMemo(() => {
-    return JSON.parse(message.content ?? "");
+    try {
+      return JSON.parse(message.content ?? "");
+    } catch (parseError) {
+      console.error('Failed to parse podcast message content:', message.content, parseError);
+      return {};
+    }
   }, [message.content]);
   const title = useMemo<string | undefined>(() => data?.title, [data]);
   const audioUrl = useMemo<string | undefined>(() => data?.audioUrl, [data]);

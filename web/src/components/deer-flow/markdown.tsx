@@ -19,6 +19,7 @@ import { cn } from "~/lib/utils";
 import Image from "./image";
 import { Tooltip } from "./tooltip";
 import { Link } from "./link";
+import { Mermaid } from "./mermaid";
 
 export function Markdown({
   className,
@@ -47,6 +48,27 @@ export function Markdown({
           <Image className="rounded" src={src as string} alt={alt ?? ""} />
         </a>
       ),
+      code: ({ className, children, ...props }: any) => {
+        const match = /language-(\w+)/.exec(className || "");
+        const language = match ? match[1] : "";
+        const inline = !className;
+        
+        if (!inline && language === "mermaid") {
+          const chartContent = String(children).replace(/\n$/, "");
+          return (
+            <Mermaid
+              chart={chartContent}
+              className="my-4"
+            />
+          );
+        }
+        
+        return (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      },
     };
   }, [checkLinkCredibility]);
 
@@ -124,9 +146,16 @@ function processKatexInMarkdown(markdown?: string | null) {
 
 function dropMarkdownQuote(markdown?: string | null) {
   if (!markdown) return markdown;
-  return markdown
-    .replace(/^```markdown\n/gm, "")
-    .replace(/^```text\n/gm, "")
-    .replace(/^```\n/gm, "")
-    .replace(/\n```$/gm, "");
+  
+  // Remove markdown/text wrapper blocks but preserve language-specific code blocks
+  let result = markdown;
+  
+  // Remove markdown wrapper blocks
+  result = result.replace(/^```markdown\n([\s\S]*?)\n```$/gm, "$1");
+  result = result.replace(/^```text\n([\s\S]*?)\n```$/gm, "$1");
+  
+  // Remove empty code blocks (no language specified)
+  result = result.replace(/^```\n([\s\S]*?)\n```$/gm, "$1");
+  
+  return result;
 }

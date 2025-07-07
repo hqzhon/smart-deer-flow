@@ -188,15 +188,13 @@ function findMessageByToolCallId(toolCallId: string) {
 }
 
 function appendMessage(message: Message) {
-  console.log('appendMessage called with:', { agent: message.agent, id: message.id, shouldInclude: message.agent ? AgentConfigManager.shouldIncludeInResearch(message.agent) : false });
+  
   if (message.agent && AgentConfigManager.shouldIncludeInResearch(message.agent)) {
     if (!getOngoingResearchId()) {
       const id = message.id;
-      console.log('Starting new research with id:', id);
       appendResearch(id);
       openResearch(id);
     }
-    console.log('Adding message to research activity:', message.id);
     appendResearchActivity(message);
   }
   useStore.getState().appendMessage(message);
@@ -245,20 +243,15 @@ function appendResearch(researchId: string) {
 
 function appendResearchActivity(message: Message) {
   const researchId = getOngoingResearchId();
-  console.log('appendResearchActivity called:', { researchId, messageId: message.id, agent: message.agent });
   if (researchId) {
     const researchActivityIds = useStore.getState().researchActivityIds;
     const current = researchActivityIds.get(researchId)!;
-    console.log('Current activity ids:', current);
     if (!current.includes(message.id)) {
       const newActivityIds = [...current, message.id];
-      console.log('Adding message to activity ids:', newActivityIds);
       useStore.setState({
         researchActivityIds: new Map(researchActivityIds).set(researchId, newActivityIds),
       });
-    } else {
-      console.log('Message already in activity ids');
-    }
+    } 
     if (message.agent && AgentConfigManager.isReporter(message.agent)) {
       useStore.setState({
         researchReportIds: new Map(useStore.getState().researchReportIds).set(
@@ -267,9 +260,7 @@ function appendResearchActivity(message: Message) {
         ),
       });
     }
-  } else {
-    console.log('No ongoing research id found');
-  }
+  } 
 }
 
 export function openResearch(researchId: string | null) {

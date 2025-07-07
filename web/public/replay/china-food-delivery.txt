@@ -377,7 +377,7 @@ event: message_chunk
 data: {"thread_id": "G3JIeLDLd92fDEfIcCs2G", "agent": "researcher", "id": "run-8d095923-c930-4de9-8fde-28b8bbfd3ce3", "role": "assistant", "finish_reason": "tool_calls"}
 
 event: tool_call_result
-data: {"thread_id": "G3JIeLDLd92fDEfIcCs2G", "agent": "researcher", "id": "27aacd90-9de3-4444-8cac-3b404fad6b72", "role": "assistant", "content": "Failed to crawl. Error: TypeError('Incoming markup is of an invalid type: None. Markup must be a string, a bytestring, or an open filehandle.')", "tool_call_id": "call_bdaf64f2b3ff4f318ed54a"}
+data: {"thread_id": "G3JIeLDLd92fDEfIcCs2G", "agent": "researcher", "id": "27aacd90-9de3-4444-8cac-3b404fad6b72", "role": "assistant", "content": "Failed to crawl. Error: TypeError(\"Incoming markup is of an invalid type: None. Markup must be a string, a bytestring, or an open filehandle.\")", "tool_call_id": "call_bdaf64f2b3ff4f318ed54a"}
 
 event: message_chunk
 data: {"thread_id": "G3JIeLDLd92fDEfIcCs2G", "agent": "researcher", "id": "run-1849cb6c-ddc6-467b-9b23-580337c17b51", "role": "assistant", "content": "##"}

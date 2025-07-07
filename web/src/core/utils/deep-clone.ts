@@ -2,5 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 export function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.error('Failed to deep clone object:', value, error);
+    // Return the original value as fallback
+    return value;
+  }
 }

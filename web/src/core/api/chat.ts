@@ -54,10 +54,17 @@ export async function* chatStream(
     });
     
     for await (const event of stream) {
-      yield {
-        type: event.event,
-        data: JSON.parse(event.data),
-      } as ChatEvent;
+      try {
+        const parsedData = JSON.parse(event.data);
+        yield {
+          type: event.event,
+          data: parsedData,
+        } as ChatEvent;
+      } catch (parseError) {
+        console.error('Failed to parse SSE event data:', event.data, parseError);
+        // Skip invalid JSON events instead of yielding an error event
+        continue;
+      }
     }
   }catch(e){
     console.error(e);
@@ -118,10 +125,20 @@ async function* chatReplayStream(
     const [, data] = dataRaw.split("data: ", 2) as [string, string];
 
     try {
+      let parsedData;
+      try {
+        parsedData = JSON.parse(data);
+      } catch (parseError) {
+        console.error('Failed to parse replay event data:', data, parseError);
+        // Skip invalid JSON events in replay
+        continue;
+      }
+      
       const chatEvent = {
         type: event,
-        data: JSON.parse(data),
+        data: parsedData,
       } as ChatEvent;
+      
       if (chatEvent.type === "message_chunk") {
         if (!chatEvent.data.finish_reason) {
           await sleepInReplay(50);
@@ -138,7 +155,7 @@ async function* chatReplayStream(
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error processing replay event:', e);
     }
   }
 }
