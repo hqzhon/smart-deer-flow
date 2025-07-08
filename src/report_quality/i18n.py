@@ -89,6 +89,8 @@ class I18nManager:
                     "extend_time_range": "扩展时间范围",
                     "use_recent_data": "使用更新的数据",
                     "explain_time_limits": "说明时间局限性",
+                    "explain_short_term_limits": "说明短期数据的局限性和可能的偏差",
+                    "compare_historical_trends": "与历史趋势进行对比分析以增强可信度",
                     "expand_geographic_scope": "扩大地理范围",
                     "use_representative_regions": "使用代表性地区",
                     "explain_geographic_limits": "说明地理局限性",
@@ -158,10 +160,14 @@ class I18nManager:
                 "interactive_elements": {
                     "chart_title": "图表",
                     "chart_description": "点击查看详细信息",
+                    "clickable_chart_title": "可点击图表：{alt_text}",
+                    "clickable_chart_description": "点击查看图表详细信息和数据",
                     "table_title": "数据表格",
                     "table_description": "可排序的数据表格",
                     "link_title": "外部链接",
                     "link_description": "点击访问外部资源",
+                    "source_link_title": "参考链接：{link_text}",
+                    "source_link_description": "点击访问外部参考资源",
                     "code_viewer_title": "代码查看器",
                     "code_viewer_description": "点击查看代码详情",
                     "click_for_details": "🔗 点击查看详情",
@@ -173,7 +179,12 @@ class I18nManager:
                     "no_code_blocks": "无代码块",
                     "language_label": "语言",
                     "view_code_button": "查看代码",
-                    "enhanced_interactive_report": "增强交互式报告"
+                    "code_block_description": "{language} 代码块 #{index}",
+                    "dynamic_table_title": "动态表格 #{index}",
+                    "enhanced_interactive_report": "增强交互式报告",
+                    "data_source_description": "数据源：{name}",
+                    "external_data_source_description": "外部数据源：{name}",
+                    "default_report_title": "交互式报告"
                 }
             },
             
@@ -236,6 +247,8 @@ class I18nManager:
                     "extend_time_range": "Extend time range",
                     "use_recent_data": "Use more recent data",
                     "explain_time_limits": "Explain temporal limitations",
+                    "explain_short_term_limits": "Explain limitations and potential biases of short-term data",
+                    "compare_historical_trends": "Compare with historical trends to enhance credibility",
                     "expand_geographic_scope": "Expand geographic scope",
                     "use_representative_regions": "Use representative regions",
                     "explain_geographic_limits": "Explain geographic limitations",
@@ -323,10 +336,14 @@ class I18nManager:
                 "interactive_elements": {
                     "chart_title": "Chart",
                     "chart_description": "Click for details",
+                    "clickable_chart_title": "Clickable Chart: {alt_text}",
+                    "clickable_chart_description": "Click to view detailed chart information and data",
                     "table_title": "Data Table",
                     "table_description": "Sortable data table",
                     "link_title": "External Link",
                     "link_description": "Click to visit external resource",
+                    "source_link_title": "Source Link: {link_text}",
+                    "source_link_description": "Click to visit external source",
                     "code_viewer_title": "Code Viewer",
                     "code_viewer_description": "Click to view code details",
                     "click_for_details": "🔗 Click for details",
@@ -338,7 +355,12 @@ class I18nManager:
                     "no_code_blocks": "No code blocks",
                     "language_label": "Language",
                     "view_code_button": "View Code",
-                    "enhanced_interactive_report": "Enhanced Interactive Report"
+                    "code_block_description": "{language} Code Block #{index}",
+                    "dynamic_table_title": "Dynamic Table #{index}",
+                    "enhanced_interactive_report": "Enhanced Interactive Report",
+                    "data_source_description": "Data source: {name}",
+                    "external_data_source_description": "External data source: {name}",
+                    "default_report_title": "Interactive Report"
                 }
             }
         }

@@ -11,6 +11,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
 from src.prompts.planner_model import StepType
+from src.utils.performance_optimizer import TaskPriority
+from src.utils.memory_manager import cached
 
 from .types import State
 from .nodes import (
@@ -95,6 +97,99 @@ def _build_base_graph():
     return builder
 
 
+def _create_optimized_node(original_func, node_name: str):
+    """Create an optimized node wrapper with performance monitoring."""
+    async def optimized_node(state: State, config: RunnableConfig):
+        import time
+        start_time = time.time()
+        
+        try:
+            # Execute original function
+            result = await original_func(state, config)
+            
+            # Add performance metrics
+            execution_time = time.time() - start_time
+            logger.debug(f"Node '{node_name}' executed in {execution_time:.2f}s")
+            
+            # Add execution metadata to state if it's a dict
+            if isinstance(result, dict):
+                result["node_metrics"] = result.get("node_metrics", {})
+                result["node_metrics"][node_name] = {
+                    "execution_time": execution_time,
+                    "timestamp": time.time()
+                }
+            
+            return result
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Node '{node_name}' failed after {execution_time:.2f}s: {e}")
+            raise
+    
+    return optimized_node
+
+
+def _enhanced_coordinator_routing(state: State) -> str:
+    """Enhanced coordinator routing with collaboration support."""
+    # Check if collaboration is enabled and needed
+    if (state.get("enable_collaboration", False) and 
+        state.get("collaboration_systems") and
+        state.get("user_input", "").lower().find("complex") != -1):
+        return "role_bidding"
+    elif state.get("needs_planning", True):
+        return "planner"
+    else:
+        return "research_team"
+
+
+async def _role_bidding_node(state: State, config: RunnableConfig) -> State:
+    """Role bidding node for collaborative task assignment."""
+    try:
+        collaboration_systems = state.get("collaboration_systems")
+        if collaboration_systems and "role_bidding" in collaboration_systems:
+            role_bidding_system = collaboration_systems["role_bidding"]
+            
+            # Perform role bidding
+            user_input = state.get("user_input", "")
+            # Simplified role bidding logic
+            assigned_roles = await role_bidding_system.assign_roles(user_input)
+            
+            return {
+                **state,
+                "assigned_roles": assigned_roles,
+                "role_bidding_completed": True
+            }
+    except Exception as e:
+        logger.error(f"Role bidding failed: {e}")
+    
+    return state
+
+
+async def _conflict_resolution_node(state: State, config: RunnableConfig) -> State:
+    """Conflict resolution node for handling disagreements."""
+    try:
+        collaboration_systems = state.get("collaboration_systems")
+        if collaboration_systems and "conflict_resolution" in collaboration_systems:
+            conflict_system = collaboration_systems["conflict_resolution"]
+            
+            # Resolve conflicts if any
+            conflicts = state.get("conflicts", [])
+            if conflicts:
+                resolved_conflicts = await conflict_system.resolve_conflicts(conflicts)
+                return {
+                    **state,
+                    "resolved_conflicts": resolved_conflicts,
+                    "has_conflicts": False
+                }
+    except Exception as e:
+        logger.error(f"Conflict resolution failed: {e}")
+    
+    return {
+        **state,
+        "has_conflicts": False
+    }
+
+
 def build_graph_with_memory():
     """Build and return the agent workflow graph with memory."""
     # use persistent memory to save conversation history
@@ -106,10 +201,24 @@ def build_graph_with_memory():
     return builder.compile(checkpointer=memory)
 
 
+@cached(ttl=3600, priority=3)  # Cache graph for 1 hour with high priority
 def build_graph():
-    """Build and return the agent workflow graph without memory."""
-    # build state graph
+    """Build and return the agent workflow graph without memory with performance optimizations."""
+    logger.info("Building optimized workflow graph...")
+    
+    # build state graph with enhanced configuration
     builder = _build_base_graph()
+    
+    # Add conditional nodes for enhanced collaboration
+    if ENHANCED_FEATURES_AVAILABLE:
+        try:
+            builder.add_node("role_bidding", _role_bidding_node)
+            builder.add_node("conflict_resolution", _conflict_resolution_node)
+            logger.info("Added enhanced collaboration nodes")
+        except NameError:
+            logger.warning("Enhanced collaboration nodes not available")
+    
+    logger.info("Optimized workflow graph built successfully")
     return builder.compile()
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-并行执行和速率限制功能测试
+Parallel execution and rate limiting functionality tests
 """
 
 import asyncio
@@ -22,10 +22,10 @@ from src.config.parallel_config import (
 
 
 class TestTokenBucket:
-    """令牌桶测试"""
+    """Token bucket tests"""
     
     def test_token_bucket_initialization(self):
-        """测试令牌桶初始化"""
+        """Test token bucket initialization"""
         bucket = TokenBucket(capacity=10, refill_rate=1.0)
         assert bucket.capacity == 10
         assert bucket.tokens == 10
@@ -33,53 +33,53 @@ class TestTokenBucket:
     
     @pytest.mark.asyncio
     async def test_token_bucket_acquire_immediate(self):
-        """测试立即获取令牌"""
+        """Test immediate token acquisition"""
         bucket = TokenBucket(capacity=10, refill_rate=1.0)
         
-        # 应该立即获取到令牌
+        # Should acquire token immediately
         delay = await bucket.acquire(1)
         assert delay == 0.0
         assert bucket.tokens == 9
     
     @pytest.mark.asyncio
     async def test_token_bucket_acquire_with_delay(self):
-        """测试需要等待的令牌获取"""
+        """Test token acquisition with delay"""
         bucket = TokenBucket(capacity=2, refill_rate=1.0)
         
-        # 消耗所有令牌
+        # Consume all tokens
         await bucket.acquire(2)
         assert bucket.tokens == 0
         
-        # 下一次获取应该需要等待
+        # Next acquisition should require waiting
         start_time = time.time()
         delay = await bucket.acquire(1)
         end_time = time.time()
         
         assert delay > 0
-        assert end_time - start_time >= delay * 0.9  # 允许一些时间误差
+        assert end_time - start_time >= delay * 0.9  # Allow some time error
     
     @pytest.mark.asyncio
     async def test_token_bucket_refill(self):
-        """测试令牌补充"""
+        """Test token refill"""
         bucket = TokenBucket(capacity=5, refill_rate=2.0)
         
-        # 消耗所有令牌
+        # Consume all tokens
         await bucket.acquire(5)
         assert bucket.tokens == 0
         
-        # 等待一段时间让令牌补充
-        await asyncio.sleep(1.1)  # 稍微超过0.5秒（补充1个令牌的时间）
+        # Wait for tokens to refill
+        await asyncio.sleep(1.1)  # Slightly over 0.5 seconds (time to refill 1 token)
         
-        # 应该能够获取到补充的令牌
+        # Should be able to acquire refilled tokens
         delay = await bucket.acquire(1)
         assert delay == 0.0
 
 
 class TestRateLimiter:
-    """速率限制器测试"""
+    """Rate limiter tests"""
     
     def test_rate_limiter_initialization(self):
-        """测试速率限制器初始化"""
+        """Test rate limiter initialization"""
         config = RateLimitConfig(
             requests_per_minute=60,
             burst_capacity=10
@@ -91,20 +91,20 @@ class TestRateLimiter:
     
     @pytest.mark.asyncio
     async def test_rate_limiter_acquire(self):
-        """测试速率限制器获取许可"""
+        """Test rate limiter acquire permission"""
         config = RateLimitConfig(
             requests_per_minute=60,
             burst_capacity=5
         )
         limiter = RateLimiter(config)
         
-        # 前几次请求应该立即通过
+        # First few requests should pass immediately
         for _ in range(3):
             delay = await limiter.acquire()
             assert delay == 0.0
     
     def test_rate_limiter_record_success(self):
-        """测试记录成功"""
+        """Test record success"""
         config = RateLimitConfig()
         limiter = RateLimiter(config)
         
@@ -113,7 +113,7 @@ class TestRateLimiter:
         assert limiter.success_count == initial_success + 1
     
     def test_rate_limiter_record_failure(self):
-        """测试记录失败"""
+        """Test record failure"""
         config = RateLimitConfig()
         limiter = RateLimiter(config)
         
@@ -122,7 +122,7 @@ class TestRateLimiter:
         assert limiter.failure_count == initial_failure + 1
     
     def test_rate_limiter_get_stats(self):
-        """测试获取统计信息"""
+        """Test get statistics"""
         config = RateLimitConfig()
         limiter = RateLimiter(config)
         
@@ -139,10 +139,10 @@ class TestRateLimiter:
 
 
 class TestAdaptiveRateLimiter:
-    """自适应速率限制器测试"""
+    """Adaptive rate limiter tests"""
     
     def test_adaptive_rate_limiter_initialization(self):
-        """测试自适应速率限制器初始化"""
+        """Test adaptive rate limiter initialization"""
         config = RateLimitConfig(
             requests_per_minute=60,
             adaptive_adjustment=True
@@ -153,7 +153,7 @@ class TestAdaptiveRateLimiter:
         assert limiter.current_rpm == 60
     
     def test_adaptive_rate_limiter_adjust_on_failure(self):
-        """测试失败时的自适应调整"""
+        """Test adaptive adjustment on failure"""
         config = RateLimitConfig(
             requests_per_minute=60,
             adaptive_adjustment=True,
@@ -163,20 +163,20 @@ class TestAdaptiveRateLimiter:
         
         initial_rpm = limiter.current_rpm
         
-        # 记录多次失败
+        # Record multiple failures
         for _ in range(5):
             limiter.record_failure("Rate limit exceeded")
         
-        # 触发调整
+        # Trigger adjustment
         limiter._adjust_rate()
         
-        # 速率应该降低
+        # Rate should decrease
         assert limiter.current_rpm < initial_rpm
     
     def test_adaptive_rate_limiter_adjust_on_success(self):
-        """测试成功时的自适应调整"""
+        """Test adaptive adjustment on success"""
         config = RateLimitConfig(
-            requests_per_minute=30,  # 从较低的速率开始
+            requests_per_minute=30,  # Start with lower rate
             adaptive_adjustment=True,
             max_requests_per_minute=120
         )
@@ -184,22 +184,22 @@ class TestAdaptiveRateLimiter:
         
         initial_rpm = limiter.current_rpm
         
-        # 记录多次成功
+        # Record multiple successes
         for _ in range(20):
             limiter.record_success()
         
-        # 触发调整
+        # Trigger adjustment
         limiter._adjust_rate()
         
-        # 速率应该增加
+        # Rate should increase
         assert limiter.current_rpm >= initial_rpm
 
 
 class TestParallelTask:
-    """并行任务测试"""
+    """Parallel task tests"""
     
     def test_parallel_task_initialization(self):
-        """测试并行任务初始化"""
+        """Test parallel task initialization"""
         def dummy_func():
             return "test"
         
@@ -224,7 +224,7 @@ class TestParallelTask:
         assert task.dependencies == ["dep1", "dep2"]
     
     def test_parallel_task_default_values(self):
-        """测试并行任务默认值"""
+        """Test parallel task default values"""
         def dummy_func():
             return "test"
         
@@ -242,10 +242,10 @@ class TestParallelTask:
 
 
 class TestParallelExecutor:
-    """并行执行器测试"""
+    """Parallel executor tests"""
     
     def test_parallel_executor_initialization(self):
-        """测试并行执行器初始化"""
+        """Test parallel executor initialization"""
         executor = ParallelExecutor(
             max_concurrent_tasks=5,
             enable_adaptive_scheduling=True,
@@ -260,7 +260,7 @@ class TestParallelExecutor:
         assert len(executor.completed_tasks) == 0
     
     def test_add_task(self):
-        """测试添加任务"""
+        """Test add task"""
         executor = ParallelExecutor()
         
         def dummy_func():
@@ -278,7 +278,7 @@ class TestParallelExecutor:
         assert executor.total_tasks == 1
     
     def test_add_tasks(self):
-        """测试批量添加任务"""
+        """Test batch add tasks"""
         executor = ParallelExecutor()
         
         def dummy_func():
@@ -296,7 +296,7 @@ class TestParallelExecutor:
     
     @pytest.mark.asyncio
     async def test_execute_simple_task(self):
-        """测试执行简单任务"""
+        """Test execute simple task"""
         executor = ParallelExecutor(max_concurrent_tasks=1)
         
         async def simple_task(value):
@@ -319,7 +319,7 @@ class TestParallelExecutor:
     
     @pytest.mark.asyncio
     async def test_execute_multiple_tasks(self):
-        """测试执行多个任务"""
+        """Test execute multiple tasks"""
         executor = ParallelExecutor(max_concurrent_tasks=2)
         
         async def task_func(task_id):
@@ -347,7 +347,7 @@ class TestParallelExecutor:
     
     @pytest.mark.asyncio
     async def test_execute_with_dependencies(self):
-        """测试执行有依赖关系的任务"""
+        """Test execute tasks with dependencies"""
         executor = ParallelExecutor(max_concurrent_tasks=2)
         
         execution_order = []
@@ -381,13 +381,13 @@ class TestParallelExecutor:
         results = await executor.execute_all()
         
         assert len(results) == 3
-        # 检查执行顺序
+        # Check execution order
         assert execution_order.index("task-1") < execution_order.index("task-2")
         assert execution_order.index("task-2") < execution_order.index("task-3")
     
     @pytest.mark.asyncio
     async def test_execute_with_failure_and_retry(self):
-        """测试执行失败和重试"""
+        """Test execute with failure and retry"""
         executor = ParallelExecutor(max_concurrent_tasks=1)
         
         call_count = 0
@@ -395,7 +395,7 @@ class TestParallelExecutor:
         async def failing_task():
             nonlocal call_count
             call_count += 1
-            if call_count < 3:  # 前两次失败
+            if call_count < 3:  # First two times fail
                 raise Exception("Temporary failure")
             return "success"
         
@@ -412,24 +412,24 @@ class TestParallelExecutor:
         assert "failing-task" in results
         assert results["failing-task"].status == TaskStatus.COMPLETED
         assert results["failing-task"].result == "success"
-        assert results["failing-task"].retry_count == 2  # 重试了2次
-        assert call_count == 3  # 总共调用了3次
+        assert results["failing-task"].retry_count == 2  # Retried 2 times
+        assert call_count == 3  # Called 3 times total
     
     def test_get_stats(self):
-        """测试获取统计信息"""
+        """Test get statistics"""
         executor = ParallelExecutor()
         
         def dummy_func():
             return "test"
         
-        # 添加一些任务
+        # Add some tasks
         tasks = [
             ParallelTask(task_id=f"task-{i}", func=dummy_func)
             for i in range(3)
         ]
         executor.add_tasks(tasks)
         
-        # 模拟一些执行结果
+        # Mock some execution results
         executor.successful_tasks = 2
         executor.failed_tasks = 1
         
@@ -445,11 +445,11 @@ class TestParallelExecutor:
 
 
 class TestCreateParallelExecutor:
-    """测试并行执行器创建函数"""
+    """Test parallel executor creation function"""
     
     @patch('src.utils.parallel_executor.config_loader')
     def test_create_parallel_executor_with_config(self, mock_config_loader):
-        """测试从配置创建并行执行器"""
+        """Test create parallel executor from config"""
         mock_config_loader.load_config.return_value = {
             'max_parallel_tasks': 5
         }
@@ -461,7 +461,7 @@ class TestCreateParallelExecutor:
         assert executor.enable_adaptive_scheduling is True
     
     def test_create_parallel_executor_with_params(self):
-        """测试使用参数创建并行执行器"""
+        """Test create parallel executor with parameters"""
         executor = create_parallel_executor(
             max_concurrent_tasks=3,
             enable_rate_limiting=False,
@@ -474,10 +474,10 @@ class TestCreateParallelExecutor:
 
 
 class TestParallelConfig:
-    """测试并行配置"""
+    """Test parallel configuration"""
     
     def test_parallel_execution_config_from_env(self):
-        """测试从环境变量加载并行执行配置"""
+        """Test load parallel execution config from environment variables"""
         with patch.dict('os.environ', {
             'ENABLE_PARALLEL_EXECUTION': 'false',
             'MAX_PARALLEL_TASKS': '5',
@@ -490,7 +490,7 @@ class TestParallelConfig:
             assert config.task_timeout == 600.0
     
     def test_rate_limit_config_from_env(self):
-        """测试从环境变量加载速率限制配置"""
+        """Test load rate limit config from environment variables"""
         with patch.dict('os.environ', {
             'ENABLE_RATE_LIMITING': 'false',
             'REQUESTS_PER_MINUTE': '30',
@@ -503,7 +503,7 @@ class TestParallelConfig:
             assert config.burst_capacity == 5
     
     def test_combined_config_from_env(self):
-        """测试从环境变量加载组合配置"""
+        """Test load combined config from environment variables"""
         with patch.dict('os.environ', {
             'MAX_PARALLEL_TASKS': '4',
             'REQUESTS_PER_MINUTE': '40'
@@ -514,7 +514,7 @@ class TestParallelConfig:
             assert config.rate_limit.requests_per_minute == 40
     
     def test_combined_config_to_dict(self):
-        """测试组合配置转换为字典"""
+        """Test convert combined config to dictionary"""
         config = CombinedConfig.from_env()
         config_dict = config.to_dict()
         
@@ -528,39 +528,39 @@ class TestParallelConfig:
 
 @pytest.mark.integration
 class TestIntegration:
-    """集成测试"""
+    """Integration tests"""
     
     @pytest.mark.asyncio
     async def test_full_pipeline_with_rate_limiting(self):
-        """测试完整的并行执行和速率限制流水线"""
-        # 创建速率限制配置
+        """Test complete parallel execution and rate limiting pipeline"""
+        # Create rate limiting config
         rate_config = RateLimitConfig(
-            requests_per_minute=30,  # 较低的速率
+            requests_per_minute=30,  # Lower rate
             burst_capacity=3
         )
         
-        # 创建并行执行器
+        # Create parallel executor
         executor = ParallelExecutor(
             max_concurrent_tasks=2,
             rate_limiter=RateLimiter(rate_config),
-            enable_adaptive_scheduling=False  # 禁用自适应以便测试
+            enable_adaptive_scheduling=False  # Disable adaptive for testing
         )
         
         request_times = []
         
         async def rate_limited_task(task_id):
             request_times.append(time.time())
-            await asyncio.sleep(0.1)  # 模拟处理时间
+            await asyncio.sleep(0.1)  # Simulate processing time
             return f"result-{task_id}"
         
-        # 创建多个任务
+        # Create multiple tasks
         tasks = [
             ParallelTask(
                 task_id=f"task-{i}",
                 func=rate_limited_task,
                 args=(i,)
             )
-            for i in range(6)  # 6个任务，应该触发速率限制
+            for i in range(6)  # 6 tasks, should trigger rate limiting
         ]
         
         executor.add_tasks(tasks)
@@ -569,18 +569,18 @@ class TestIntegration:
         results = await executor.execute_all()
         end_time = time.time()
         
-        # 验证结果
+        # Verify results
         assert len(results) == 6
         assert all(r.status == TaskStatus.COMPLETED for r in results.values())
         
-        # 验证速率限制生效（执行时间应该比无限制时更长）
+        # Verify rate limiting is effective (execution time should be longer than unlimited)
         execution_time = end_time - start_time
-        assert execution_time > 1.0  # 由于速率限制，应该需要更长时间
+        assert execution_time > 1.0  # Should take longer due to rate limiting
         
-        # 验证请求时间间隔
+        # Verify request time intervals
         if len(request_times) > 1:
             intervals = [request_times[i] - request_times[i-1] for i in range(1, len(request_times))]
-            # 某些间隔应该大于最小间隔（由于速率限制）
+            # Some intervals should be greater than minimum interval (due to rate limiting)
             assert any(interval > 0.5 for interval in intervals)
 
 

@@ -39,8 +39,36 @@ BASIC_MODEL:
 CONTENT_PROCESSING:
   enable_smart_chunking: true          # Enable smart chunking
   enable_content_summarization: true   # Enable content summarization
+  enable_smart_filtering: true         # Enable LLM-based search result filtering
   chunk_strategy: "auto"               # Chunking strategy: auto, sentences, paragraphs
   summary_type: "comprehensive"        # Summary type: comprehensive, key_points, abstract
 
 # Search configuration
 max_search_results: 3  # Maximum number of search results
+
+# Parallel execution configuration
+PARALLEL_EXECUTION:
+  enable_parallel_execution: true      # Enable parallel execution
+  max_context_steps_parallel: 1        # Maximum context steps in parallel (reduced for token optimization)
+  disable_context_parallel: false      # Disable context sharing in parallel execution
+
+# Advanced context management configuration
+# These settings optimize token usage and prevent context length exceeded errors
+ADVANCED_CONTEXT_MANAGEMENT:
+  max_context_ratio: 0.6               # Use 60% of model limit for context
+  sliding_window_size: 5               # Number of recent interactions to keep
+  overlap_ratio: 0.2                   # Overlap between sliding windows (0.0-1.0)
+  compression_threshold: 0.8           # Trigger compression at 80% token capacity
+  default_strategy: "adaptive"         # Default compression strategy: adaptive, hierarchical, sliding_window, summarize, truncate, none
+  
+  # Priority weights for content importance
+  priority_weights:
+    critical: 1.0                      # System instructions, current task
+    high: 0.7                          # Recent interactions, key decisions
+    medium: 0.4                        # Historical context, background info
+    low: 0.1                           # Auxiliary information
+  
+  # Performance optimization settings
+  enable_caching: true                 # Cache compressed content for reuse
+  enable_analytics: true               # Track optimization statistics
+  debug_mode: false                    # Enable detailed debug logging

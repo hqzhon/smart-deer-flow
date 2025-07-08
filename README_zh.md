@@ -1,142 +1,118 @@
+<div align="center">
+
 # 🦌 SmartDeerFlow
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**AI 驱动的深度研究框架，支持多智能体协作**
+
 [English](./README.md) | [简体中文](./README_zh.md)
-> 源于开源，回馈开源。
 
-**SmartDeerFlow** 是一个社区驱动的深度研究框架，从 [DeerFlow](https://github.com/bytedance/deer-flow) fork 而来，将语言模型与专业工具（如网络搜索、爬虫和 Python 代码执行）相结合，同时通过**增强功能和优化**回馈开源社区。
+</div>
 
-目前，DeerFlow 已正式入驻[火山引擎的 FaaS 应用中心](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/market)，用户可通过[体验链接](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/market/deerflow/?channel=github&source=deerflow)进行在线体验，直观感受其强大功能与便捷操作；同时，为满足不同用户的部署需求，DeerFlow 支持基于火山引擎一键部署，点击[部署链接](https://console.volcengine.com/vefaas/region:vefaas+cn-beijing/application/create?templateId=683adf9e372daa0008aaed5c&channel=github&source=deerflow)即可快速完成部署流程，开启高效研究之旅。
+## 🌟 概述
 
-请访问[DeerFlow 的官方网站](https://deerflow.tech/)了解更多详情。
+**SmartDeerFlow** 是一个社区驱动的 AI 研究框架，从 [DeerFlow](https://github.com/bytedance/deer-flow) fork 而来并进行了增强。它将大型语言模型与专业工具（网络搜索、爬虫、代码执行）相结合，提供强大的研究和内容生成能力。
 
-## 演示
+### ✨ 核心亮点
 
-### 视频
+- 🤖 **多智能体协作** - 协调器、规划器、研究员和编码员的智能协作
+- ⚡ **性能优化** - 4-16 个工作进程的并行处理和智能调度
+- 🔍 **多源搜索** - Tavily、Brave、DuckDuckGo、ArXiv 集成
+- 📊 **丰富输出格式** - 研究报告、播客脚本、演示文稿
+- 🌐 **Web & 控制台界面** - 灵活的用户交互方式
+- 🔧 **可扩展架构** - MCP 协议支持和工具生态系统
 
-https://github.com/user-attachments/assets/f3786598-1f2a-4d07-919e-8b99dfa1de3e
-
-在此演示中，我们展示了如何使用 DeerFlow：
-
-- 无缝集成 MCP 服务
-- 进行深度研究过程并生成包含图像的综合报告
-- 基于生成的报告创建播客音频
-
-### 回放示例
-
-- [埃菲尔铁塔与最高建筑相比有多高？](https://deerflow.tech/chat?replay=eiffel-tower-vs-tallest-building)
-- [GitHub 上最热门的仓库有哪些？](https://deerflow.tech/chat?replay=github-top-trending-repo)
-- [撰写关于南京传统美食的文章](https://deerflow.tech/chat?replay=nanjing-traditional-dishes)
-- [如何装饰租赁公寓？](https://deerflow.tech/chat?replay=rental-apartment-decoration)
-- [访问我们的官方网站探索更多回放示例。](https://deerflow.tech/#case-studies)
+> **Fork 来源：** 本项目基于 ByteDance 的 [DeerFlow](https://github.com/bytedance/deer-flow) 开发，增加了性能优化、协作功能和用户体验改进。
 
 ---
 
 ## 📑 目录
 
-- [🚀 快速开始](#快速开始)
-- [🌟 特性](#特性)
-- [🏗️ 架构](#架构)
-- [🛠️ 开发](#开发)
-- [🗣️ 文本转语音集成](#文本转语音集成)
-- [📚 示例](#示例)
-- [❓ 常见问题](#常见问题)
-- [📜 许可证](#许可证)
-- [💖 致谢](#致谢)
-- [⭐ Star History](#star-History)
+- [🚀 快速开始](#-快速开始)
+- [⚡ 性能优化](#-性能优化)
+- [🌟 功能特性](#-功能特性)
+- [🏗️ 架构](#-架构)
+- [🛠️ 开发](#️-开发)
+- [🐳 Docker](#-docker)
+- [📚 示例](#-示例)
+- [🔧 命令行选项](#-命令行选项)
+- [❓ 常见问题](#-常见问题)
+- [📄 许可证](#-许可证)
+- [🙏 致谢](#-致谢)
 
-## 快速开始
+## 🚀 快速开始
 
-DeerFlow 使用 Python 开发，并配有用 Node.js 编写的 Web UI。为确保顺利的设置过程，我们推荐使用以下工具：
-
-### 推荐工具
-
-- **[`uv`](https://docs.astral.sh/uv/getting-started/installation/):**
-  简化 Python 环境和依赖管理。`uv`会自动在根目录创建虚拟环境并为您安装所有必需的包—无需手动安装 Python 环境。
-
-- **[`nvm`](https://github.com/nvm-sh/nvm):**
-  轻松管理多个 Node.js 运行时版本。
-
-- **[`pnpm`](https://pnpm.io/installation):**
-  安装和管理 Node.js 项目的依赖。
-
-### 环境要求
-
-确保您的系统满足以下最低要求：
-
-- **[Python](https://www.python.org/downloads/):** 版本 `3.12+`
-- **[Node.js](https://nodejs.org/en/download/):** 版本 `22+`
+### 先决条件
+- **Python 3.12+** 和 **Node.js 22+**
+- 推荐工具：[`uv`](https://docs.astral.sh/uv/) (Python) 和 [`pnpm`](https://pnpm.io/) (Node.js)
 
 ### 安装
 
+#### 1. 克隆和设置
 ```bash
-# 克隆仓库
-git clone https://github.com/bytedance/deer-flow.git
-cd deer-flow
+git clone https://github.com/hqzhon/smart-deer-flow.git
+cd smart-deer-flow
+uv sync  # 自动创建虚拟环境并安装依赖
+```
 
-# 安装依赖，uv将负责Python解释器和虚拟环境的创建，并安装所需的包
-uv sync
-
-# 使用您的API密钥配置.env
-# Tavily: https://app.tavily.com/home
-# Brave_SEARCH: https://brave.com/search/api/
-# 火山引擎TTS: 如果您有TTS凭证，请添加
+#### 2. 配置 API 密钥
+```bash
 cp .env.example .env
-
-# 查看下方的"支持的搜索引擎"和"文本转语音集成"部分了解所有可用选项
-
-# 为您的LLM模型和API密钥配置conf.yaml
-# 请参阅'docs/configuration_guide.md'获取更多详情
 cp conf.yaml.example conf.yaml
+# 编辑 .env 和 conf.yaml 文件，添加您的 API 密钥
+```
 
-# 安装marp用于PPT生成
-# https://github.com/marp-team/marp-cli?tab=readme-ov-file#use-package-manager
+#### 3. 可选：安装额外工具
+```bash
+# Web UI 依赖
+cd web && pnpm install
+
+# PPT 生成工具
 brew install marp-cli
 ```
 
-可选，通过[pnpm](https://pnpm.io/installation)安装 Web UI 依赖：
+### 使用方法
 
+#### 控制台模式（快速启动）
 ```bash
-cd deer-flow/web
-pnpm install
+uv run main.py "您的研究问题"
 ```
 
-### 配置
-
-请参阅[配置指南](docs/configuration_guide.md)获取更多详情。
-
-> [!注意]
-> 在启动项目之前，请仔细阅读指南，并更新配置以匹配您的特定设置和要求。
-
-### 控制台 UI
-
-运行项目的最快方法是使用控制台 UI。
-
+#### 交互模式
 ```bash
-# 在类bash的shell中运行项目
-uv run main.py
+uv run main.py --interactive
 ```
 
-### Web UI
-
-本项目还包括一个 Web UI，提供更加动态和引人入胜的交互体验。
-
-> [!注意]
-> 您需要先安装 Web UI 的依赖。
-
+#### Web UI 模式
 ```bash
-# 在开发模式下同时运行后端和前端服务器
-# 在macOS/Linux上
-./bootstrap.sh -d
-
-# 在Windows上
-bootstrap.bat -d
+./bootstrap.sh -d  # macOS/Linux
+bootstrap.bat -d   # Windows
+# 访问 http://localhost:3000
 ```
 
-打开浏览器并访问[`http://localhost:3000`](http://localhost:3000)探索 Web UI。
+📖 **配置指南：** [详细配置说明](docs/configuration_guide.md)
 
-在[`web`](./web/)目录中探索更多详情。
+## ⚡ 性能优化
+
+### 优化级别
+| 级别 | 工作进程 | 功能特性 |
+|------|----------|----------|
+| **基础** | 4 | 并行处理 |
+| **标准** | 8 | 速率限制、缓存 |
+| **高级** | 12 | 智能调度 |
+| **最大** | 16 | ML 驱动优化 |
+
+### 快速设置
+```bash
+# 启用性能模式
+cp .env.performance.example .env.performance
+export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
+python scripts/start_server.py --performance-mode performance
+```
+
+📖 **详细指南：** [性能优化](./README_PERFORMANCE.md) | [并行优化](./README_PARALLEL_OPTIMIZATION.md)
 
 ## 支持的搜索引擎
 
@@ -167,57 +143,37 @@ DeerFlow 支持多种搜索引擎，可以在`.env`文件中通过`SEARCH_API`�
 SEARCH_API=tavily
 ```
 
-## 特性
+## 🌟 功能特性
 
-### 核心能力
+### 🤖 AI & LLM 集成
+- **多智能体协作** - 基于 LangGraph 的专业化代理系统
+- **自适应研究策略** - 根据发现动态调整研究方向
+- **智能内容生成** - AI 驱动的高质量内容创作
+- **MCP 服务器支持** - 扩展模型上下文协议集成
 
-- 🤖 **LLM 集成**
-  - 通过[litellm](https://docs.litellm.ai/docs/providers)支持集成大多数模型
-  - 支持开源模型如 Qwen
-  - 兼容 OpenAI 的 API 接口
-  - 多层 LLM 系统适用于不同复杂度的任务
-  - **增强的图构建器，具有改进的错误处理和模型管理功能**
+### 🔍 研究与数据收集
+- **多源搜索引擎** - Tavily、Brave、Bing、Google、Serper、SearXNG
+- **并行信息检索** - 同时查询多个数据源
+- **智能过滤与排序** - 高质量信息筛选
+- **实时数据更新** - 获取最新信息
 
-### 工具和 MCP 集成
+### ⚡ 性能与优化
+- **并行处理架构** - 多线程异步执行
+- **智能负载均衡** - 资源优化分配
+- **缓存机制** - 提升响应速度
+- **可扩展设计** - 支持高并发场景
 
-- 🔍 **搜索和检索**
+### 📊 内容生成
+- **多格式输出** - Markdown、PDF、DOCX、PowerPoint
+- **模板系统** - 可自定义输出格式
+- **数据可视化** - 图表和图形生成
+- **引用管理** - 自动引用和参考文献
 
-  - 通过 Tavily、Brave Search 等进行网络搜索
-  - 使用 Jina 进行爬取
-  - 高级内容提取
-
-- 🔗 **MCP 无缝集成**
-  - 扩展私有域访问、知识图谱、网页浏览等能力
-  - 促进多样化研究工具和方法的集成
-
-### 并行执行
-
-- ⚡ **高级并行任务执行**
-  - **具有智能消息缓冲的高级并行任务执行**
-  - **并发操作的智能消息排序和视觉指示器**
-  - **具有可配置并行任务限制的优化性能**
-  - **增强的错误恢复和速率限制机制**
-
-### 人机协作
-
-- 🧠 **人在环中**
-
-  - 支持使用自然语言交互式修改研究计划
-  - 支持自动接受研究计划
-  - **具有共识机制和角色竞标的高级协作系统**
-  - **具有智能截断和摘要的增强内容处理**
-
-- 📝 **报告后期编辑**
-  - 支持类 Notion 的块编辑
-  - 允许 AI 优化，包括 AI 辅助润色、句子缩短和扩展
-  - 由[tiptap](https://tiptap.dev/)提供支持
-
-### 内容创作
-
-- 🎙️ **播客和演示文稿生成**
-  - AI 驱动的播客脚本生成和音频合成
-  - 自动创建简单的 PowerPoint 演示文稿
-  - 可定制模板以满足个性化内容需求
+### 👥 人机协作
+- **交互模式** - 实时协作和反馈
+- **人工干预** - 生成过程中的编辑控制
+- **质量审核** - 人工验证机制
+- **迭代优化** - 基于反馈的持续改进
 
 ## 架构
 
@@ -252,34 +208,31 @@ DeerFlow 实现了一个模块化的多智能体系统架构，专为自动化�
    - 处理和组织收集的信息
    - 生成全面的研究报告
 
-## 开发
+## 🛠️ 开发
 
-### 测试
-
-运行测试套件：
-
+### 快速命令
 ```bash
-# 运行所有测试
-make test
+# 测试
+uv run pytest --cov=deer_flow
 
-# 运行特定测试文件
-pytest tests/integration/test_workflow.py
+# 代码质量
+uv run ruff check --fix && uv run ruff format
 
-# 运行覆盖率测试
-make coverage
+# LangGraph Studio 调试
+langgraph dev  # 访问 http://localhost:2024
 ```
 
-### 代码质量
+## 🐳 Docker
 
+### 快速启动
 ```bash
-# 运行代码检查
-make lint
-
-# 格式化代码
-make format
+docker-compose up -d
+# 访问 http://localhost:3000
 ```
 
-### 使用 LangGraph Studio 进行调试
+**包含服务：** Web UI、API 后端、Redis 缓存
+
+### LangGraph Studio 调试
 
 DeerFlow 使用 LangGraph 作为其工作流架构。您可以使用 LangGraph Studio 实时调试和可视化工作流。
 
@@ -407,75 +360,28 @@ curl --location 'http://localhost:8000/api/tts' \
 --output speech.mp3
 ```
 
-## 示例
-
-以下示例展示了 DeerFlow 的功能：
-
-### 研究报告
-
-1. **OpenAI Sora 报告** - OpenAI 的 Sora AI 工具分析
-
-   - 讨论功能、访问方式、提示工程、限制和伦理考虑
-   - [查看完整报告](examples/openai_sora_report.md)
-
-2. **Google 的 Agent to Agent 协议报告** - Google 的 Agent to Agent (A2A)协议概述
-
-   - 讨论其在 AI 智能体通信中的作用及其与 Anthropic 的 Model Context Protocol (MCP)的关系
-   - [查看完整报告](examples/what_is_agent_to_agent_protocol.md)
-
-3. **什么是 MCP？** - 对"MCP"一词在多个上下文中的全面分析
-
-   - 探讨 AI 中的 Model Context Protocol、化学中的 Monocalcium Phosphate 和电子学中的 Micro-channel Plate
-   - [查看完整报告](examples/what_is_mcp.md)
-
-4. **比特币价格波动** - 最近比特币价格走势分析
-
-   - 研究市场趋势、监管影响和技术指标
-   - 基于历史数据提供建议
-   - [查看完整报告](examples/bitcoin_price_fluctuation.md)
-
-5. **什么是 LLM？** - 对大型语言模型的深入探索
-
-   - 讨论架构、训练、应用和伦理考虑
-   - [查看完整报告](examples/what_is_llm.md)
-
-6. **如何使用 Claude 进行深度研究？** - 在深度研究中使用 Claude 的最佳实践和工作流程
-
-   - 涵盖提示工程、数据分析和与其他工具的集成
-   - [查看完整报告](examples/how_to_use_claude_deep_research.md)
-
-7. **医疗保健中的 AI 采用：影响因素** - 影响医疗保健中 AI 采用的因素分析
-
-   - 讨论 AI 技术、数据质量、伦理考虑、经济评估、组织准备度和数字基础设施
-   - [查看完整报告](examples/AI_adoption_in_healthcare.md)
-
-8. **量子计算对密码学的影响** - 量子计算对密码学影响的分析
-
-   - 讨论经典密码学的漏洞、后量子密码学和抗量子密码解决方案
-   - [查看完整报告](examples/Quantum_Computing_Impact_on_Cryptography.md)
-
-9. **克里斯蒂亚诺·罗纳尔多的表现亮点** - 克里斯蒂亚诺·罗纳尔多表现亮点的分析
-   - 讨论他的职业成就、国际进球和在各种比赛中的表现
-   - [查看完整报告](examples/Cristiano_Ronaldo's_Performance_Highlights.md)
-
-要运行这些示例或创建您自己的研究报告，您可以使用以下命令：
+## 📚 示例
 
 ```bash
-# 使用特定查询运行
-uv run main.py "哪些因素正在影响医疗保健中的AI采用？"
+# 研究报告生成
+uv run main.py "人工智能在医疗保健中的影响"
 
-# 使用自定义规划参数运行
-uv run main.py --max_plan_iterations 3 "量子计算如何影响密码学？"
+# 性能模式
+uv run main.py "市场分析" --performance-mode advanced
 
-# 在交互模式下运行，带有内置问题
+# 交互会话
 uv run main.py --interactive
-
-# 或者使用基本交互提示运行
-uv run main.py
-
-# 查看所有可用选项
-uv run main.py --help
 ```
+
+## 🔧 命令行选项
+
+| 选项 | 描述 | 默认值 |
+|------|------|--------|
+| `--interactive` | 启用交互模式 | `false` |
+| `--performance-mode` | 性能级别 (basic/standard/advanced/max) | `standard` |
+| `--max-plan-iterations` | 最大规划迭代次数 | `3` |
+| `--human-in-the-loop` | 启用人工干预 | `false` |
+| `--output-format` | 输出格式 (markdown/pdf/docx/ppt) | `markdown` |
 
 ### 交互模式
 
@@ -529,33 +435,32 @@ DeerFlow 包含一个人在环中机制，允许您在执行研究计划前审�
 - **--max_step_num**：研究计划中的最大步骤数（默认：3）
 - **--debug**：启用详细调试日志
 
-## 常见问题
+## ❓ 常见问题
 
-请参阅[FAQ.md](docs/FAQ.md)获取更多详情。
+**Q: 如何配置 API 密钥？**  
+A: 复制 `.env.example` 和 `conf.yaml.example`，然后编辑添加您的 API 密钥。
 
-## 许可证
+**Q: 可以使用本地模型吗？**  
+A: 支持！通过 Ollama、vLLM、LM Studio 等本地推理服务。
 
-本项目是开源的，遵循[MIT 许可证](./LICENSE)。
+**Q: 如何优化性能？**  
+A: 启用并行处理、调整工作进程数、使用缓存和选择更快的模型。
 
-## 致谢
+**Q: 支持哪些搜索引擎？**  
+A: Tavily、Brave、Bing、Google、Serper、SearXNG 等多种搜索引擎。
 
-DeerFlow 建立在开源社区的杰出工作基础之上。我们深深感谢所有使 DeerFlow 成为可能的项目和贡献者。诚然，我们站在巨人的肩膀上。
+**Q: 如何贡献代码？**  
+A: Fork 仓库 → 创建分支 → 提交更改 → 发起 Pull Request。
 
-我们要向以下项目表达诚挚的感谢，感谢他们的宝贵贡献：
+## 📄 许可证
 
-- **[LangChain](https://github.com/langchain-ai/langchain)**：他们卓越的框架为我们的 LLM 交互和链提供动力，实现了无缝集成和功能。
-- **[LangGraph](https://github.com/langchain-ai/langgraph)**：他们在多智能体编排方面的创新方法对于实现 DeerFlow 复杂工作流至关重要。
+本项目采用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
 
-这些项目展示了开源协作的变革力量，我们很自豪能够在他们的基础上构建。
+## 🙏 致谢
 
-### 核心贡献者
-
-衷心感谢`DeerFlow`的核心作者，他们的愿景、热情和奉献使这个项目得以实现：
-
-- **[Daniel Walnut](https://github.com/hetaoBackend/)**
-- **[Henry Li](https://github.com/magiccube/)**
-
-您坚定不移的承诺和专业知识是 DeerFlow 成功的驱动力。我们很荣幸有您引领这一旅程。
+**核心依赖：** LangChain/LangGraph、Tavily、FastAPI、React/Next.js  
+**Fork 来源：** 基于 [DeerFlow](https://github.com/bytedance/deer-flow) 增强开发  
+**贡献者：** 感谢所有为项目做出贡献的开发者和用户
 
 ## Star History
 

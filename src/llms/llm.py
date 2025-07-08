@@ -13,14 +13,37 @@ from typing import get_args
 
 from src.config import load_yaml_config
 from src.config.agents import LLMType
+from src.utils.content_processor import ModelTokenLimits
 
 # Cache for LLM instances
 _llm_cache: dict[LLMType, ChatOpenAI] = {}
+
+# Global registry for model token limits
+_model_token_limits_registry: dict[str, ModelTokenLimits] = {}
 
 
 def _get_config_file_path() -> str:
     """Get the path to the configuration file."""
     return str((Path(__file__).parent.parent.parent / "conf.yaml").resolve())
+
+
+def _store_model_token_limits(model_name: str, token_limits: Dict[str, Any]) -> None:
+    """Store model token limits in global registry."""
+    try:
+        limits = ModelTokenLimits(
+            input_limit=token_limits.get("input_limit", 32000),
+            output_limit=token_limits.get("output_limit", 4096),
+            context_window=token_limits.get("context_window", 32000),
+            safety_margin=token_limits.get("safety_margin", 0.8)
+        )
+        _model_token_limits_registry[model_name] = limits
+    except Exception as e:
+        print(f"Warning: Failed to store token limits for model {model_name}: {e}")
+
+
+def get_model_token_limits_registry() -> dict[str, ModelTokenLimits]:
+    """Get the global model token limits registry."""
+    return _model_token_limits_registry.copy()
 
 
 def _get_llm_type_config_keys() -> dict[str, str]:
@@ -76,9 +99,13 @@ def _create_llm_use_conf(
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
     
-    # Remove token_limits as it's not a valid parameter for ChatOpenAI/ChatDeepSeek
+    # Store token_limits for ContentProcessor before removing from LLM config
     # token_limits is used by ContentProcessor for intelligent content processing
-    merged_conf.pop("token_limits", None)
+    token_limits = merged_conf.pop("token_limits", None)
+    
+    # Store token_limits in a global registry for ContentProcessor access
+    if token_limits and merged_conf.get("model"):
+        _store_model_token_limits(merged_conf["model"], token_limits)
 
     # Create custom HTTP client if SSL verification is disabled
     if not verify_ssl:
@@ -86,6 +113,10 @@ def _create_llm_use_conf(
         http_async_client = httpx.AsyncClient(verify=False)
         merged_conf["http_client"] = http_client
         merged_conf["http_async_client"] = http_async_client
+
+    # Rename 'model' to 'model_name' for LangChain compatibility
+    if "model" in merged_conf:
+        merged_conf["model_name"] = merged_conf.pop("model")
 
     return (
         ChatOpenAI(**merged_conf)

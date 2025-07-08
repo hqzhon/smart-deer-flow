@@ -44,7 +44,8 @@ def prompt_enhancer_node(state: PromptEnhancerState):
             model.invoke,
             messages,
             operation_name="Prompt Enhancer",
-            context="Enhancing user prompt"
+            context="Enhancing user prompt",
+            enable_context_evaluation=True
         )
 
         # Clean up the response - remove any extra formatting or comments

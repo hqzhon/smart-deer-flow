@@ -23,8 +23,9 @@ def prose_continue_node(state: ProseState):
     response = safe_llm_call(
         model.invoke,
         messages,
-        operation_name="Prose Continue Writer",
-        context="Continue prose content"
+        operation_name="Prose Continue",
+        context="Continuing prose content",
+        enable_context_evaluation=True
     )
     response_content = response.content if hasattr(response, 'content') else str(response)
     logger.info(f"prose_continue_node response: {response_content}")

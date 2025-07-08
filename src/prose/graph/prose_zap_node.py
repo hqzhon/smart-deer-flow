@@ -26,7 +26,8 @@ def prose_zap_node(state: ProseState):
             ),
         ],
         operation_name="Prose Zap",
-        context="Processing text with custom command"
+        context="Processing text with custom command",
+        enable_context_evaluation=True
     )
     logger.info(f"prose_content: {prose_content}")
     return {"output": prose_content.content}

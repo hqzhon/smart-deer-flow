@@ -19,13 +19,27 @@ from .i18n import Language, get_text
 class InteractiveReportConfig:
     """Configuration for interactive report generation"""
     output_dir: Optional[str] = None
-    filename_template: str = "interactive_report_{language}.html"
+    filename_template: str = "interactive_report_{language}_{timestamp}.html"
     auto_create_dirs: bool = True
     encoding: str = "utf-8"
+    use_timestamp: bool = True
     
-    def get_output_path(self, language: Language) -> str:
+    def get_output_path(self, language: Language, report_id: str = None) -> str:
         """Get the full output path for a given language"""
-        filename = self.filename_template.format(language=language.value)
+        from datetime import datetime
+        
+        # Prepare template variables
+        template_vars = {
+            'language': language.value,
+            'timestamp': datetime.now().strftime('%Y%m%d_%H%M%S'),
+            'report_id': report_id or f"report_{uuid.uuid4().hex[:8]}"
+        }
+        
+        # If timestamp is disabled, use simple template
+        if not self.use_timestamp:
+            filename = f"interactive_report_{language.value}.html"
+        else:
+            filename = self.filename_template.format(**template_vars)
         
         if self.output_dir:
             if self.auto_create_dirs:
@@ -109,7 +123,8 @@ class InteractiveElementGenerator:
         if self.language == Language.ZH_CN:
             return {
                 InteractiveElementType.CLICKABLE_CHART: [
-                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Images
+                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Standard markdown images
+                    r'!\s+https?://[^\s]+',  # New simple format: ! https://...
                     r'图\s*\d+',
                     r'图表\s*\d+',
                     r'chart|graph|plot'
@@ -136,7 +151,8 @@ class InteractiveElementGenerator:
         else:  # English
             return {
                 InteractiveElementType.CLICKABLE_CHART: [
-                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Images
+                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Standard markdown images
+                    r'!\s+https?://[^\s]+',  # New simple format: ! https://...
                     r'figure\s*\d+',
                     r'chart\s*\d+',
                     r'chart|graph|plot'
@@ -187,7 +203,7 @@ class InteractiveElementGenerator:
         """Extract chart elements"""
         elements = []
         
-        # Find image references
+        # Find standard markdown image references: ![alt](url)
         img_pattern = r'!\[(.*?)\]\((.*?)\)'
         matches = re.finditer(img_pattern, content)
         
@@ -212,6 +228,33 @@ class InteractiveElementGenerator:
                     }
                 )
                 elements.append(element)
+        
+        # Find new format image references: ! https://...
+        simple_img_pattern = r'!\s+(https?://[^\s]+)'
+        simple_matches = re.finditer(simple_img_pattern, content)
+        
+        for match in simple_matches:
+            img_path = match.group(1)
+            
+            # Extract filename or use URL as alt text
+            alt_text = self._extract_filename_from_url(img_path) or "Image"
+            
+            # Create element for simple format images (assume they could be charts)
+            element = InteractiveElement(
+                element_id=self._generate_element_id("chart"),
+                element_type=InteractiveElementType.CLICKABLE_CHART,
+                title=get_text(self.language, "interactive_elements", "clickable_chart_title").format(alt_text=alt_text),
+                description=get_text(self.language, "interactive_elements", "clickable_chart_description"),
+                target_content=img_path,
+                trigger_text=match.group(0),
+                metadata={
+                    "alt_text": alt_text,
+                    "image_path": img_path,
+                    "chart_type": self._detect_chart_type(alt_text),
+                    "format_type": "simple"
+                }
+            )
+            elements.append(element)
                 
         return elements
         
@@ -219,13 +262,21 @@ class InteractiveElementGenerator:
         """Extract table elements"""
         elements = []
         
+        # Remove code blocks to avoid false positives
+        content_without_code = re.sub(r'```.*?```', '', content, flags=re.DOTALL)
+        
         # Find Markdown tables
         table_pattern = r'(\|.*?\|.*?\n(?:\|.*?\|.*?\n)*)'
-        matches = re.finditer(table_pattern, content, re.MULTILINE)
+        matches = re.finditer(table_pattern, content_without_code, re.MULTILINE)
         
         for i, match in enumerate(matches):
             table_content = match.group(1)
             
+            # Additional validation: ensure it's a real table (has at least 2 rows)
+            lines = table_content.strip().split('\n')
+            if len(lines) < 2:
+                continue
+                
             element = InteractiveElement(
                 element_id=self._generate_element_id("table"),
                 element_type=InteractiveElementType.DYNAMIC_TABLE,
@@ -330,6 +381,19 @@ class InteractiveElementGenerator:
             return urlparse(url).netloc
         except:
             return "unknown"
+    
+    def _extract_filename_from_url(self, url: str) -> str:
+        """Extract filename from URL"""
+        try:
+            from urllib.parse import urlparse
+            path = urlparse(url).path
+            filename = path.split('/')[-1]
+            # Remove file extension for cleaner alt text
+            if '.' in filename:
+                filename = filename.rsplit('.', 1)[0]
+            return filename.replace('-', ' ').replace('_', ' ').title()
+        except:
+            return "Image"
 
 
 class ReportEnhancer:
@@ -394,11 +458,11 @@ class ReportEnhancer:
         # Determine output path
         if output_dir:
             # Use provided output_dir, override config
-            temp_config = InteractiveReportConfig(output_dir=output_dir)
-            output_file = temp_config.get_output_path(self.language)
+            temp_config = InteractiveReportConfig(output_dir=output_dir, use_timestamp=self.config.use_timestamp)
+            output_file = temp_config.get_output_path(self.language, interactive_report.report_id)
         else:
             # Use instance config
-            output_file = self.config.get_output_path(self.language)
+            output_file = self.config.get_output_path(self.language, interactive_report.report_id)
         
         # Save HTML file
         with open(output_file, 'w', encoding=self.config.encoding) as f:
@@ -489,11 +553,12 @@ class ReportEnhancer:
         """Generate navigation tree"""
         tree = {"sections": []}
         
-        # Extract heading levels
+        # Extract heading levels (支持1-6级标题)
         heading_pattern = r'^(#{1,6})\s+(.*?)$'
         matches = re.finditer(heading_pattern, content, re.MULTILINE)
         
         current_section = None
+        current_subsection = None
         
         for match in matches:
             level = len(match.group(1))
@@ -509,8 +574,19 @@ class ReportEnhancer:
             if level == 1:
                 tree["sections"].append(section)
                 current_section = section
+                current_subsection = None
             elif level == 2 and current_section:
                 current_section["subsections"].append(section)
+                current_subsection = section
+            elif level == 3 and current_subsection:
+                current_subsection["subsections"].append(section)
+            elif level == 4 and current_subsection and current_subsection["subsections"]:
+                # 四级标题作为三级标题的子项
+                if current_subsection["subsections"]:
+                    last_l3 = current_subsection["subsections"][-1]
+                    if "subsections" not in last_l3:
+                        last_l3["subsections"] = []
+                    last_l3["subsections"].append(section)
                 
         return tree
         
@@ -573,7 +649,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{{{TITLE}}}}</title>
+    <title>{{TITLE}}</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -729,7 +805,29 @@ class HTMLGenerator:
             margin: 0;
             font-family: 'Courier New', monospace;
         }
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(to right, #3498db, #2c3e50, #3498db);
+            margin: 30px 0;
+            border-radius: 1px;
+        }
+        .mermaid-diagram {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            overflow-x: auto;
+        }
+        .mermaid {
+            font-family: 'trebuchet ms', verdana, arial, sans-serif;
+            font-size: 16px;
+            fill: #333;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -749,11 +847,11 @@ class HTMLGenerator:
     <button class="sidebar-toggle" onclick="toggleSidebar()">📊</button>
     
     <div class="sidebar" id="sidebar">
-        <h3>{{{{DATA_SOURCES_TITLE}}}}</h3>
-        {{{{DATA_SOURCES}}}}
+        <h3>{{DATA_SOURCES_TITLE}}</h3>
+        {{DATA_SOURCES}}
         
-        <h3>{{{{CODE_BLOCKS_TITLE}}}}</h3>
-        {{{{CODE_BLOCKS}}}}
+        <h3>{{CODE_BLOCKS_TITLE}}</h3>
+        {{CODE_BLOCKS}}
     </div>
     
     <div class="modal" id="modal">
@@ -764,6 +862,17 @@ class HTMLGenerator:
     </div>
     
     <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+        
         {{INTERACTIVE_ELEMENTS}}
         
         function toggleSidebar() {
@@ -818,10 +927,19 @@ class HTMLGenerator:
         """Convert Markdown to HTML (simplified version)"""
         html = markdown
         
-        # Headers
+        # Horizontal rules (分割线)
+        html = re.sub(r'^---+\s*$', r'<hr>', html, flags=re.MULTILINE)
+        
+        # Headers (支持1-6级标题)
+        html = re.sub(r'^###### (.*?)$', r'<h6>\1</h6>', html, flags=re.MULTILINE)
+        html = re.sub(r'^##### (.*?)$', r'<h5>\1</h5>', html, flags=re.MULTILINE)
+        html = re.sub(r'^#### (.*?)$', r'<h4>\1</h4>', html, flags=re.MULTILINE)
         html = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
         html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
         html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+        
+        # Lists (支持-号列表)
+        html = self._convert_lists_to_html(html)
         
         # Links
         html = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" target="_blank">\1</a>', html)
@@ -836,12 +954,57 @@ class HTMLGenerator:
         # Tables
         html = self._convert_tables_to_html(html)
         
-        # Code blocks
-        html = re.sub(r'```(\w+)?\n(.*?)\n```', 
-                     r'<div class="code-block"><pre><code>\2</code></pre></div>', 
-                     html, flags=re.DOTALL)
+        # Code blocks and Mermaid diagrams
+        html = self._convert_code_blocks_to_html(html)
         
         return html
+        
+    def _convert_lists_to_html(self, content: str) -> str:
+        """Convert Markdown lists to HTML"""
+        lines = content.split('\n')
+        result = []
+        in_list = False
+        list_level = 0
+        
+        for line in lines:
+            # 检测列表项 (支持 - 和 * 开头的列表)
+            list_match = re.match(r'^(\s*)[-*]\s+(.*)', line)
+            
+            if list_match:
+                indent = len(list_match.group(1))
+                content = list_match.group(2)
+                current_level = indent // 2  # 假设每级缩进2个空格
+                
+                if not in_list:
+                    result.append('<ul>')
+                    in_list = True
+                    list_level = current_level
+                elif current_level > list_level:
+                    # 嵌套列表
+                    result.append('<ul>')
+                    list_level = current_level
+                elif current_level < list_level:
+                    # 结束嵌套
+                    for _ in range(list_level - current_level):
+                        result.append('</ul>')
+                    list_level = current_level
+                
+                result.append(f'<li>{content}</li>')
+            else:
+                if in_list:
+                    # 结束列表
+                    for _ in range(list_level + 1):
+                        result.append('</ul>')
+                    in_list = False
+                    list_level = 0
+                result.append(line)
+        
+        # 如果文件结束时还在列表中，关闭列表
+        if in_list:
+            for _ in range(list_level + 1):
+                result.append('</ul>')
+        
+        return '\n'.join(result)
         
     def _convert_tables_to_html(self, content: str) -> str:
         """Convert Markdown tables to HTML"""
@@ -879,6 +1042,29 @@ class HTMLGenerator:
             return html
             
         return re.sub(table_pattern, convert_table, content, flags=re.MULTILINE)
+        
+    def _convert_code_blocks_to_html(self, content: str) -> str:
+        """Convert code blocks and Mermaid diagrams to HTML"""
+        def convert_code_block(match):
+            language = match.group(1) or "text"
+            code_content = match.group(2).strip()
+            
+            # Check if it's a Mermaid diagram
+            if language.lower() == "mermaid" or code_content.strip().startswith(("graph TD", "graph LR", "graph TB", "graph RL", "flowchart TD", "flowchart LR", "sequenceDiagram", "classDiagram", "stateDiagram", "erDiagram", "journey", "gantt", "pie")):
+                # Generate unique ID for the diagram
+                diagram_id = f"mermaid-{hashlib.md5(code_content.encode()).hexdigest()[:8]}"
+                return f'''
+<div class="mermaid-diagram" id="{diagram_id}">
+    <div class="mermaid">{code_content}</div>
+</div>
+'''
+            else:
+                # Regular code block
+                return f'<div class="code-block"><pre><code class="language-{language}">{code_content}</code></pre></div>'
+        
+        # Convert code blocks
+        html = re.sub(r'```(\w+)?\n(.*?)\n```', convert_code_block, content, flags=re.DOTALL)
+        return html
         
     def _generate_navigation_html(self, nav_tree: Dict[str, Any]) -> str:
         """Generate navigation HTML"""
@@ -981,11 +1167,26 @@ def demo_interactive_report(language: Language = Language.ZH_CN, output_dir: str
 
 本报告分析了公司2023年的财务表现，包括收入增长、成本控制和盈利能力等关键指标。
 
+---
+
 ### 主要发现
 
 - 总收入同比增长15%
 - 净利润率提升至12.5%
 - 运营成本有效控制
+  - 人力成本控制在预算内
+  - 营销费用优化20%
+  - 办公成本降低8%
+
+#### 关键指标详情
+
+具体的关键绩效指标如下：
+
+- ROI提升至18%
+- 客户满意度达到95%
+- 员工留存率保持在92%
+
+---
 
 ## 详细分析
 
@@ -993,12 +1194,30 @@ def demo_interactive_report(language: Language = Language.ZH_CN, output_dir: str
 
 ![收入趋势图](revenue_chart.png "2023年月度收入趋势")
 
+#### 季度收入对比
+
+各季度收入表现如下：
+
 | 季度 | 收入(万元) | 增长率 |
 |------|------------|--------|
 | Q1   | 1200       | 10%    |
 | Q2   | 1350       | 15%    |
 | Q3   | 1480       | 18%    |
 | Q4   | 1620       | 20%    |
+
+#### 收入构成分析
+
+收入主要来源包括：
+
+- 产品销售收入
+  - 核心产品A：占比45%
+  - 新产品B：占比30%
+  - 其他产品：占比25%
+- 服务收入
+  - 技术支持：占比60%
+  - 咨询服务：占比40%
+
+---
 
 ### 技术实现
 
@@ -1017,13 +1236,38 @@ plt.title('季度收入趋势')
 plt.show()
 ```
 
+---
+
 ### 数据源
 
 详细数据来源请参考：[财务系统报表](https://finance.company.com/reports)
 
+---
+
 ## 结论
 
 基于以上分析，公司在2023年表现优异，建议继续保持当前增长策略。
+
+### 建议措施
+
+- 继续投资核心产品研发
+- 扩大市场营销投入
+- 优化运营流程
+  - 自动化关键业务流程
+  - 提升数据分析能力
+  - 加强团队协作
+
+#### 短期目标
+
+- Q1目标：收入增长12%
+- Q2目标：新产品上线
+- Q3目标：市场份额提升5%
+
+#### 长期规划
+
+- 2024年：进入新市场
+- 2025年：实现IPO准备
+- 2026年：国际化扩张
 '''
     
     # Generate interactive report
@@ -1039,12 +1283,9 @@ plt.show()
     # Generate HTML
     html_content = html_generator.generate_interactive_html(interactive_report)
     
-    # Prepare output path
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(output_dir, f"interactive_report_{language.value}.html")
-    else:
-        output_file = f"interactive_report_{language.value}.html"
+    # Prepare output path using config
+    config = InteractiveReportConfig(output_dir=output_dir)
+    output_file = config.get_output_path(language, interactive_report.report_id)
     
     # Save HTML file
     with open(output_file, 'w', encoding='utf-8') as f:

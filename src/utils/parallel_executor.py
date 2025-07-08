@@ -135,8 +135,8 @@ class ParallelExecutor:
             # Brief rest to avoid busy waiting
             await asyncio.sleep(0.01)
         
-        execution_time = time.time() - start_time
-        self._log_execution_summary(execution_time)
+        total_execution_time = time.time() - start_time
+        self._log_execution_summary(total_execution_time)
         
         return self.completed_tasks.copy()
     
@@ -334,11 +334,11 @@ class ParallelExecutor:
         
         self.last_adjustment = now
     
-    def _log_execution_summary(self, execution_time: float):
+    def _log_execution_summary(self, total_execution_time: float):
         """Log execution summary"""
         rate_limiter_stats = self.rate_limiter.get_stats() if self.rate_limiter else {}
         
-        logger.info(f"Parallel execution completed in {execution_time:.2f}s")
+        logger.info(f"Parallel execution completed in {total_execution_time:.2f}s")
         logger.info(f"Tasks: {self.total_tasks} total, {self.successful_tasks} successful, {self.failed_tasks} failed")
         
         # Safely get rate limiting statistics

@@ -5,6 +5,8 @@ import asyncio
 import json
 import logging
 import os
+import time
+import traceback
 from typing import Annotated, Literal, Optional, List, Dict, Any, Set
 from concurrent.futures import ThreadPoolExecutor
 
@@ -30,31 +32,104 @@ from src.llms.error_handler import safe_llm_call, safe_llm_call_async, handle_ll
 from src.prompts.planner_model import Plan, Step, StepType
 
 
-def check_and_truncate_messages(messages, max_messages=50, model_name="deepseek-chat", max_tokens=None):
-    """Check and truncate messages to prevent excessive input length.
+def check_and_truncate_messages(messages, max_messages=50, model_name="deepseek-chat", max_tokens=None, aggressive_mode=False):
+    """Check and truncate messages to prevent excessive input length with enhanced strategies.
     
     Args:
-        messages: List of messages to check
+        messages: List of messages to check (can be strings or message objects)
         max_messages: Maximum number of messages (fallback)
         model_name: Model name for token limit lookup
         max_tokens: Override token limit
+        aggressive_mode: Enable more aggressive truncation for tight budgets
     """
     if not messages:
         return messages
+    
+    # Convert string inputs to simple message objects for consistent processing
+    processed_messages = []
+    for msg in messages:
+        if isinstance(msg, str):
+            # Create a simple object with content attribute
+            class SimpleMessage:
+                def __init__(self, content):
+                    self.content = content
+                def __str__(self):
+                    return self.content
+            processed_messages.append(SimpleMessage(msg))
+        else:
+            processed_messages.append(msg)
+    
+    # Use processed_messages for the rest of the function
+    messages = processed_messages
     
     # Try to use token-based truncation if content processor is available
     try:
         from src.utils.content_processor import ContentProcessor
         from src.config.configuration import Configuration
+        from src.config.config_loader import config_loader
         
         # Get current configuration for model limits
         config = Configuration.get_current()
-        if config and hasattr(config, 'model_token_limits'):
-            processor = ContentProcessor(config.model_token_limits)
+        model_token_limits = None
+        
+        if config and hasattr(config, 'model_token_limits') and config.model_token_limits:
+            model_token_limits = config.model_token_limits
+            logger.debug(f"Using model_token_limits from current config: {list(model_token_limits.keys())}")
+        else:
+            # Fallback: load directly from config file
+            try:
+                config_data = config_loader.load_config()
+                # Build model_token_limits from BASIC_MODEL and REASONING_MODEL configurations
+                model_token_limits = {}
+                
+                # Import ModelTokenLimits for proper object creation
+                from src.utils.content_processor import ModelTokenLimits
+                
+                # Extract token limits from BASIC_MODEL
+                basic_model = config_data.get('BASIC_MODEL', {})
+                if basic_model.get('token_limits'):
+                    basic_model_name = basic_model.get('model', 'deepseek-chat')
+                    basic_limits = basic_model['token_limits']
+                    model_token_limits[basic_model_name] = ModelTokenLimits(
+                        input_limit=basic_limits.get('input_limit', 65536),
+                        output_limit=basic_limits.get('output_limit', 8192),
+                        context_window=basic_limits.get('context_window', 65536),
+                        safety_margin=basic_limits.get('safety_margin', 0.8)
+                    )
+                    logger.debug(f"Added BASIC_MODEL token limits for {basic_model_name}: {model_token_limits[basic_model_name]}")
+                
+                # Extract token limits from REASONING_MODEL
+                reasoning_model = config_data.get('REASONING_MODEL', {})
+                if reasoning_model.get('token_limits'):
+                    reasoning_model_name = reasoning_model.get('model', 'deepseek-reasoner')
+                    reasoning_limits = reasoning_model['token_limits']
+                    model_token_limits[reasoning_model_name] = ModelTokenLimits(
+                        input_limit=reasoning_limits.get('input_limit', 65536),
+                        output_limit=reasoning_limits.get('output_limit', 8192),
+                        context_window=reasoning_limits.get('context_window', 65536),
+                        safety_margin=reasoning_limits.get('safety_margin', 0.8)
+                    )
+                    logger.debug(f"Added REASONING_MODEL token limits for {reasoning_model_name}: {model_token_limits[reasoning_model_name]}")
+                
+                logger.info(f"Built model_token_limits from config file: {list(model_token_limits.keys())}")
+            except Exception as e:
+                logger.warning(f"Failed to load model_token_limits from config file: {e}")
+                logger.warning(f"Full traceback: {traceback.format_exc()}")
+                model_token_limits = {}
+        
+        if model_token_limits:
+            processor = ContentProcessor(model_token_limits)
             limits = processor.get_model_limits(model_name)
             
             # Use provided max_tokens or calculate from model limits
-            token_limit = max_tokens or int(limits.safe_input_limit * 0.7)  # Reserve 30% for other context
+            if max_tokens is not None:
+                token_limit = max_tokens
+                # Enable aggressive mode for very tight budgets
+                if max_tokens < 2000:
+                    aggressive_mode = True
+                    logger.info(f"Enabling aggressive mode due to tight budget: {max_tokens}")
+            else:
+                token_limit = int(limits.safe_input_limit * 0.7)  # Reserve 30% for other context
             
             # Calculate total tokens
             total_tokens = 0
@@ -66,16 +141,35 @@ def check_and_truncate_messages(messages, max_messages=50, model_name="deepseek-
             if total_tokens <= token_limit:
                 return messages
             
-            # Token-based truncation: keep first and last messages, truncate middle
+            logger.warning(f"Messages exceed token limit: {total_tokens} > {token_limit}, applying {'aggressive' if aggressive_mode else 'standard'} truncation")
+            
+            # Apply truncation strategy based on mode
+            if aggressive_mode:
+                # Aggressive mode: Keep only essential messages
+                return _apply_aggressive_truncation(messages, processor, token_limit, model_name)
+            
+            # Standard token-based truncation: keep first and last messages, truncate middle
             if len(messages) <= 2:
                 # If only 1-2 messages, truncate content of the longest one
                 if len(messages) == 1:
                     content = messages[0].content if hasattr(messages[0], 'content') else str(messages[0])
                     if processor.estimate_tokens(content) > token_limit:
-                        # Truncate content to fit
-                        chunks = processor.smart_chunk_content(content, model_name)
+                        # Use aggressive chunking for extremely long content
+                        if processor.estimate_tokens(content) > token_limit * 2:
+                            logger.warning(f"Content extremely long ({processor.estimate_tokens(content)} tokens), using aggressive chunking")
+                            chunks = processor.smart_chunk_content(content, model_name, "aggressive")
+                        else:
+                            chunks = processor.smart_chunk_content(content, model_name)
+                        
                         if chunks:
                             truncated_content = chunks[0]  # Take first chunk
+                            # Double-check the chunk size and further truncate if needed
+                            if processor.estimate_tokens(truncated_content) > token_limit:
+                                # Emergency truncation: use character-based limit
+                                char_limit = int(token_limit * 3)  # Rough estimate: 1 token ≈ 3-4 characters
+                                truncated_content = truncated_content[:char_limit]
+                                logger.warning(f"Applied emergency character-based truncation to {char_limit} characters")
+                            
                             if hasattr(messages[0], 'content'):
                                 messages[0].content = truncated_content + "\n\n[Content truncated to fit token limit]"
                 return messages
@@ -86,13 +180,33 @@ def check_and_truncate_messages(messages, max_messages=50, model_name="deepseek-
             middle_msgs = messages[1:-1]
             
             # Calculate tokens for first and last messages
-            first_tokens = processor.estimate_tokens(first_msg.content if hasattr(first_msg, 'content') else str(first_msg))
-            last_tokens = processor.estimate_tokens(last_msg.content if hasattr(last_msg, 'content') else str(last_msg))
+            first_content = first_msg.content if hasattr(first_msg, 'content') else str(first_msg)
+            last_content = last_msg.content if hasattr(last_msg, 'content') else str(last_msg)
+            first_tokens = processor.estimate_tokens(first_content)
+            last_tokens = processor.estimate_tokens(last_content)
+            
+            # If first or last message is extremely long, truncate it
+            if first_tokens > token_limit // 2:
+                logger.warning(f"First message too long ({first_tokens} tokens), truncating")
+                if processor.estimate_tokens(first_content) > token_limit:
+                    chunks = processor.smart_chunk_content(first_content, model_name, "aggressive")
+                    if chunks and hasattr(first_msg, 'content'):
+                        first_msg.content = chunks[0] + "\n\n[First message truncated]"
+                        first_tokens = processor.estimate_tokens(first_msg.content)
+            
+            if last_tokens > token_limit // 2:
+                logger.warning(f"Last message too long ({last_tokens} tokens), truncating")
+                if processor.estimate_tokens(last_content) > token_limit:
+                    chunks = processor.smart_chunk_content(last_content, model_name, "aggressive")
+                    if chunks and hasattr(last_msg, 'content'):
+                        last_msg.content = chunks[0] + "\n\n[Last message truncated]"
+                        last_tokens = processor.estimate_tokens(last_msg.content)
             
             remaining_tokens = token_limit - first_tokens - last_tokens
             
             if remaining_tokens <= 0:
-                # If first and last messages exceed limit, truncate them
+                # If first and last messages still exceed limit, return minimal versions
+                logger.warning("First and last messages exceed token limit even after truncation")
                 return [first_msg, last_msg]
             
             # Select middle messages that fit in remaining tokens
@@ -121,6 +235,7 @@ def check_and_truncate_messages(messages, max_messages=50, model_name="deepseek-
             
     except Exception as e:
         logger.warning(f"Token-based truncation failed, falling back to message count: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
     
     # Fallback to original message count-based truncation
     if len(messages) > max_messages:
@@ -137,6 +252,148 @@ from .types import State
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_aggressive_truncation(messages, processor, token_limit, model_name):
+    """Apply aggressive truncation strategy for tight token budgets.
+    
+    Args:
+        messages: List of messages to truncate
+        processor: ContentProcessor instance
+        token_limit: Maximum token limit
+        model_name: Model name for processing
+        
+    Returns:
+        Aggressively truncated list of messages
+    """
+    if not messages:
+        return messages
+    
+    logger.info(f"Applying aggressive truncation with limit: {token_limit}")
+    
+    # Strategy: Keep only the most essential messages
+    result_messages = []
+    
+    # Handle single message case first
+    if len(messages) == 1:
+        msg = messages[0]
+        content = msg.content if hasattr(msg, 'content') else str(msg)
+        msg_tokens = processor.estimate_tokens(content)
+        
+        if msg_tokens <= token_limit:
+            return messages
+        
+        # Aggressive content truncation for single message
+        logger.warning(f"Single message too long ({msg_tokens} tokens), applying aggressive truncation")
+        max_chars = int(token_limit * 2.5)  # Conservative char estimate
+        
+        # Always truncate if we exceed token limit, regardless of char length
+        if max_chars > 200:
+            # Keep first 1/3 and last 2/3 of available space
+            keep_start = max_chars // 3
+            keep_end = max_chars - keep_start - 50  # Reserve for truncation marker
+            
+            if keep_end > 0 and len(content) > max_chars:
+                truncated_content = (
+                    content[:keep_start] + 
+                    "\n\n...[content aggressively truncated]...\n\n" + 
+                    content[-keep_end:]
+                )
+            else:
+                # Simple truncation for shorter content or when keep_end <= 0
+                truncated_content = content[:max_chars] + "\n\n[truncated]"
+        else:
+            truncated_content = content[:max_chars] + "\n\n[truncated]"
+        
+        if hasattr(msg, 'content'):
+            msg.content = truncated_content
+        
+        logger.info(f"Single message truncated: {len(content)} -> {len(truncated_content)} chars")
+        return [msg]
+    
+    # Always preserve system message if it exists and is reasonable size
+    if messages and hasattr(messages[0], 'content'):
+        first_content = messages[0].content if hasattr(messages[0], 'content') else str(messages[0])
+        if 'system' in str(messages[0]).lower() or len(first_content) < 500:
+            first_tokens = processor.estimate_tokens(first_content)
+            if first_tokens < token_limit * 0.3:  # System message shouldn't take more than 30%
+                result_messages.append(messages[0])
+            else:
+                # Truncate system message aggressively
+                char_limit = int(token_limit * 0.3 * 2.5)  # Conservative char estimate
+                truncated_content = first_content[:char_limit] + "...[system message truncated]"
+                if hasattr(messages[0], 'content'):
+                    messages[0].content = truncated_content
+                result_messages.append(messages[0])
+    
+    # Calculate remaining budget
+    used_tokens = sum(processor.estimate_tokens(
+        msg.content if hasattr(msg, 'content') else str(msg)
+    ) for msg in result_messages)
+    remaining_budget = token_limit - used_tokens
+    
+    if remaining_budget <= 100:
+        logger.warning(f"Very tight budget after system message: {remaining_budget}")
+        return result_messages
+    
+    # Keep only the most recent user message and assistant response
+    recent_messages = []
+    
+    # Look for the last user-assistant pair
+    for i in range(len(messages) - 1, -1, -1):
+        if len(recent_messages) >= 2:  # Already have a pair
+            break
+        
+        msg = messages[i]
+        if msg not in result_messages:  # Don't duplicate system message
+            recent_messages.insert(0, msg)
+    
+    # Process recent messages with aggressive content truncation
+    for msg in recent_messages:
+        content = msg.content if hasattr(msg, 'content') else str(msg)
+        msg_tokens = processor.estimate_tokens(content)
+        
+        if msg_tokens <= remaining_budget:
+            result_messages.append(msg)
+            remaining_budget -= msg_tokens
+        else:
+            # Aggressive content truncation
+            if remaining_budget > 50:
+                # Smart truncation: keep beginning and end
+                max_chars = int(remaining_budget * 2.5)  # Conservative estimate
+                
+                if len(content) > max_chars:
+                    if max_chars > 100:
+                        # Keep first 1/3 and last 2/3 of available space
+                        keep_start = max_chars // 3
+                        keep_end = max_chars - keep_start - 30  # Reserve for truncation marker
+                        
+                        if keep_end > 0:
+                            truncated_content = (
+                                content[:keep_start] + 
+                                "...[content aggressively truncated]..." + 
+                                content[-keep_end:]
+                            )
+                        else:
+                            truncated_content = content[:max_chars] + "...[truncated]"
+                    else:
+                        truncated_content = content[:max_chars] + "...[truncated]"
+                else:
+                    truncated_content = content
+                
+                if hasattr(msg, 'content'):
+                    msg.content = truncated_content
+                result_messages.append(msg)
+                break  # Only process one more message in aggressive mode
+    
+    # Final verification
+    final_tokens = sum(processor.estimate_tokens(
+        msg.content if hasattr(msg, 'content') else str(msg)
+    ) for msg in result_messages)
+    
+    logger.info(f"Aggressive truncation complete: {len(result_messages)} messages, {final_tokens}/{token_limit} tokens")
+    
+    return result_messages
 
 
 @tool
@@ -177,8 +434,8 @@ def background_investigation_node(state: State, config: RunnableConfig):
         ).invoke(query)
         raw_results = json.dumps(background_investigation_results, ensure_ascii=False)
     
-    # if enable smart chunking or summarization, process the content
-    if configurable.enable_smart_chunking or configurable.enable_content_summarization:
+    # Smart content processing is always enabled (smart chunking, summarization, and smart filtering)
+    if True:  # Always process content with smart features
         try:
             from src.utils.content_processor import ContentProcessor
             from src.llms.llm import get_llm_by_type
@@ -186,13 +443,67 @@ def background_investigation_node(state: State, config: RunnableConfig):
             processor = ContentProcessor(configurable.model_token_limits)
             
             # get the current llm model name
-            current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
-            model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', 'unknown'))
+            model_name = 'unknown'
+            try:
+                current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
+                model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', 'unknown'))
+            except Exception as e:
+                logger.warning(f"Failed to get LLM instance, trying to get model name from config: {e}")
+                logger.warning(f"Full traceback: {traceback.format_exc()}")
+                try:
+                    from src.config.config_loader import config_loader
+                    config_data = config_loader.load_config()
+                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
+                    
+                    if agent_model == "basic":
+                        basic_config = config_data.get("BASIC_MODEL", {})
+                        model_name = basic_config.get("model", "deepseek-chat")
+                    elif agent_model == "reasoning":
+                        reasoning_config = config_data.get("REASONING_MODEL", {})
+                        model_name = reasoning_config.get("model", "deepseek-reasoner")
+                    
+                    logger.debug(f"Retrieved model name from config for planner: {model_name}")
+                    # Create a minimal LLM instance for processing
+                    current_llm = get_llm_by_type("basic")  # Fallback to basic model
+                except Exception as config_e:
+                    logger.error(f"Failed to get model name from config: {config_e}")
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
+                    model_name = "deepseek-chat"  # Final fallback
+                    current_llm = get_llm_by_type("basic")  # Fallback to basic model
             
             # Check if the content exceeds the token limit
-            if processor.estimate_tokens(raw_results) > processor.get_model_limits(model_name).safe_input_limit:
-                logger.info("Search results exceed token limit, applying smart processing")
+            model_limits = processor.get_model_limits(model_name)
+            current_tokens = processor.estimate_tokens(raw_results)
+            token_limit_exceeded = current_tokens > model_limits.safe_input_limit
+            
+            # Use SearchResultFilter to determine if smart filtering should be enabled
+            enable_smart_filtering = getattr(configurable, 'enable_smart_filtering', True)
+            should_use_smart_filtering = False
+            
+            if enable_smart_filtering and isinstance(searched_content, list):
+                from src.utils.search_result_filter import SearchResultFilter
+                filter_instance = SearchResultFilter(processor)
+                should_use_smart_filtering = filter_instance.should_enable_smart_filtering(searched_content, model_name)
+                smart_filtering_threshold = filter_instance.get_smart_filtering_threshold(model_name)
+            
+            if token_limit_exceeded or should_use_smart_filtering:
+                logger.info(f"Applying smart processing to search results (tokens: {current_tokens}, threshold: {smart_filtering_threshold if 'smart_filtering_threshold' in locals() else 'N/A'})")
                 
+                # Try smart filtering first if enabled and threshold is met
+                if enable_smart_filtering and should_use_smart_filtering and isinstance(searched_content, list):
+                    logger.info("Using smart filtering for search results (content exceeds 80% of input limit)")
+                    processed_results = processor.process_search_results(
+                        search_results=searched_content,
+                        llm=current_llm,
+                        model_name=model_name,
+                        max_results=configurable.max_search_results,
+                        query=query,
+                        enable_smart_filtering=True
+                    )
+                    logger.info(f"Search results processed with smart filtering: {len(raw_results)} -> {len(processed_results)} characters")
+                    return {"background_investigation_results": processed_results}
+                
+                # Fallback to traditional processing
                 if configurable.enable_content_summarization:
                     # Use smart summarization
                     processed_results = processor.summarize_content(
@@ -200,8 +511,8 @@ def background_investigation_node(state: State, config: RunnableConfig):
                     )
                     logger.info(f"Search results summarized: {len(raw_results)} -> {len(processed_results)} characters")
                 else:
-                    # Use smart chunking
-                    chunks = processor.smart_chunk_content(raw_results, model_name, configurable.chunk_strategy)
+                    # Use smart chunking (always enabled with auto strategy)
+                    chunks = processor.smart_chunk_content(raw_results, model_name, "auto")
                     processed_results = chunks[0] if chunks else raw_results
                     logger.info(f"Search results chunked: {len(raw_results)} -> {len(processed_results)} characters")
                 
@@ -211,6 +522,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 
         except Exception as e:
             logger.error(f"Smart content processing failed: {e}, using original results")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
     
     return {"background_investigation_results": raw_results}
 
@@ -265,7 +577,8 @@ def planner_node(
             llm.invoke, 
             messages,
             operation_name="Planner",
-            context="Generate the full plan."
+            context="Generate the full plan.",
+            enable_context_evaluation=True
         )
         if hasattr(response, 'model_dump_json'):
             full_response = response.model_dump_json(indent=4, exclude_none=True)
@@ -283,7 +596,8 @@ def planner_node(
         response = safe_llm_call(
             stream_llm,
             operation_name="Planner streaming call",
-            context="Generate research plan"
+            context="Generate research plan",
+            enable_context_evaluation=True
         )
         full_response = response.content if hasattr(response, 'content') else str(response)
     logger.debug(f"Current state messages: {state['messages']}")
@@ -291,8 +605,9 @@ def planner_node(
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+    except json.JSONDecodeError as e:
+        logger.warning(f"Planner response is not a valid JSON: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 0:
             return Command(goto="reporter")
         else:
@@ -302,7 +617,8 @@ def planner_node(
         try:
             new_plan = Plan.model_validate(curr_plan)
         except Exception as e:
-            logger.warning(f"Planner execution error: Failed to parse Plan from completion {curr_plan}. Got: {e}") 
+            logger.warning(f"Planner execution error: Failed to parse Plan from completion {curr_plan}. Got: {e}")
+            logger.warning(f"Full traceback: {traceback.format_exc()}") 
             if plan_iterations > 0:
                 return Command(goto="reporter")
             else:
@@ -358,8 +674,9 @@ def human_feedback_node(
         new_plan = json.loads(current_plan)
         if new_plan["has_enough_context"]:
             goto = "reporter"
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+    except json.JSONDecodeError as e:
+        logger.warning(f"Planner response is not a valid JSON: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 1:  # the plan_iterations is increased before this check
             return Command(goto="reporter")
         else:
@@ -369,6 +686,7 @@ def human_feedback_node(
         validated_plan = Plan.model_validate(new_plan)
     except Exception as e:
         logger.warning(f"Human feedback node execution error: Failed to parse Plan from completion {new_plan}. Got: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 1:
             return Command(goto="reporter")
         else:
@@ -397,7 +715,8 @@ def coordinator_node(
         .invoke,
         messages,
         operation_name="Coordinator",
-        context="Coordinating with customers"
+        context="Coordinating with customers",
+        enable_context_evaluation=True
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
@@ -422,6 +741,7 @@ def coordinator_node(
                     break
         except Exception as e:
             logger.error(f"Error processing tool calls: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
     else:
         logger.warning(
             "Coordinator response contains no tool calls. Terminating workflow execution."
@@ -475,7 +795,8 @@ def reporter_node(state: State, config: RunnableConfig):
         get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke,
         invoke_messages,
         operation_name="Reporter",
-        context="Generate the final report"
+        context="Generate the final report",
+        enable_context_evaluation=True
     )
     response_content = response.content if hasattr(response, 'content') else str(response)
     logger.info(f"reporter response: {response_content}")
@@ -671,7 +992,8 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
         logger.info(f"Parallel execution stats: {stats}")
         
     except Exception as e:
-        logger.error(f"Parallel executor failed: {e.with_traceback}")
+        logger.error(f"Parallel executor failed: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         # Mark all unexecuted steps as failed
         for step in steps:
             if not step.execution_res:
@@ -699,73 +1021,168 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
 
 
 async def _execute_single_step_parallel(state: State, config: RunnableConfig, step: Step, agent_type: str) -> Any:
-    """Execute a single step in parallel context."""
+    """Execute a single step in parallel context with proactive token budget management."""
     logger.info(f"Executing step in parallel: {step.title} with {agent_type}")
     
-    # Get completed steps for context with intelligent selection
+    # Get completed steps for context
     current_plan = state.get("current_plan")
     completed_steps = [s for s in current_plan.steps if s.execution_res and s.title != step.title]
     
-    # Intelligent context management: limit and prioritize completed steps
+    # Initialize configuration and processors
     configurable = Configuration.from_runnable_config(config)
-    max_context_steps = getattr(configurable, 'max_context_steps_parallel', 5)  # Limit context steps
     
-    # Sort completed steps by relevance (you can implement more sophisticated relevance scoring)
-    # For now, prioritize more recent steps and limit the number
-    if len(completed_steps) > max_context_steps:
-        # Take the most recent steps
-        completed_steps = completed_steps[-max_context_steps:]
+    # Initialize token budget manager for proactive management
+    task_id = f"{agent_type}_{step.title}_{int(time.time())}"
     
-    # Format completed steps information with token awareness
-    completed_steps_info = ""
-    if completed_steps:
-        completed_steps_info = "# Existing Research Findings\n\n"
+    try:
+        from src.utils.token_budget_manager import TokenBudgetManager, BudgetPriority
+        from src.utils.content_processor import ContentProcessor
         
-        # Try to use content processor for intelligent summarization
+        content_processor = ContentProcessor(configurable.model_token_limits)
+        budget_manager = TokenBudgetManager(content_processor, configurable)
+        
+        # Get model name for budget calculation
+        agent_model = AGENT_LLM_MAP.get(agent_type, "basic")
+        model_name = "deepseek-chat"  # Default fallback
+        
         try:
-            from src.utils.content_processor import ContentProcessor
-            processor = ContentProcessor(configurable.model_token_limits)
+            from src.config.config_loader import config_loader
+            config_data = config_loader.load_config()
             
-            for i, completed_step in enumerate(completed_steps):
-                step_content = f"## Existing Finding {i + 1}: {completed_step.title}\n\n"
-                step_result = completed_step.execution_res
-                
-                # Estimate tokens and summarize if too long
-                if processor.estimate_tokens(step_result) > 1000:  # If step result is too long
-                    # Summarize the step result
-                    summary_prompt = processor.create_summary_prompt(step_result, "key_points")
-                    try:
-                        # Use basic model for summarization to save costs
-                        from src.llms.llm import get_llm_by_type
-                        basic_llm = get_llm_by_type("basic")
-                        summary_result = basic_llm.invoke(summary_prompt)
-                        step_result = summary_result.content if hasattr(summary_result, 'content') else str(summary_result)
-                        step_result += "\n\n[This content has been automatically summarized to save tokens]"
-                    except Exception as e:
-                        logger.warning(f"Failed to summarize step result: {e}")
-                        # Fallback: truncate to first 500 characters
-                        step_result = step_result[:500] + "...\n\n[Content truncated]"
-                
-                step_content += f"<finding>\n{step_result}\n</finding>\n\n"
-                completed_steps_info += step_content
-                
+            if agent_model == "basic":
+                basic_config = config_data.get("BASIC_MODEL", {})
+                model_name = basic_config.get("model", "deepseek-chat")
+            elif agent_model == "reasoning":
+                reasoning_config = config_data.get("REASONING_MODEL", {})
+                model_name = reasoning_config.get("model", "deepseek-reasoner")
         except Exception as e:
-            logger.warning(f"Failed to use content processor for context optimization: {e}")
-            # Fallback to simple formatting
-            for i, completed_step in enumerate(completed_steps):
-                completed_steps_info += f"## Existing Finding {i + 1}: {completed_step.title}\n\n"
-                # Simple truncation for fallback
-                result_content = completed_step.execution_res
-                if len(result_content) > 1000:
-                    result_content = result_content[:1000] + "...\n\n[Content truncated]"
-                completed_steps_info += f"<finding>\n{result_content}\n</finding>\n\n"
+            logger.warning(f"Failed to get model name from config: {e}")
+            logger.warning(f"Full traceback: {traceback.format_exc()}")
+        
+        # Estimate parallel task count for budget allocation
+        parallel_tasks = len([s for s in current_plan.steps if not s.execution_res])
+        parallel_tasks = max(1, min(parallel_tasks, 3))  # Cap at 3 for resource management
+        
+        # Allocate token budget for this task
+        task_allocation = budget_manager.allocate_task_budget(
+            task_id=task_id,
+            model_name=model_name,
+            priority=BudgetPriority.HIGH,
+            parallel_tasks=parallel_tasks
+        )
+        
+        logger.info(f"Allocated {task_allocation.allocated_tokens} tokens for task {task_id}")
+        
+    except Exception as e:
+        logger.warning(f"Token budget manager initialization failed: {e}, falling back to legacy management")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
+        budget_manager = None
+        task_allocation = None
     
-    # Prepare agent input
+    # Context management with budget-aware optimization
+    try:
+        from src.utils.advanced_context_manager import AdvancedContextManager, CompressionStrategy
+        
+        if budget_manager:
+            # Get available context budget
+            context_budget = budget_manager.get_context_budget(task_id)
+            logger.info(f"Available context budget for task {task_id}: {context_budget} tokens")
+        else:
+            context_budget = None
+        
+        context_manager = AdvancedContextManager(configurable, content_processor)
+        
+        # Check if context sharing should be disabled
+        disable_context_parallel = getattr(configurable, 'disable_context_parallel', False)
+        if disable_context_parallel:
+            logger.info("Context sharing disabled for parallel execution")
+            completed_steps = []
+        
+        # Select compression strategy based on budget constraints
+        strategy = CompressionStrategy.ADAPTIVE
+        if disable_context_parallel:
+            strategy = CompressionStrategy.NONE
+        elif context_budget and context_budget < 1000:  # Very limited budget
+            strategy = CompressionStrategy.HIERARCHICAL
+            logger.info(f"Using hierarchical compression due to limited context budget: {context_budget}")
+        elif len(completed_steps) > 3:
+            strategy = CompressionStrategy.HIERARCHICAL
+        elif len(completed_steps) > 1:
+            strategy = CompressionStrategy.SLIDING_WINDOW
+        
+        # Optimize context using advanced manager with budget constraints
+        current_task = f"Title: {step.title}\n\nDescription: {step.description}\n\nLocale: {state.get('locale', 'en-US')}"
+        
+        # If we have budget constraints, modify the context manager's max_context_ratio
+        if budget_manager and context_budget:
+            # Calculate what ratio of model limit this budget represents
+            limits = content_processor.get_model_limits(model_name)
+            budget_ratio = min(0.6, context_budget / limits.safe_input_limit)
+            context_manager.max_context_ratio = budget_ratio
+            logger.info(f"Adjusted context ratio to {budget_ratio:.2f} based on budget constraints")
+        
+        context_window = context_manager.optimize_context_for_parallel(
+            completed_steps=completed_steps,
+            current_task=current_task,
+            model_name=model_name,
+            strategy=strategy
+        )
+        
+        # Format optimized context
+        main_content = context_manager.format_context_window(context_window)
+        
+        # Log optimization statistics
+        stats = context_manager.get_optimization_stats(context_window)
+        logger.info(f"Context optimization stats: {stats['total_tokens']}/{stats['max_tokens']} tokens, "
+                   f"compression: {stats['compression_ratio']:.2%}, strategy: {stats['strategy_used']}")
+        
+    except Exception as e:
+        logger.error(f"Advanced context management failed: {e}, attempting recovery with conservative settings")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Instead of falling back to simple management, retry with more conservative settings
+        try:
+            # Create a new context manager with very conservative settings
+            context_manager = AdvancedContextManager(configurable, content_processor)
+            context_manager.max_context_ratio = 0.3  # Very conservative ratio
+            context_manager.sliding_window_size = 2   # Minimal window
+            context_manager.compression_threshold = 0.5  # Early compression
+            
+            # Force hierarchical compression for maximum token reduction
+            strategy = CompressionStrategy.HIERARCHICAL
+            
+            # Limit completed steps more aggressively
+            if len(completed_steps) > 2:
+                completed_steps = completed_steps[-2:]  # Only keep last 2 steps
+            
+            logger.info("Retrying context optimization with conservative settings")
+            
+            context_window = context_manager.optimize_context_for_parallel(
+                completed_steps=completed_steps,
+                current_task=current_task,
+                model_name=model_name,
+                strategy=strategy
+            )
+            
+            # Format optimized context
+            main_content = context_manager.format_context_window(context_window)
+            
+            # Log recovery statistics
+            stats = context_manager.get_optimization_stats(context_window)
+            logger.info(f"Recovery context stats: {stats['total_tokens']}/{stats['max_tokens']} tokens, "
+                       f"compression: {stats['compression_ratio']:.2%}, strategy: {stats['strategy_used']}")
+            
+        except Exception as recovery_error:
+            logger.error(f"Context management recovery also failed: {recovery_error}")
+            logger.error(f"Recovery traceback: {traceback.format_exc()}")
+            
+            # Last resort: use minimal context with only current task
+            logger.warning("Using minimal context with current task only")
+            main_content = f"# Current Task\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
+    
     agent_input = {
         "messages": [
-            HumanMessage(
-                content=f"{completed_steps_info}# Current Task\n\n## Title\n\n{step.title}\n\n## Description\n\n{step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
-            )
+            HumanMessage(content=main_content)
         ]
     }
     
@@ -825,23 +1242,114 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
     except AttributeError:
         pass
     
-    # Fallback to default model name if not found
+    # If model instance is not available, get model name from configuration
+    if not model_name:
+        try:
+            from src.config.config_loader import config_loader
+            config_data = config_loader.load_config()
+            
+            if agent_model == "basic":
+                basic_config = config_data.get("BASIC_MODEL", {})
+                model_name = basic_config.get("model")
+            elif agent_model == "reasoning":
+                reasoning_config = config_data.get("REASONING_MODEL", {})
+                model_name = reasoning_config.get("model")
+                
+            logger.debug(f"Retrieved model name from config: {model_name} for agent_model: {agent_model}")
+        except Exception as e:
+            logger.warning(f"Failed to get model name from config: {e}")
+            logger.warning(f"Full traceback: {traceback.format_exc()}")
+    
+    # Final fallback to default model name if still not found
     if not model_name:
         model_name = "deepseek-chat"  # Default model name
+        logger.warning(f"Using default model name: {model_name} for agent_model: {agent_model}")
     
-    agent_input["messages"] = check_and_truncate_messages(
-        agent_input["messages"], 
-        model_name=model_name,
-        max_messages=20  # Reduced from default 50 for parallel execution
-    )
+    # Apply budget-aware message optimization
+    if budget_manager:
+        try:
+            # Use budget manager to optimize messages
+            agent_input["messages"] = budget_manager.optimize_message_for_budget(
+                task_id=task_id,
+                messages=agent_input["messages"],
+                model_name=model_name
+            )
+            
+            # Validate final message budget
+            is_valid, estimated_tokens, available_tokens = budget_manager.validate_message_budget(
+                task_id, agent_input["messages"], model_name
+            )
+            
+            if not is_valid:
+                logger.error(f"Message budget validation failed for task {task_id}: "
+                           f"{estimated_tokens} > {available_tokens}")
+            else:
+                logger.info(f"Message budget validated for task {task_id}: {estimated_tokens}/{available_tokens} tokens")
+                
+        except Exception as e:
+            logger.warning(f"Budget-aware message optimization failed: {e}, falling back to legacy truncation")
+            logger.warning(f"Full traceback: {traceback.format_exc()}")
+            # Fallback to legacy truncation with aggressive mode
+            agent_input["messages"] = check_and_truncate_messages(
+                agent_input["messages"], 
+                model_name=model_name,
+                max_messages=10,  # Further reduced for parallel execution
+                max_tokens=int(content_processor.get_model_limits(model_name).safe_input_limit * 0.6),
+                aggressive_mode=True  # Enable aggressive mode for parallel execution
+            )
+    else:
+        # Legacy truncation when budget manager is not available
+        agent_input["messages"] = check_and_truncate_messages(
+            agent_input["messages"], 
+            model_name=model_name,
+            max_messages=10,  # Further reduced for parallel execution
+            max_tokens=int(content_processor.get_model_limits(model_name).safe_input_limit * 0.6),
+            aggressive_mode=True  # Enable aggressive mode for parallel execution
+        )
     
-    result = await safe_llm_call_async(
-        agent.ainvoke,
-        input=agent_input,
-        config={"recursion_limit": recursion_limit},
-        operation_name=f"{agent_type} executor (parallel)",
-        context=f"Parallel execution of step: {step.title}"
-    )
+    # Execute agent with budget tracking
+    try:
+        result = await safe_llm_call_async(
+            agent.ainvoke,
+            input=agent_input,
+            config={"recursion_limit": recursion_limit},
+            operation_name=f"{agent_type} executor (parallel)",
+            context=f"Parallel execution of step: {step.title}",
+            enable_smart_processing=True,
+            enable_context_evaluation=True,
+            max_retries=2  # Reduce retries for parallel execution
+        )
+        
+        # Update token usage tracking
+        if budget_manager:
+            try:
+                # Estimate tokens used in the request
+                input_tokens = budget_manager.estimate_message_tokens(agent_input["messages"])
+                
+                # Estimate output tokens (rough approximation)
+                if hasattr(result, 'get') and "messages" in result:
+                    output_content = result["messages"][-1].content
+                else:
+                    output_content = result.content if hasattr(result, 'content') else str(result)
+                
+                output_tokens = content_processor.estimate_tokens(output_content)
+                total_used = input_tokens + output_tokens
+                
+                budget_manager.update_token_usage(task_id, total_used)
+                
+                # Log budget utilization
+                stats = budget_manager.get_budget_stats()
+                logger.info(f"Token usage updated for task {task_id}: {total_used} tokens. "
+                           f"Overall utilization: {stats['utilization_rate']:.2%}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to update token usage tracking: {e}")
+                logger.warning(f"Full traceback: {traceback.format_exc()}")
+        
+    finally:
+        # Always release budget allocation when task completes
+        if budget_manager:
+            budget_manager.release_task_budget(task_id)
     
     # Process result
     if hasattr(result, 'get') and "messages" in result:
@@ -882,7 +1390,7 @@ async def _execute_steps_serial(state: State, config: RunnableConfig) -> Command
 
 
 async def _execute_agent_step(
-    state: State, agent, agent_name: str
+    state: State, config: RunnableConfig, agent, agent_name: str
 ) -> Command[Literal["research_team"]]:
     """Helper function to execute a step using the specified agent."""
     current_plan = state.get("current_plan")
@@ -904,6 +1412,20 @@ async def _execute_agent_step(
 
     logger.info(f"Executing step: {current_step.title}, agent: {agent_name}")
 
+    # Check if context sharing should be disabled (apply parallel execution settings to serial execution too)
+    configurable = Configuration.from_runnable_config(config)
+    disable_context_parallel = getattr(configurable, 'disable_context_parallel', False)
+    max_context_steps_parallel = getattr(configurable, 'max_context_steps_parallel', 1)
+    
+    # Apply context limitations
+    if disable_context_parallel:
+        logger.info("Context sharing disabled - no historical context will be included")
+        completed_steps = []
+    elif max_context_steps_parallel > 0 and len(completed_steps) > max_context_steps_parallel:
+        # Limit the number of context steps
+        completed_steps = completed_steps[-max_context_steps_parallel:]
+        logger.info(f"Limited context to last {max_context_steps_parallel} steps")
+    
     # Format completed steps information
     completed_steps_info = ""
     if completed_steps:
@@ -964,16 +1486,94 @@ async def _execute_agent_step(
             f"Invalid AGENT_RECURSION_LIMIT value: '{raw_env_value}'. "
             f"Using default value {default_recursion_limit}."
         )
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
         recursion_limit = default_recursion_limit
 
-    logger.info(f"Agent input: {agent_input}")
+    # Get model name for token truncation
+    model_name = None
+    
+    try:
+        # Try to get model name from LLM instance
+        agent_model = AGENT_LLM_MAP.get(agent_name, "basic")
+        current_llm = get_llm_by_type(agent_model)
+        model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', None))
+    except Exception as e:
+        logger.warning(f"Failed to get LLM instance for {agent_name}, trying to get model name from config: {e}")
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
+        try:
+            from src.config.config_loader import config_loader
+            config_data = config_loader.load_config()
+            agent_model = AGENT_LLM_MAP.get(agent_name, "basic")
+            
+            if agent_model == "basic":
+                basic_config = config_data.get("BASIC_MODEL", {})
+                model_name = basic_config.get("model", "deepseek-chat")
+            elif agent_model == "reasoning":
+                reasoning_config = config_data.get("REASONING_MODEL", {})
+                model_name = reasoning_config.get("model", "deepseek-reasoner")
+            
+            logger.debug(f"Retrieved model name from config for {agent_name}: {model_name}")
+        except Exception as config_e:
+            logger.error(f"Failed to get model name from config: {config_e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            model_name = "deepseek-chat"  # Final fallback
+    
+    # Final fallback to default model name if still not found
+    if not model_name:
+        model_name = "deepseek-chat"  # Default model name
+        logger.warning(f"Using default model name: {model_name} for agent: {agent_name}")
+    
+    # Apply token truncation to prevent context length exceeded errors
+    # Get token limits from configuration
+    try:
+        from src.config.config_loader import config_loader
+        config_data = config_loader.load_config()
+        
+        # Determine which model config to use
+        agent_model = AGENT_LLM_MAP.get(agent_name, "basic")
+        if agent_model == "basic":
+            model_config = config_data.get("BASIC_MODEL", {})
+        elif agent_model == "reasoning":
+            model_config = config_data.get("REASONING_MODEL", {})
+        else:
+            model_config = config_data.get("BASIC_MODEL", {})
+        
+        # Get token limits with safety margin
+        token_limits = model_config.get("token_limits", {})
+        input_limit = token_limits.get("input_limit", 65536)
+        safety_margin = model_config.get("safety_margin", 0.8)
+        max_tokens = int(input_limit * safety_margin * 0.6)  # Reserve 40% for response and other context
+        
+        logger.info(f"Using token limit {max_tokens} for {agent_name} (model: {model_name})")
+        
+        agent_input["messages"] = check_and_truncate_messages(
+            agent_input["messages"], 
+            model_name=model_name,
+            max_messages=20,  # Reduced from default 50 for better performance
+            max_tokens=max_tokens
+        )
+    except Exception as e:
+        logger.error(f"Failed to get token limits for truncation: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Fallback to conservative truncation
+        agent_input["messages"] = check_and_truncate_messages(
+            agent_input["messages"], 
+            model_name=model_name,
+            max_messages=10,  # Very conservative fallback
+            max_tokens=20000  # Conservative token limit
+        )
+    
+    logger.info(f"Agent input (after truncation): {len(agent_input['messages'])} messages")
     
     result = await safe_llm_call_async(
         agent.ainvoke,
         input=agent_input, 
         config={"recursion_limit": recursion_limit},
         operation_name=f"{agent_name} executor",
-        context=f"Execute step: {current_step.title}"
+        context=f"Execute step: {current_step.title}",
+        enable_smart_processing=True,
+        enable_context_evaluation=True,
+        max_retries=3
     )
     
     # Process the result
@@ -1055,11 +1655,11 @@ async def _setup_and_execute_agent_step(
                     )
                     loaded_tools.append(tool)
             agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
-            return await _execute_agent_step(state, agent, agent_type)
+            return await _execute_agent_step(state, config, agent, agent_type)
     else:
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type)
-        return await _execute_agent_step(state, agent, agent_type)
+        return await _execute_agent_step(state, config, agent, agent_type)
 
 
 async def researcher_node(

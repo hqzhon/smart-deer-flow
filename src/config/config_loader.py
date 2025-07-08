@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 from src.utils.content_processor import ModelTokenLimits
-from src.config.configuration import Configuration
+from src.config.configuration import Configuration, AdvancedContextConfig
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,42 @@ class ConfigLoader:
             except Exception as e:
                 logger.error(f"Failed to parse model {model_name} token limit configuration: {e}")
         
+        # If no model limits found, add default deepseek configurations
+        if not model_limits:
+            logger.warning("No model token limits found in configuration, using defaults")
+            default_models = {
+                'deepseek-chat': ModelTokenLimits(input_limit=65536, output_limit=8192, context_window=131072, safety_margin=0.2),
+                'deepseek-reasoner': ModelTokenLimits(input_limit=65536, output_limit=8192, context_window=131072, safety_margin=0.2)
+            }
+            model_limits.update(default_models)
+            logger.info(f"Added default configurations for models: {list(default_models.keys())}")
+        
         return model_limits
+    
+    def parse_advanced_context_config(self, config: Dict[str, Any]) -> AdvancedContextConfig:
+        """Parse advanced context management configuration"""
+        advanced_config = config.get('ADVANCED_CONTEXT_MANAGEMENT', {})
+        
+        try:
+            return AdvancedContextConfig(
+                max_context_ratio=advanced_config.get('max_context_ratio', 0.6),
+                sliding_window_size=advanced_config.get('sliding_window_size', 5),
+                overlap_ratio=advanced_config.get('overlap_ratio', 0.2),
+                compression_threshold=advanced_config.get('compression_threshold', 0.8),
+                default_strategy=advanced_config.get('default_strategy', 'adaptive'),
+                priority_weights=advanced_config.get('priority_weights', {
+                    'critical': 1.0,
+                    'high': 0.7,
+                    'medium': 0.4,
+                    'low': 0.1
+                }),
+                enable_caching=advanced_config.get('enable_caching', True),
+                enable_analytics=advanced_config.get('enable_analytics', True),
+                debug_mode=advanced_config.get('debug_mode', False)
+            )
+        except Exception as e:
+            logger.error(f"Failed to parse advanced context management configuration: {e}")
+            return AdvancedContextConfig()  # Return default configuration
     
     def create_configuration(self) -> Configuration:
         """Create configuration object"""
@@ -117,6 +152,9 @@ class ConfigLoader:
         
         # Parse parallel execution configuration
         parallel_config = config_data.get('PARALLEL_EXECUTION', {})
+        
+        # Parse advanced context management configuration
+        advanced_context_config = self.parse_advanced_context_config(config_data)
         
         # Create model instances
         basic_model = None
@@ -134,17 +172,20 @@ class ConfigLoader:
             logger.warning(f"Failed to create model instances: {e}")
         
         return Configuration(
-            enable_smart_chunking=content_config.get('enable_smart_chunking', True),
+            # enable_smart_chunking removed - smart chunking is now always enabled
             enable_content_summarization=content_config.get('enable_content_summarization', True),
-            chunk_strategy=content_config.get('chunk_strategy', 'auto'),
+            enable_smart_filtering=content_config.get('enable_smart_filtering', True),
+            # chunk_strategy removed - smart chunking now uses 'auto' strategy by default
             summary_type=content_config.get('summary_type', 'comprehensive'),
             model_token_limits=model_limits,
             max_search_results=config_data.get('max_search_results', 3),
             enable_parallel_execution=parallel_config.get('enable_parallel_execution', True),
             max_parallel_tasks=parallel_config.get('max_parallel_tasks', 3),
-            max_context_steps_parallel=parallel_config.get('max_context_steps_parallel', 5),
+            max_context_steps_parallel=parallel_config.get('max_context_steps_parallel', 1),  # Reduced for token optimization
+            disable_context_parallel=parallel_config.get('disable_context_parallel', False),
             basic_model=basic_model,
-            reasoning_model=reasoning_model
+            reasoning_model=reasoning_model,
+            advanced_context_config=advanced_context_config
         )
     
     def save_example_config(self, output_path: Optional[str] = None):
@@ -175,9 +216,10 @@ class ConfigLoader:
                 }
             },
             'CONTENT_PROCESSING': {
-                'enable_smart_chunking': True,
+                # 'enable_smart_chunking': True,  # Removed - smart chunking is now always enabled
                 'enable_content_summarization': True,
-                'chunk_strategy': 'auto',  # auto, sentences, paragraphs
+                'enable_smart_filtering': True,  # Enable LLM-based search result filtering
+                # 'chunk_strategy': 'auto',  # Removed - smart chunking now uses 'auto' strategy by default
                 'summary_type': 'key_points'  # comprehensive, key_points, abstract
             },
             'PARALLEL_EXECUTION': {

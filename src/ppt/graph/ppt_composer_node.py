@@ -27,7 +27,8 @@ def ppt_composer_node(state: PPTState):
             HumanMessage(content=state["input"]),
         ],
         operation_name="PPT Composer",
-        context="Generating PPT content"
+        context="Generating PPT content",
+        enable_context_evaluation=True
     )
     logger.info(f"ppt_content: {ppt_content}")
     # save the ppt content in a temp file

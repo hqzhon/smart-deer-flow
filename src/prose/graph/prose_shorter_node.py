@@ -24,7 +24,8 @@ def prose_shorter_node(state: ProseState):
         model.invoke,
         messages,
         operation_name="Prose Shortener",
-        context="Shorten prose content"
+        context="Shorten prose content",
+        enable_context_evaluation=True
     )
     response_content = response.content if hasattr(response, 'content') else str(response)
     logger.info(f"prose_shorter_node response: {response_content}")

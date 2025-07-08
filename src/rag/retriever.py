@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 import abc
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, validator
 
 
 class Chunk:
@@ -53,9 +54,56 @@ class Resource(BaseModel):
     Resource is a class that represents a resource.
     """
 
-    uri: str = Field(..., description="The URI of the resource")
-    title: str = Field(..., description="The title of the resource")
-    description: str | None = Field("", description="The description of the resource")
+    uri: str = Field(..., description="The URI of the resource", max_length=2048)
+    title: str = Field(..., description="The title of the resource", max_length=500)
+    description: str | None = Field("", description="The description of the resource", max_length=2000)
+    
+    @validator('uri')
+    def validate_uri(cls, v):
+        if not v.strip():
+            raise ValueError('URI cannot be empty')
+        # Check for valid URI format (basic validation)
+        if not re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*:', v):
+            raise ValueError('Invalid URI format')
+        # Check for suspicious patterns
+        suspicious_patterns = [
+            r'<script[^>]*>.*?</script>',
+            r'javascript:',
+            r'on\w+\s*='
+        ]
+        for pattern in suspicious_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError('Potentially unsafe content in URI')
+        return v
+    
+    @validator('title')
+    def validate_title(cls, v):
+        if not v.strip():
+            raise ValueError('Title cannot be empty')
+        # Check for suspicious patterns
+        suspicious_patterns = [
+            r'<script[^>]*>.*?</script>',
+            r'javascript:',
+            r'on\w+\s*='
+        ]
+        for pattern in suspicious_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError('Potentially unsafe content in title')
+        return v
+    
+    @validator('description')
+    def validate_description(cls, v):
+        if v:
+            # Check for suspicious patterns
+            suspicious_patterns = [
+                r'<script[^>]*>.*?</script>',
+                r'javascript:',
+                r'on\w+\s*='
+            ]
+            for pattern in suspicious_patterns:
+                if re.search(pattern, v, re.IGNORECASE):
+                    raise ValueError('Potentially unsafe content in description')
+        return v
 
 
 class Retriever(abc.ABC):

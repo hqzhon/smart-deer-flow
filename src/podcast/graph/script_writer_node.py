@@ -28,7 +28,8 @@ def script_writer_node(state: PodcastState):
             HumanMessage(content=state["input"]),
         ],
         operation_name="Podcast Script Writer",
-        context="Generating podcast script"
+        context="Generating podcast script",
+        enable_context_evaluation=True
     )
     print(script)
     return {"script": script, "audio_chunks": []}

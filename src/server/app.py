@@ -5,10 +5,13 @@ import base64
 import json
 import logging
 import os
-from typing import Annotated, List, cast
+import time
+import asyncio
+from typing import Annotated, List, cast, Dict, Any
 from uuid import uuid4
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
@@ -17,6 +20,18 @@ from langgraph.types import Command
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
+from src.utils.performance_optimizer import (
+    AdvancedParallelExecutor,
+    AdaptiveRateLimiter,
+    SmartErrorRecovery,
+    TaskPriority
+)
+from src.utils.memory_manager import HierarchicalMemoryManager
+from src.config.performance_config import (
+    get_performance_config,
+    update_performance_config,
+    PerformanceConfig
+)
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prose.graph.builder import build_graph as build_prose_graph
@@ -46,10 +61,172 @@ logger = logging.getLogger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
+# Global variables for advanced optimization with thread safety
+import threading
+from typing import Optional
+
+# Thread-safe global state management
+_global_state_lock = threading.RLock()
+_global_state = {
+    "connection_pool": None,
+    "request_queue": None,
+    "batch_processor": None,
+    "advanced_parallel_executor": None,
+    "adaptive_rate_limiter": None,
+    "smart_error_recovery": None,
+    "hierarchical_memory": None
+}
+
+def get_global_component(name: str):
+    """Thread-safe getter for global components"""
+    with _global_state_lock:
+        return _global_state.get(name)
+
+def set_global_component(name: str, value):
+    """Thread-safe setter for global components"""
+    with _global_state_lock:
+        _global_state[name] = value
+
+# Initialize request queue
+request_queue = asyncio.Queue(maxsize=1000)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan with configurable performance optimization."""
+    
+    # Get performance configuration
+    config = get_performance_config()
+    
+    # Startup
+    logger.info("Starting DeerFlow API server with configurable optimizations...")
+    logger.info(f"Advanced optimization: {config.enable_advanced_optimization}")
+    logger.info(f"Collaboration: {config.enable_collaboration}")
+    
+    # Initialize advanced performance components based on configuration
+    if config.enable_advanced_optimization:
+        set_global_component("advanced_parallel_executor", AdvancedParallelExecutor(
+            max_workers=config.parallel_execution.max_workers,
+            enable_metrics=config.monitoring.metrics_enabled
+        ))
+        set_global_component("adaptive_rate_limiter", AdaptiveRateLimiter(
+            initial_rate=config.rate_limit.initial_rate,
+            time_window=config.rate_limit.time_window
+        ))
+        set_global_component("smart_error_recovery", SmartErrorRecovery(
+            max_retries=config.error_recovery.max_retries,
+            base_delay=config.error_recovery.base_delay,
+            max_delay=config.error_recovery.max_delay
+        ))
+        set_global_component("hierarchical_memory", HierarchicalMemoryManager(
+            l1_max_size=config.cache.l1_size * 1024 * 1024,  # Convert MB to bytes
+            l2_max_size=config.cache.l2_size * 1024 * 1024,  # Convert MB to bytes
+            l3_max_size=config.cache.l3_size * 1024 * 1024,  # Convert MB to bytes
+        ))
+        
+        # Start advanced components
+        await get_global_component("advanced_parallel_executor").start()
+        await get_global_component("hierarchical_memory").start()
+        
+        logger.info("Advanced optimization components initialized")
+    else:
+        logger.info("Running in basic optimization mode")
+    
+    # Initialize enhanced connection pool with configuration
+    set_global_component("connection_pool", {
+        "max_connections": config.connection_pool.max_connections,
+        "active_connections": 0,
+        "semaphore": asyncio.Semaphore(config.connection_pool.max_connections),
+        "connection_metrics": {
+            "total_acquired": 0,
+            "total_released": 0,
+            "peak_usage": 0
+        }
+    })
+    
+    # Start batch processor (enhanced or basic based on config)
+    if config.enable_advanced_optimization:
+        set_global_component("batch_processor", asyncio.create_task(_enhanced_batch_processor()))
+    else:
+        set_global_component("batch_processor", asyncio.create_task(_basic_batch_processor()))
+    
+    logger.info("DeerFlow API server started successfully with configurable optimizations")
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down DeerFlow API server...")
+    
+    # Stop components
+    batch_proc = get_global_component("batch_processor")
+    if batch_proc:
+        batch_proc.cancel()
+        try:
+            await batch_proc
+        except asyncio.CancelledError:
+            pass
+    
+    if config.enable_advanced_optimization:
+        adv_executor = get_global_component("advanced_parallel_executor")
+        if adv_executor:
+            await adv_executor.stop()
+        hier_memory = get_global_component("hierarchical_memory")
+        if hier_memory:
+            await hier_memory.stop()
+    
+    # Log final metrics if enabled
+    conn_pool = get_global_component("connection_pool")
+    if conn_pool and config.monitoring.metrics_enabled:
+        metrics = conn_pool["connection_metrics"]
+        logger.info(f"Connection pool metrics - Acquired: {metrics['total_acquired']}, "
+                   f"Released: {metrics['total_released']}, Peak: {metrics['peak_usage']}")
+    
+    logger.info("DeerFlow API server shutdown complete")
+
+
+async def _process_enhanced_batch(batch: List[Dict[str, Any]]):
+    """Process a batch of requests with enhanced optimization."""
+    if not batch:
+        return
+    
+    logger.info(f"Processing enhanced batch of {len(batch)} requests")
+    
+    # Use hierarchical memory for caching if available
+    hier_memory = get_global_component("hierarchical_memory")
+    if hier_memory:
+        # Check cache for similar requests
+        cached_results = await hier_memory.get_batch(batch)
+        uncached_batch = [req for req, result in zip(batch, cached_results) if result is None]
+        
+        if uncached_batch:
+            # Process uncached requests with smart error recovery
+            error_recovery = get_global_component("smart_error_recovery")
+            if error_recovery:
+                tasks = []
+                for request_data in uncached_batch:
+                    task = error_recovery.execute_with_retry(
+                        _process_single_request, request_data
+                    )
+                    tasks.append(task)
+                
+                # Wait for all tasks with adaptive rate limiting
+                rate_limiter = get_global_component("adaptive_rate_limiter")
+                if rate_limiter:
+                    await rate_limiter.acquire_batch(len(tasks))
+                
+                await asyncio.gather(*tasks, return_exceptions=True)
+            else:
+                # Fallback to regular processing
+                await _process_batch(uncached_batch)
+    else:
+        # Fallback to regular batch processing
+        await _process_batch(batch)
+
+
 app = FastAPI(
     title="DeerFlow API",
     description="API for Deer",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -64,31 +241,270 @@ app.add_middleware(
 graph = build_graph_with_memory()
 
 
+async def _enhanced_batch_processor():
+    """Enhanced background batch processor with advanced optimization."""
+    config = get_performance_config()
+    batch_size = config.batch_processing.batch_size
+    batch_timeout = config.batch_processing.batch_timeout
+    
+    while True:
+        try:
+            batch = []
+            start_time = time.time()
+            
+            # Collect requests for batch processing with priority handling
+            while len(batch) < batch_size and (time.time() - start_time) < batch_timeout:
+                try:
+                    request_data = await asyncio.wait_for(
+                        request_queue.get(), timeout=0.05
+                    )
+                    batch.append(request_data)
+                except asyncio.TimeoutError:
+                    continue
+            
+            # Process batch if we have requests
+            if batch:
+                # Submit batch processing to advanced parallel executor
+                adv_executor = get_global_component("advanced_parallel_executor")
+                if adv_executor:
+                    await adv_executor.submit_task(
+                        _process_enhanced_batch,
+                        batch,
+                        priority=TaskPriority.HIGH
+                    )
+                else:
+                    # Fallback to regular batch processing
+                    await _process_batch(batch)
+            
+            # Adaptive delay based on queue size
+            queue_size = request_queue.qsize()
+            if queue_size > 50:
+                await asyncio.sleep(0.001)  # Very short delay when busy
+            elif queue_size > 10:
+                await asyncio.sleep(0.005)  # Short delay when moderately busy
+            else:
+                await asyncio.sleep(0.01)   # Normal delay when not busy
+            
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in enhanced batch processor: {e}")
+            await asyncio.sleep(1.0)
+
+
+async def _basic_batch_processor():
+    """Basic batch processor for when advanced optimization is disabled."""
+    config = get_performance_config()
+    batch_size = min(config.batch_processing.batch_size, 5)  # Smaller batch size for basic mode
+    batch_timeout = config.batch_processing.batch_timeout * 2  # Longer timeout for basic mode
+    
+    while True:
+        try:
+            batch = []
+            start_time = time.time()
+            
+            # Collect requests for batch processing
+            while len(batch) < batch_size and (time.time() - start_time) < batch_timeout:
+                try:
+                    request_data = await asyncio.wait_for(
+                        request_queue.get(), timeout=0.1
+                    )
+                    batch.append(request_data)
+                except asyncio.TimeoutError:
+                    continue
+            
+            # Process batch if we have requests
+            if batch:
+                await _process_batch(batch)
+            
+            # Fixed delay for basic mode
+            await asyncio.sleep(0.1)
+            
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in basic batch processor: {e}")
+            await asyncio.sleep(1.0)
+
+
+async def _process_batch(batch: List[Dict[str, Any]]):
+    """Process a batch of requests concurrently."""
+    if not batch:
+        return
+    
+    logger.info(f"Processing batch of {len(batch)} requests")
+    
+    # Process requests concurrently
+    tasks = []
+    for request_data in batch:
+        task = asyncio.create_task(_process_single_request(request_data))
+        tasks.append(task)
+    
+    # Wait for all tasks to complete
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _process_single_request(request_data: Dict[str, Any]):
+    """Process a single request from the batch."""
+    try:
+        # This would be implemented based on the specific request type
+        # For now, just log the processing
+        logger.debug(f"Processing request: {request_data.get('id', 'unknown')}")
+        await asyncio.sleep(0.1)  # Simulate processing
+    except Exception as e:
+        logger.error(f"Error processing request {request_data.get('id', 'unknown')}: {e}")
+
+
+async def _acquire_connection():
+    """Acquire a connection from the enhanced pool with metrics tracking."""
+    conn_pool = get_global_component("connection_pool")
+    if conn_pool:
+        await conn_pool["semaphore"].acquire()
+        conn_pool["active_connections"] += 1
+        conn_pool["connection_metrics"]["total_acquired"] += 1
+        
+        # Update peak usage
+        current_usage = conn_pool["active_connections"]
+        if current_usage > conn_pool["connection_metrics"]["peak_usage"]:
+            conn_pool["connection_metrics"]["peak_usage"] = current_usage
+        
+        logger.debug(f"Acquired connection (active: {current_usage})")
+
+
+async def _release_connection():
+    """Release a connection back to the enhanced pool with metrics tracking."""
+    conn_pool = get_global_component("connection_pool")
+    if conn_pool:
+        conn_pool["active_connections"] -= 1
+        conn_pool["connection_metrics"]["total_released"] += 1
+        conn_pool["semaphore"].release()
+        
+        current_usage = conn_pool["active_connections"]
+        logger.debug(f"Released connection (active: {current_usage})")
+        
+        # Log warning if connection pool is getting full
+        utilization = current_usage / conn_pool["max_connections"]
+        if utilization > 0.8:
+            logger.warning(f"High connection pool utilization: {utilization:.1%}")
+
+
+async def _get_connection_metrics() -> Dict[str, Any]:
+    """Get current connection pool metrics."""
+    conn_pool = get_global_component("connection_pool")
+    if conn_pool:
+        metrics = conn_pool["connection_metrics"]
+        return {
+            "active_connections": conn_pool["active_connections"],
+            "max_connections": conn_pool["max_connections"],
+            "utilization": conn_pool["active_connections"] / conn_pool["max_connections"],
+            "total_acquired": metrics["total_acquired"],
+            "total_released": metrics["total_released"],
+            "peak_usage": metrics["peak_usage"],
+            "queue_size": request_queue.qsize()
+        }
+    return {"status": "connection_pool_not_initialized"}
+
+
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
-    thread_id = request.thread_id
-    if thread_id == "__default__":
-        thread_id = str(uuid4())
-    return StreamingResponse(
-        _astream_workflow_generator(
-            request.model_dump()["messages"],
-            thread_id,
-            request.resources,
-            request.max_plan_iterations,
-            request.max_step_num,
-            request.max_search_results,
-            request.auto_accepted_plan,
-            request.interrupt_feedback,
-            request.mcp_settings,
-            request.enable_background_investigation,
-            request.report_style,
-            request.enable_deep_thinking,
-            request.enable_collaboration,
-            request.enable_parallel_execution,
-            request.max_parallel_tasks,
-        ),
-        media_type="text/event-stream",
+async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
+    start_time = time.time()
+    connection_acquired = False
+    
+    try:
+        # Acquire connection from enhanced pool
+        await _acquire_connection()
+        connection_acquired = True
+        
+        # Check adaptive rate limiting
+        rate_limiter = get_global_component("adaptive_rate_limiter")
+        if rate_limiter:
+            await rate_limiter.acquire()
+        
+        thread_id = request.thread_id
+        if thread_id == "__default__":
+            thread_id = str(uuid4())
+        
+        # Log request metrics with enhanced details
+        logger.info(f"Starting enhanced chat stream for thread: {thread_id}")
+        
+        # Add cleanup task with enhanced monitoring
+        background_tasks.add_task(_release_connection)
+        background_tasks.add_task(_log_request_completion, thread_id, start_time)
+        
+        return StreamingResponse(
+            _astream_workflow_generator(
+                request.model_dump()["messages"],
+                thread_id,
+                request.resources,
+                request.max_plan_iterations,
+                request.max_step_num,
+                request.max_search_results,
+                request.auto_accepted_plan,
+                request.interrupt_feedback,
+                request.mcp_settings,
+                request.enable_background_investigation,
+                request.report_style,
+                request.enable_deep_thinking,
+                request.enable_collaboration,
+                request.enable_parallel_execution,
+                request.max_parallel_tasks,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "X-Connection-ID": str(id(thread_id)),
+                "X-Advanced-Optimization": "enabled" if get_global_component("hierarchical_memory") else "disabled"
+            },
+        )
+    except Exception as e:
+        # 确保在异常情况下释放连接
+        if connection_acquired:
+            try:
+                await _release_connection()
+            except Exception as release_error:
+                logger.error(f"Error releasing connection: {release_error}")
+        logger.error(f"Error in enhanced chat_stream: {e}")
+        raise
+
+
+async def _log_enhanced_request_completion(
+    connection_id: str, 
+    start_time: float, 
+    message_length: int = 0
+):
+    """Log enhanced request completion metrics with detailed performance data."""
+    completion_time = time.time()
+    processing_time = completion_time - start_time
+    
+    # Get current system metrics
+    connection_metrics = await _get_connection_metrics()
+    
+    # Calculate throughput metrics
+    chars_per_second = message_length / processing_time if processing_time > 0 else 0
+    
+    # Log comprehensive metrics
+    logger.info(
+        f"Enhanced request completed - Connection: {connection_id}, "
+        f"Processing time: {processing_time:.2f}s, "
+        f"Message length: {message_length} chars, "
+        f"Throughput: {chars_per_second:.1f} chars/s, "
+        f"Pool utilization: {connection_metrics.get('utilization', 0):.1%}"
     )
+    
+    # Log performance warnings if needed
+    if processing_time > 10.0:
+        logger.warning(f"Slow request detected: {processing_time:.2f}s")
+    
+    if connection_metrics.get('utilization', 0) > 0.9:
+        logger.warning("High connection pool utilization detected")
+    
+    # Release connection
+    await _release_connection()
+
+
+async def _log_request_completion(thread_id: str, start_time: float):
+    """Legacy request completion logging for backward compatibility."""
+    execution_time = time.time() - start_time
+    logger.info(f"Chat stream completed for thread {thread_id} in {execution_time:.2f} seconds")
 
 
 async def _astream_workflow_generator(
@@ -239,9 +655,25 @@ async def _astream_workflow_generator(
                     })
                     return
                 else:
-                    # Other types of errors, re-raise
-                    logger.error(f"Non-retryable error in workflow: {error_message}")
-                    raise
+                    # Other types of errors, log with proper error classification
+                    logger.error(f"Non-retryable error in workflow (type: {error_type}): {error_message}")
+                    # Send appropriate error message based on error type
+                    if error_type in ['AUTHENTICATION_ERROR', 'PERMISSION_ERROR']:
+                        yield _make_event("error", {
+                            "thread_id": thread_id,
+                            "error": "Authentication or permission error occurred."
+                        })
+                    elif error_type in ['NETWORK_ERROR', 'TIMEOUT_ERROR']:
+                        yield _make_event("error", {
+                            "thread_id": thread_id,
+                            "error": "Network or timeout error occurred. Please try again."
+                        })
+                    else:
+                        yield _make_event("error", {
+                            "thread_id": thread_id,
+                            "error": "An unexpected error occurred. Please try again."
+                        })
+                    return
 
 
 def _make_event(event_type: str, data: dict[str, any]):
@@ -466,3 +898,178 @@ async def config():
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
     )
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """Get comprehensive system performance metrics."""
+    import time
+    import sys
+    
+    try:
+        # Get connection pool metrics
+        connection_metrics = await _get_connection_metrics()
+        
+        # Get advanced component metrics if available
+        advanced_metrics = {}
+        
+        adv_executor = get_global_component("advanced_parallel_executor")
+        if adv_executor:
+            advanced_metrics["parallel_executor"] = {
+                "active_tasks": len(adv_executor._tasks) if hasattr(adv_executor, '_tasks') else 0,
+                "status": "active"
+            }
+        
+        rate_limiter = get_global_component("adaptive_rate_limiter")
+        if rate_limiter:
+            advanced_metrics["rate_limiter"] = {
+                "current_rate": getattr(rate_limiter, '_current_rate', 0),
+                "status": "active"
+            }
+        
+        hier_memory = get_global_component("hierarchical_memory")
+        if hier_memory:
+            cache_stats = hier_memory.get_stats() if hasattr(hier_memory, 'get_stats') else {}
+            advanced_metrics["memory_manager"] = {
+                "cache_stats": cache_stats,
+                "status": "active"
+            }
+        
+        error_recovery = get_global_component("smart_error_recovery")
+        if error_recovery:
+            advanced_metrics["error_recovery"] = {
+                "circuit_breaker_state": getattr(error_recovery, '_circuit_state', 'unknown'),
+                "status": "active"
+            }
+        
+        # Compile comprehensive metrics
+        metrics = {
+            "timestamp": time.time(),
+            "connection_pool": connection_metrics,
+            "request_queue": {
+                "size": request_queue.qsize(),
+                "max_size": getattr(request_queue, '_maxsize', 'unlimited')
+            },
+            "advanced_optimizations": advanced_metrics,
+            "system_info": {
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "platform": sys.platform
+            }
+        }
+        
+        return metrics
+        
+    except Exception as e:
+        logger.error(f"Error getting metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
+async def health_check():
+    """Enhanced health check with component status."""
+    import time
+    
+    try:
+        config = get_performance_config()
+        
+        # Check core components
+        health_status = {
+            "status": "healthy",
+            "timestamp": time.time(),
+            "configuration": {
+                "advanced_optimization": config.enable_advanced_optimization,
+                "collaboration": config.enable_collaboration,
+                "debug_mode": config.debug_mode
+            },
+            "components": {
+                "connection_pool": "healthy" if get_global_component("connection_pool") else "not_initialized",
+                "request_queue": "healthy" if request_queue else "not_initialized",
+                "batch_processor": "healthy" if get_global_component("batch_processor") and not get_global_component("batch_processor").done() else "inactive"
+            },
+            "advanced_components": {
+                "parallel_executor": "active" if get_global_component("advanced_parallel_executor") else "inactive",
+                "rate_limiter": "active" if get_global_component("adaptive_rate_limiter") else "inactive",
+                "memory_manager": "active" if get_global_component("hierarchical_memory") else "inactive",
+                "error_recovery": "active" if get_global_component("smart_error_recovery") else "inactive"
+            }
+        }
+        
+        # Check if any critical component is unhealthy
+        if not get_global_component("connection_pool") or not request_queue:
+            health_status["status"] = "degraded"
+        
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": time.time()
+        }
+
+
+@app.get("/config")
+async def get_config():
+    """Get current performance configuration."""
+    try:
+        config = get_performance_config()
+        return {
+            "timestamp": time.time(),
+            "configuration": config.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Error getting configuration: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/config")
+async def update_config(config_update: Dict[str, Any]):
+    """Update performance configuration dynamically."""
+    try:
+        # Validate and update configuration
+        update_performance_config(config_update)
+        
+        # Get updated configuration
+        updated_config = get_performance_config()
+        
+        logger.info(f"Configuration updated: {config_update}")
+        
+        return {
+            "status": "success",
+            "message": "Configuration updated successfully",
+            "timestamp": time.time(),
+            "updated_configuration": updated_config.to_dict()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating configuration: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/config/reset")
+async def reset_config():
+    """Reset configuration to defaults."""
+    try:
+        from src.config.performance_config import reset_performance_config
+        
+        reset_performance_config()
+        config = get_performance_config()
+        
+        logger.info("Configuration reset to defaults")
+        
+        return {
+            "status": "success",
+            "message": "Configuration reset to defaults",
+            "timestamp": time.time(),
+            "default_configuration": config.to_dict()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error resetting configuration: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
