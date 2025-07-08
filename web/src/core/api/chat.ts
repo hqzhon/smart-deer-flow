@@ -54,6 +54,16 @@ export async function* chatStream(
     });
     
     for await (const event of stream) {
+      if (event.event === "error") {
+        yield {
+          type: "error" as const,
+          data: {
+            thread_id: "",
+            message: event.data,
+          },
+        } as ChatEvent;
+        continue;
+      }
       try {
         const parsedData = JSON.parse(event.data);
         yield {
@@ -62,8 +72,14 @@ export async function* chatStream(
         } as ChatEvent;
       } catch (parseError) {
         console.error('Failed to parse SSE event data:', event.data, parseError);
-        // Skip invalid JSON events instead of yielding an error event
-        continue;
+        yield {
+          type: "error",
+          data: {
+            thread_id: "",
+            message: "Failed to parse server-sent event.",
+            error: event.data,
+          },
+        } as ChatEvent;
       }
     }
   }catch(e){

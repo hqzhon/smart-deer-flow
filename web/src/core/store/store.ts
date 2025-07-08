@@ -122,6 +122,10 @@ export async function sendMessage(
   try {
     for await (const event of stream) {
       const { type, data } = event;
+      if (type === "error") {
+        toast(`Error: ${data.message}`);
+        break; // Stop processing the stream on error
+      }
       messageId = data.id;
       let message: Message | undefined;
       if (type === "tool_call_result") {
@@ -147,10 +151,10 @@ export async function sendMessage(
         updateMessage(message);
       }
     }
-  } catch {
+  } catch (error) {
     toast("An error occurred while generating the response. Please try again.");
     // Update message status.
-    // TODO: const isAborted = (error as Error).name === "AbortError";
+    const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
       const message = getMessage(messageId);
       if (message?.isStreaming) {

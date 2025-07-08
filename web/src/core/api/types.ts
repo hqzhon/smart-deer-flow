@@ -76,9 +76,19 @@ export interface InterruptEvent
     }
   > {}
 
+export interface ErrorEvent {
+  type: "error";
+  data: {
+    thread_id: string;
+    error?: string;
+    message?: string;
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
   | ToolCallChunksEvent
   | ToolCallResultEvent
-  | InterruptEvent;
+  | InterruptEvent
+  | ErrorEvent;
