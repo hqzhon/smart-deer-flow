@@ -109,7 +109,6 @@ bootstrap.bat -d   # Windows
 # 启用性能模式
 cp .env.performance.example .env.performance
 export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
-python scripts/start_server.py --performance-mode performance
 ```
 
 📖 **详细指南：** [性能优化](./README_PERFORMANCE.md) | [并行优化](./README_PARALLEL_OPTIMIZATION.md)

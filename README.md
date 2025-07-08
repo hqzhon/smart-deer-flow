@@ -127,7 +127,6 @@ SEARCH_API=tavily
 # Enable performance mode
 cp .env.performance.example .env.performance
 export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
-python scripts/start_server.py --performance-mode performance
 ```
 
 📖 **Detailed Guides:** [Performance](./README_PERFORMANCE.md) | [Parallel Optimization](./README_PARALLEL_OPTIMIZATION.md)
