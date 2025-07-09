@@ -17,6 +17,30 @@ from src.utils.structured_logging import (
 logger = get_logger(__name__)
 
 
+class ErrorHandlerConfig:
+    """Configuration constants for error handler to avoid hardcoded values"""
+    
+    # Binary search and iteration limits
+    MAX_ITERATIONS = 50
+    
+    # Token to character ratio estimates
+    CHAR_TO_TOKEN_RATIO_CONSERVATIVE = 2.5  # More conservative estimate
+    CHAR_TO_TOKEN_RATIO_ROUGH = 3.0  # Rough estimate: 1 token ≈ 3-4 characters
+    
+    # Token multipliers for different strategies
+    TOKEN_SAFETY_MULTIPLIER = 2  # For checking if content is extremely long
+    TOKEN_AGGRESSIVE_MULTIPLIER = 3  # For aggressive truncation fallback
+    
+    # Optimization and safety thresholds
+    OPTIMIZATION_THRESHOLD = 0.9  # 90% threshold for optimization
+    SAFETY_MARGIN = 0.8  # 80% safety margin
+    
+    # Truncation messages
+    TRUNCATION_SUFFIX = "...[truncated]"
+    TRUNCATION_NOTE = "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
+    SIMPLE_TRUNCATION_NOTE = "\n\n[Content truncated due to length constraints]"
+
+
 class LLMErrorType:
     """LLM error type constants"""
 
@@ -378,7 +402,7 @@ def _handle_content_too_long_error(
         # If content is extremely long, use aggressive chunking
         if (
             processor.count_tokens_accurate(combined_content, model_name).total_tokens
-            > max_tokens * 2
+            > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
         ):
             logger.info("Content is extremely long, using aggressive chunking")
             # Use aggressive chunking strategy for extremely long content
@@ -404,7 +428,7 @@ def _handle_content_too_long_error(
                     content = truncated_content
                     left, right = 0, len(content)
                     best_content = ""
-                    max_iterations = 50  # Prevent infinite loops
+                    max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
                     iteration_count = 0
 
                     # Handle edge case: empty content
@@ -417,9 +441,9 @@ def _handle_content_too_long_error(
                             
                             # Handle edge case: mid is 0
                             if mid == 0:
-                                test_content = "...[truncated]"
+                                test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                             else:
-                                test_content = content[:mid] + "...[truncated]"
+                                test_content = content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
                             
                             test_tokens = processor.estimate_tokens(
                                 test_content, model_name
@@ -438,15 +462,15 @@ def _handle_content_too_long_error(
                     if best_content:
                         truncated_content = best_content
                     else:
-                        # Fallback to conservative character limit if binary search fails
-                        char_limit = int(max_tokens * 2.5)  # More conservative estimate
-                        truncated_content = truncated_content[:char_limit]
-                        logger.warning(
-                            f"Applied emergency character-based truncation to {char_limit} characters"
-                        )
+                            # Fallback to conservative character limit if binary search fails
+                            char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
+                            truncated_content = truncated_content[:char_limit]
+                            logger.warning(
+                                f"Applied emergency character-based truncation to {char_limit} characters"
+                            )
 
                     # Add a note about truncation
-                    truncated_content += "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
+                    truncated_content += ErrorHandlerConfig.TRUNCATION_NOTE
             else:
                 # Fallback: take first portion based on character count
                 # Use precise token-based truncation
@@ -455,12 +479,12 @@ def _handle_content_too_long_error(
                 # Binary search for precise truncation
                 left, right = 0, len(combined_content)
                 best_content = ""
-                max_iterations = 50  # Prevent infinite loops
+                max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
                 iteration_count = 0
 
                 # Handle edge case: empty content
                 if not combined_content:
-                    best_content = "...[truncated]"
+                    best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                 else:
                     while left <= right and iteration_count < max_iterations:
                         iteration_count += 1
@@ -468,9 +492,9 @@ def _handle_content_too_long_error(
                         
                         # Handle edge case: mid is 0
                         if mid == 0:
-                            test_content = "...[truncated]"
+                            test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                         else:
-                            test_content = combined_content[:mid] + "...[truncated]"
+                            test_content = combined_content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
                         
                         test_tokens = processor.estimate_tokens(test_content, model_name)
 
@@ -488,10 +512,10 @@ def _handle_content_too_long_error(
                     truncated_content = best_content
                 else:
                     # Fallback to conservative character limit
-                    char_limit = int(max_tokens * 2.5)  # More conservative estimate
+                    char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
                     truncated_content = (
                         combined_content[:char_limit]
-                        + "\n\n[Content truncated due to length constraints]"
+                        + ErrorHandlerConfig.SIMPLE_TRUNCATION_NOTE
                     )
         else:
             # Try summarization first if LLM is available
@@ -520,7 +544,7 @@ def _handle_content_too_long_error(
                         combined_content, model_name, "auto"
                     )
                     truncated_content = (
-                        chunks[0] if chunks else combined_content[: max_tokens * 3]
+                        chunks[0] if chunks else combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
                     )
             else:
                 # Use chunking with aggressive strategy for very long content
@@ -531,7 +555,7 @@ def _handle_content_too_long_error(
                     if processor.count_tokens_accurate(
                         combined_content, model_name
                     ).total_tokens
-                    > max_tokens * 2
+                    > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
                     else "auto"
                 )
                 chunks = processor.smart_chunk_content(
@@ -558,7 +582,7 @@ def _handle_content_too_long_error(
 
                         # Handle edge case: empty content
                         if not content:
-                            best_content = "...[truncated]"
+                            best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                         else:
                             while left <= right and iteration_count < max_iterations:
                                 iteration_count += 1
@@ -589,11 +613,11 @@ def _handle_content_too_long_error(
                         else:
                             # Fallback to conservative character limit
                             char_limit = int(
-                                max_tokens * 2.5
+                                max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE
                             )  # More conservative estimate
                         truncated_content = truncated_content[:char_limit]
                 else:
-                    truncated_content = combined_content[: max_tokens * 3]
+                    truncated_content = combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
 
         # Create new message list with truncated content
         new_messages = []
@@ -737,15 +761,15 @@ async def _handle_content_too_long_error_async(
                     # Reuse existing processor instance
 
                     # Binary search for precise truncation
-                    content = truncated_content
-                    left, right = 0, len(content)
-                    best_content = ""
-                    max_iterations = 50  # Prevent infinite loops
-                    iteration_count = 0
+                        content = truncated_content
+                        left, right = 0, len(content)
+                        best_content = ""
+                        max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
+                        iteration_count = 0
 
-                    # Handle edge case: empty content
-                    if not content:
-                        best_content = "...[truncated]"
+                        # Handle edge case: empty content
+                        if not content:
+                            best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                     else:
                         while left <= right and iteration_count < max_iterations:
                             iteration_count += 1
@@ -753,9 +777,9 @@ async def _handle_content_too_long_error_async(
                             
                             # Handle edge case: mid is 0
                             if mid == 0:
-                                test_content = "...[truncated]"
+                                test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                             else:
-                                test_content = content[:mid] + "...[truncated]"
+                                test_content = content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
                             
                             test_tokens = processor.estimate_tokens(
                                 test_content, model_name
@@ -775,20 +799,20 @@ async def _handle_content_too_long_error_async(
                         truncated_content = best_content
                     else:
                         # Fallback to conservative character limit if binary search fails
-                        char_limit = int(max_tokens * 2.5)  # More conservative estimate
+                        char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
                         truncated_content = truncated_content[:char_limit]
                         logger.warning(
                             f"Applied emergency character-based truncation to {char_limit} characters"
                         )
 
                 # Add a note about truncation
-                truncated_content += "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
+                truncated_content += ErrorHandlerConfig.TRUNCATION_NOTE
             else:
                 # Fallback: take first portion based on character count
-                char_limit = max_tokens * 3  # Rough estimate: 1 token ≈ 3-4 characters
+                char_limit = max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER  # Rough estimate: 1 token ≈ 3-4 characters
                 truncated_content = (
                     combined_content[:char_limit]
-                    + "\n\n[Content truncated due to length constraints]"
+                    + ErrorHandlerConfig.SIMPLE_TRUNCATION_NOTE
                 )
         else:
             # Try summarization first if LLM is available
@@ -817,7 +841,7 @@ async def _handle_content_too_long_error_async(
                         combined_content, model_name, "auto"
                     )
                     truncated_content = (
-                        chunks[0] if chunks else combined_content[: max_tokens * 3]
+                        chunks[0] if chunks else combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
                     )
             else:
                 # Use chunking with aggressive strategy for very long content
@@ -828,7 +852,7 @@ async def _handle_content_too_long_error_async(
                     if processor.count_tokens_accurate(
                         combined_content, model_name
                     ).total_tokens
-                    > max_tokens * 2
+                    > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
                     else "auto"
                 )
                 chunks = processor.smart_chunk_content(
@@ -843,10 +867,10 @@ async def _handle_content_too_long_error_async(
                         ).total_tokens
                         > max_tokens
                     ):
-                        char_limit = int(max_tokens * 3)
+                        char_limit = int(max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER)
                         truncated_content = truncated_content[:char_limit]
                 else:
-                    truncated_content = combined_content[: max_tokens * 3]
+                    truncated_content = combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
 
         # Create new message list with truncated content
         new_messages = []
@@ -1057,18 +1081,18 @@ async def _evaluate_and_optimize_context_before_call(
                     model_limit = model_limits.safe_input_limit  # Use configured limit
 
                     if (
-                        estimated_tokens > model_limit * 0.9
+                        estimated_tokens > model_limit * ErrorHandlerConfig.OPTIMIZATION_THRESHOLD
                     ):  # 90% threshold for final check
                         logger.warning(
                             f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})"
                         )
                         # Emergency truncation
                         max_chars = int(
-                            model_limit * 0.8 * 3
+                            model_limit * ErrorHandlerConfig.SAFETY_MARGIN * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER
                         )  # Conservative character limit
                         if len(total_content) > max_chars:
                             truncated_content = (
-                                total_content[:max_chars] + "...[truncated]"
+                                total_content[:max_chars] + ErrorHandlerConfig.TRUNCATION_SUFFIX
                             )
                             # Update the last message with truncated content
                             if optimized_messages and hasattr(
@@ -1264,18 +1288,18 @@ def _evaluate_and_optimize_context_before_call_sync(
                     model_limit = model_limits.safe_input_limit  # Use configured limit
 
                     if (
-                        estimated_tokens > model_limit * 0.9
+                        estimated_tokens > model_limit * ErrorHandlerConfig.OPTIMIZATION_THRESHOLD
                     ):  # 90% threshold for final check
                         logger.warning(
                             f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})"
                         )
                         # Emergency truncation
                         max_chars = int(
-                            model_limit * 0.8 * 3
+                            model_limit * ErrorHandlerConfig.SAFETY_MARGIN * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER
                         )  # Conservative character limit
                         if len(total_content) > max_chars:
                             truncated_content = (
-                                total_content[:max_chars] + "...[truncated]"
+                                total_content[:max_chars] + ErrorHandlerConfig.TRUNCATION_SUFFIX
                             )
                             # Update the last message with truncated content
                             if optimized_messages and hasattr(
