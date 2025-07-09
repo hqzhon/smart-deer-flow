@@ -21,7 +21,7 @@ import { resourceSuggestion } from "./resource-suggestion";
 import React, { forwardRef, useEffect, useMemo, useRef } from "react";
 import type { Resource } from "~/core/messages";
 import { useRAGProvider } from "~/core/api/hooks";
-import { LoadingOutlined } from "@ant-design/icons";
+import { Loader2 } from "lucide-react";
 
 export interface MessageInputRef {
   focus: () => void;
@@ -170,7 +170,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     if (loading) {
       return (
         <div className={className}>
-          <LoadingOutlined />
+          <Loader2 className="size-4 animate-spin" />
         </div>
       );
     }

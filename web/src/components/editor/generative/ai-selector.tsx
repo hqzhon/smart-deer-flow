@@ -16,7 +16,7 @@ import Magic from "../../ui/icons/magic";
 import { ScrollArea } from "../../ui/scroll-area";
 import AICompletionCommands from "./ai-completion-command";
 import AISelectorCommands from "./ai-selector-commands";
-import { LoadingOutlined } from "@ant-design/icons";
+import { Loader2 } from "lucide-react";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { fetchStream } from "~/core/sse";
 //TODO: I think it makes more sense to create a custom Tiptap extension for this functionality https://tiptap.dev/docs/editor/ai/introduction
@@ -114,7 +114,7 @@ export function AISelector({ onOpenChange }: AISelectorProps) {
           <Magic className="mr-2 h-4 w-4 shrink-0" />
           AI is thinking
           <div className="mt-1 ml-2">
-            <LoadingOutlined />
+            <Loader2 className="size-4 animate-spin" />
           </div>
         </div>
       )}

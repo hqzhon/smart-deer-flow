@@ -17,7 +17,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.0.0",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-checkbox": "^1.2.3",
@@ -73,6 +72,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "sharp": "^0.34.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
     "tippy.js": "^6.3.7",
@@ -106,10 +106,5 @@
   "ct3aMetadata": {
     "initVersion": "7.39.3"
   },
-  "packageManager": "pnpm@10.6.5",
-  "pnpm": {
-    "ignoredBuiltDependencies": [
-      "sharp"
-    ]
-  }
+  "packageManager": "pnpm@10.6.5"
 }

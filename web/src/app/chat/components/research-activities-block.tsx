@@ -1,9 +1,9 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { PythonOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";
 import { LRUCache } from "lru-cache";
+import { Code2 } from "lucide-react";
 import { BookOpenText, FileText, PencilRuler, Search } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useMemo } from "react";
@@ -345,7 +345,7 @@ function PythonToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
   return (
     <section className="mt-4 pl-4">
       <div className="flex items-center">
-        <PythonOutlined className={"mr-2"} />
+        <Code2 className={"mr-2"} />
         <RainbowText
           className="text-base font-medium italic"
           animated={toolCall.result === undefined}

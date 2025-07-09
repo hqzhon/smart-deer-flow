@@ -23,7 +23,7 @@ export function mergeMessage(message: Message, event: ChatEvent) {
   } else if (event.type === "interrupt") {
     mergeInterruptMessage(message, event);
   }
-  if (event.data.finish_reason) {
+  if ('finish_reason' in event.data && event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
     message.isStreaming = false;
     if (message.toolCalls) {

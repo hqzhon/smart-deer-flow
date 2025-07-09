@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useStore, useToolCalls } from "~/core/store";
 import { Tooltip } from "./tooltip";
-import { WarningFilled } from "@ant-design/icons";
+import { AlertTriangle } from "lucide-react";
 
 export const Link = ({
   href,
@@ -52,7 +52,7 @@ export const Link = ({
           title="This link might be a hallucination from AI model and may not be reliable."
           delayDuration={300}
         >
-          <WarningFilled className="text-sx transition-colors hover:!text-yellow-500" />
+          <AlertTriangle className="text-sx transition-colors hover:!text-yellow-500" />
         </Tooltip>
       )}
     </span>

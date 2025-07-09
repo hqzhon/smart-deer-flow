@@ -3,7 +3,7 @@
 
 "use client";
 
-import { GithubOutlined } from "@ant-design/icons";
+import { Github } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -36,7 +36,7 @@ export default function HomePage() {
                 href="https://github.com/bytedance/deer-flow"
                 target="_blank"
               >
-                <GithubOutlined />
+                <Github className="size-4" />
               </Link>
             </Button>
           </Tooltip>

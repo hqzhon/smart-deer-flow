@@ -1,8 +1,8 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { LoadingOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import {
   Download,
   Headphones,
@@ -577,7 +577,7 @@ function PodcastCard({
       <CardHeader>
         <div className="text-muted-foreground flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
-            {isGenerating ? <LoadingOutlined /> : <Headphones size={16} />}
+            {isGenerating ? <Loader2 className="size-4 animate-spin" /> : <Headphones size={16} />}
             {!hasError ? (
               <RainbowText animated={isGenerating}>
                 {isGenerating

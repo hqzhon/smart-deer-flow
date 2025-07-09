@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { GithubFilled } from "@ant-design/icons";
+import { Github } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -70,7 +70,7 @@ export function Jumbotron() {
                 href="https://github.com/bytedance/deer-flow"
                 target="_blank"
               >
-                <GithubFilled />
+                <Github />
                 Learn More
               </Link>
             </Button>
