@@ -584,7 +584,6 @@ def planner_node(
                 pass
             
             # Calculate combined token count for messages + background content
-            import json
             messages_text = json.dumps(messages, ensure_ascii=False)
             combined_content = messages_text + background_content
             
