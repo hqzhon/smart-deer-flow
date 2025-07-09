@@ -26,7 +26,7 @@ def prose_longer_node(state: ProseState):
         messages,
         operation_name="Prose Longer",
         context="Making prose longer",
-        enable_context_evaluation=True
+
     )
     response_content = response.content if hasattr(response, 'content') else str(response)
     logger.info(f"prose_longer_node response: {response_content}")

@@ -160,7 +160,7 @@ class TokenBudgetManager:
         total_tokens = 0
         for msg in messages:
             content = msg.content if hasattr(msg, 'content') else str(msg)
-            total_tokens += self.content_processor.estimate_tokens(content)
+            total_tokens += self.content_processor.count_tokens_accurate(content, "deepseek-chat").total_tokens
         return total_tokens
     
     def validate_message_budget(self, 

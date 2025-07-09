@@ -12,8 +12,10 @@ from typing import List, Callable, Any, Optional, Dict, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
 
 from src.utils.rate_limiter import get_global_rate_limiter, RateLimiter
+from src.utils.decorators import safe_background_task
 from src.llms.error_handler import error_handler, LLMErrorType
 
 logger = logging.getLogger(__name__)
@@ -285,6 +287,7 @@ class ParallelExecutor:
                 return await loop.run_in_executor(executor, 
                                                 lambda: task.func(*task.args, **task.kwargs))
     
+    @safe_background_task
     async def _wait_for_task_completion(self):
         """Wait for at least one task to complete"""
         if not self.running_tasks:
@@ -300,9 +303,59 @@ class ParallelExecutor:
         # Process completed tasks
         for task in done:
             try:
-                await task  # Get result or exception
+                result = await task  # Get result or exception
+                # Find task ID for better logging
+                task_id = None
+                for tid, running_task in self.running_tasks.items():
+                    if running_task == task:
+                        task_id = tid
+                        break
+                
+                if task_id:
+                    logger.debug(f"Task {task_id} completed successfully")
+                else:
+                    logger.debug("Unknown task completed successfully")
+                    
+            except asyncio.CancelledError:
+                # Task was cancelled, find task ID for logging
+                task_id = None
+                for tid, running_task in self.running_tasks.items():
+                    if running_task == task:
+                        task_id = tid
+                        break
+                
+                if task_id:
+                    logger.warning(f"Task {task_id} was cancelled")
+                else:
+                    logger.warning("Unknown task was cancelled")
+                    
             except Exception as e:
-                logger.error(f"Unexpected error in task: {e}")
+                # Find task ID for better error reporting
+                task_id = None
+                for tid, running_task in self.running_tasks.items():
+                    if running_task == task:
+                        task_id = tid
+                        break
+                
+                if task_id:
+                    logger.error(
+                        f"Unexpected error in task {task_id}: {e}",
+                        exc_info=True,
+                        extra={
+                            "task_id": task_id,
+                            "error_type": type(e).__name__,
+                            "running_tasks_count": len(self.running_tasks)
+                        }
+                    )
+                else:
+                    logger.error(
+                        f"Unexpected error in unknown task: {e}",
+                        exc_info=True,
+                        extra={
+                            "error_type": type(e).__name__,
+                            "running_tasks_count": len(self.running_tasks)
+                        }
+                    )
     
     def _adaptive_adjust_concurrency(self):
         """Adaptive adjustment of concurrency"""

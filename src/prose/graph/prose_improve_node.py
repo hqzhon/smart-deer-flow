@@ -28,7 +28,7 @@ def prose_improve_node(state: ProseState):
         messages,
         operation_name="Prose Improver",
         context="Improve prose content",
-        enable_context_evaluation=True
+
     )
     response_content = prose_content.content if hasattr(prose_content, 'content') else str(prose_content)
     logger.info(f"prose_content: {response_content}")

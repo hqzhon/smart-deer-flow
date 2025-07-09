@@ -77,14 +77,21 @@ Please return the filtered results in JSON format:
         formatted_content = self._format_search_results(search_results)
         
         limits = self.content_processor.get_model_limits(model_name)
-        estimated_tokens = self.content_processor.estimate_tokens(formatted_content)
+        
+        # Use accurate token counting
+        content_within_limit, token_result = self.content_processor.check_content_token_limit(
+            formatted_content, model_name, limits.input_limit, limits.safety_margin
+        )
         
         # Calculate smart filtering threshold
         smart_filtering_threshold = int(limits.input_limit * self.SMART_FILTERING_THRESHOLD_RATIO)
         
-        logger.debug(f"Token estimation: {estimated_tokens}, smart filtering threshold: {smart_filtering_threshold}")
+        logger.debug(
+            f"Token estimation: {token_result.total_tokens}, "
+            f"smart filtering threshold: {smart_filtering_threshold}"
+        )
         
-        return estimated_tokens > smart_filtering_threshold
+        return token_result.total_tokens > smart_filtering_threshold
         
     def get_smart_filtering_threshold(self, model_name: str) -> int:
         """Get smart filtering threshold
@@ -134,8 +141,16 @@ Please return the filtered results in JSON format:
         
         limits = self.content_processor.get_model_limits(model_name)
         
-        if self.content_processor.estimate_tokens(filter_prompt) > limits.safe_input_limit:
-            logger.info("Search results too long, using batch filtering strategy")
+        # Use accurate token counting for filter prompt
+        prompt_within_limit, prompt_token_result = self.content_processor.check_content_token_limit(
+            filter_prompt, model_name, limits.safe_input_limit, limits.safety_margin
+        )
+        
+        if not prompt_within_limit:
+            logger.info(
+                f"Search results too long ({prompt_token_result.total_tokens} > {limits.safe_input_limit}), "
+                "using batch filtering strategy"
+            )
             return self._batch_filter_results(query, search_results, llm, model_name)
         
         # Direct filtering
@@ -177,7 +192,7 @@ Content: {content}
                 operation_name="search_result_filtering",
                 context="Filter and merge search results",
                 max_retries=3,
-                enable_context_evaluation=True
+    
             )
             
             response_content = response.content if hasattr(response, 'content') else str(response)
@@ -308,7 +323,7 @@ Please return the most relevant result numbers (1-{len(filtered_results)}), sepa
                 operation_name="secondary_filtering",
                 context="Select most relevant content from filtered results",
                 max_retries=2,
-                enable_context_evaluation=True
+    
             )
             
             response_content = response.content if hasattr(response, 'content') else str(response)

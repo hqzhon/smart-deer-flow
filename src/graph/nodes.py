@@ -414,10 +414,15 @@ def background_investigation_node(state: State, config: RunnableConfig):
     background_investigation_results = None
     
     # get the background investigation results
+    from src.llms.error_handler import safe_llm_call
+    
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
-        searched_content = LoggedTavilySearch(
-            max_results=configurable.max_search_results
-        ).invoke(query)
+        searched_content = safe_llm_call(
+            LoggedTavilySearch(max_results=configurable.max_search_results).invoke,
+            query,
+            operation_name="Background Investigation - Tavily Search",
+            context="Search for background information",
+        )
         if isinstance(searched_content, list):
             background_investigation_results = [
                 f"## {elem['title']}\n\n{elem['content']}" for elem in searched_content
@@ -429,9 +434,12 @@ def background_investigation_node(state: State, config: RunnableConfig):
             )
             return {"background_investigation_results": ""}
     else:
-        background_investigation_results = get_web_search_tool(
-            configurable.max_search_results
-        ).invoke(query)
+        background_investigation_results = safe_llm_call(
+            get_web_search_tool(configurable.max_search_results).invoke,
+            query,
+            operation_name="Background Investigation - Web Search",
+            context="Search for background information",
+        )
         raw_results = json.dumps(background_investigation_results, ensure_ascii=False)
     
     # Smart content processing is always enabled (smart chunking, summarization, and smart filtering)
@@ -442,11 +450,15 @@ def background_investigation_node(state: State, config: RunnableConfig):
             
             processor = ContentProcessor(configurable.model_token_limits)
             
-            # get the current llm model name
-            model_name = 'unknown'
+            # get the current llm model name with proper fallback
+            model_name = "deepseek-chat"  # Default fallback
             try:
                 current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
-                model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', 'unknown'))
+                model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', None))
+                # If model_name is None or 'unknown', use fallback based on agent type
+                if not model_name or model_name == 'unknown':
+                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
+                    model_name = "deepseek-reasoner" if agent_model == "reasoning" else "deepseek-chat"
             except Exception as e:
                 logger.warning(f"Failed to get LLM instance, trying to get model name from config: {e}")
                 logger.warning(f"Full traceback: {traceback.format_exc()}")
@@ -471,10 +483,12 @@ def background_investigation_node(state: State, config: RunnableConfig):
                     model_name = "deepseek-chat"  # Final fallback
                     current_llm = get_llm_by_type("basic")  # Fallback to basic model
             
-            # Check if the content exceeds the token limit
+            # Preemptive token check for raw search results
             model_limits = processor.get_model_limits(model_name)
-            current_tokens = processor.estimate_tokens(raw_results)
-            token_limit_exceeded = current_tokens > model_limits.safe_input_limit
+            results_within_limit, results_token_result = processor.check_content_token_limit(
+                raw_results, model_name, model_limits.safe_input_limit, model_limits.safety_margin
+            )
+            token_limit_exceeded = not results_within_limit
             
             # Use SearchResultFilter to determine if smart filtering should be enabled
             enable_smart_filtering = getattr(configurable, 'enable_smart_filtering', True)
@@ -487,11 +501,18 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 smart_filtering_threshold = filter_instance.get_smart_filtering_threshold(model_name)
             
             if token_limit_exceeded or should_use_smart_filtering:
-                logger.info(f"Applying smart processing to search results (tokens: {current_tokens}, threshold: {smart_filtering_threshold if 'smart_filtering_threshold' in locals() else 'N/A'})")
+                logger.info(
+                    f"Applying smart processing to search results "
+                    f"(tokens: {results_token_result.total_tokens}, limit: {model_limits.safe_input_limit}, "
+                    f"threshold: {smart_filtering_threshold if 'smart_filtering_threshold' in locals() else 'N/A'})"
+                )
                 
                 # Try smart filtering first if enabled and threshold is met
                 if enable_smart_filtering and should_use_smart_filtering and isinstance(searched_content, list):
-                    logger.info("Using smart filtering for search results (content exceeds 80% of input limit)")
+                    logger.info(
+                        f"Using smart filtering for search results "
+                        f"(tokens: {results_token_result.total_tokens} > 80% of {model_limits.safe_input_limit})"
+                    )
                     processed_results = processor.process_search_results(
                         search_results=searched_content,
                         llm=current_llm,
@@ -539,16 +560,85 @@ def planner_node(
     if state.get("enable_background_investigation") and state.get(
         "background_investigation_results"
     ):
-        messages += [
-            {
-                "role": "user",
-                "content": (
-                    "background investigation results of user query:\n"
-                    + state["background_investigation_results"]
-                    + "\n"
-                ),
-            }
-        ]
+        # Preemptive token check before adding background investigation results
+        background_content = (
+            "background investigation results of user query:\n"
+            + state["background_investigation_results"]
+            + "\n"
+        )
+        
+        # Check if adding background results would exceed token limits
+        try:
+            from src.utils.content_processor import ContentProcessor
+            processor = ContentProcessor(configurable.model_token_limits)
+            
+            # Get current model name
+            model_name = "deepseek-chat"  # Default fallback
+            try:
+                current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
+                model_name = getattr(current_llm, 'model_name', getattr(current_llm, 'model', None))
+                if not model_name or model_name == 'unknown':
+                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
+                    model_name = "deepseek-reasoner" if agent_model == "reasoning" else "deepseek-chat"
+            except Exception:
+                pass
+            
+            # Calculate combined token count for messages + background content
+            import json
+            messages_text = json.dumps(messages, ensure_ascii=False)
+            combined_content = messages_text + background_content
+            
+            model_limits = processor.get_model_limits(model_name)
+            content_within_limit, token_result = processor.check_content_token_limit(
+                combined_content, model_name, model_limits.safe_input_limit, model_limits.safety_margin
+            )
+            
+            if content_within_limit:
+                messages += [
+                    {
+                        "role": "user",
+                        "content": background_content,
+                    }
+                ]
+                logger.info(
+                    f"Added background investigation results to planner context "
+                    f"({token_result.total_tokens} tokens, within limit)"
+                )
+            else:
+                # Summarize background results if they would cause overflow
+                logger.warning(
+                    f"Background investigation results too large ({token_result.total_tokens} tokens), "
+                    f"summarizing to fit within {model_limits.safe_input_limit} token limit"
+                )
+                
+                summarized_background = processor.summarize_content(
+                    state["background_investigation_results"], 
+                    get_llm_by_type("basic"), 
+                    model_name, 
+                    "key_points"
+                )
+                
+                messages += [
+                    {
+                        "role": "user",
+                        "content": (
+                            "background investigation results of user query (summarized):\n"
+                            + summarized_background
+                            + "\n"
+                        ),
+                    }
+                ]
+                logger.info(f"Added summarized background investigation results to planner context")
+                
+        except Exception as e:
+            logger.error(f"Failed to check token limits for background investigation: {e}")
+            # Fallback to original behavior
+            messages += [
+                {
+                    "role": "user",
+                    "content": background_content,
+                }
+            ]
 
     # Configure LLM based on settings
     use_structured_output = AGENT_LLM_MAP["planner"] == "basic" and not configurable.enable_deep_thinking
@@ -571,14 +661,35 @@ def planner_node(
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
 
+    # Prepare messages with context evaluation
+    from src.utils.message_processor import prepare_messages_with_context_evaluation
+    
+    # Get model name for context evaluation
+    model_name = "deepseek-chat"  # Default fallback
+    try:
+        model_name = getattr(llm, 'model_name', getattr(llm, 'model', None))
+        if not model_name or model_name == 'unknown':
+            agent_model = AGENT_LLM_MAP.get("planner", "basic")
+            model_name = "deepseek-reasoner" if agent_model == "reasoning" else "deepseek-chat"
+    except Exception:
+        pass
+    
+    # Apply context evaluation and optimization
+    optimized_messages = prepare_messages_with_context_evaluation(
+        messages,
+        model_name=model_name,
+        operation_name="Planner",
+        context="Generate the full plan"
+    )
+    
     full_response = ""
     if use_structured_output:
         response = safe_llm_call(
             llm.invoke, 
-            messages,
+            optimized_messages,
             operation_name="Planner",
             context="Generate the full plan.",
-            enable_context_evaluation=True
+
         )
         if hasattr(response, 'model_dump_json'):
             full_response = response.model_dump_json(indent=4, exclude_none=True)
@@ -587,7 +698,13 @@ def planner_node(
             full_response = '{"steps": [{"title": "Research Task", "description": "Continue with general research due to content limitations."}]}'
     else:
         def stream_llm():
-            response = llm.stream(messages)
+            response = safe_llm_call(
+                llm.stream,
+                optimized_messages,
+                operation_name="LLM streaming call",
+                context="Stream LLM response",
+
+            )
             content = ""
             for chunk in response:
                 content += chunk.content
@@ -597,7 +714,7 @@ def planner_node(
             stream_llm,
             operation_name="Planner streaming call",
             context="Generate research plan",
-            enable_context_evaluation=True
+
         )
         full_response = response.content if hasattr(response, 'content') else str(response)
     logger.debug(f"Current state messages: {state['messages']}")
@@ -709,14 +826,25 @@ def coordinator_node(
     logger.info("Coordinator talking.")
     configurable = Configuration.from_runnable_config(config)
     messages = apply_prompt_template("coordinator", state)
+    
+    # Apply context evaluation and optimization before LLM call
+    from src.utils.message_processor import prepare_messages_with_context_evaluation
+    llm = get_llm_by_type(AGENT_LLM_MAP["coordinator"]).bind_tools([handoff_to_planner])
+    model_name = getattr(llm, 'model_name', 'coordinator')
+    
+    optimized_messages = prepare_messages_with_context_evaluation(
+        messages=messages,
+        model_name=model_name,
+        operation_name="Coordinator",
+        context="Coordinating with customers"
+    )
+    
     response = safe_llm_call(
-        get_llm_by_type(AGENT_LLM_MAP["coordinator"])
-        .bind_tools([handoff_to_planner])
-        .invoke,
-        messages,
+        llm.invoke,
+        optimized_messages,
         operation_name="Coordinator",
         context="Coordinating with customers",
-        enable_context_evaluation=True
+
     )
     logger.debug(f"Current state messages: {state['messages']}")
 
@@ -791,12 +919,24 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
     
+    # Apply context evaluation and optimization before LLM call
+    from src.utils.message_processor import prepare_messages_with_context_evaluation
+    llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
+    model_name = getattr(llm, 'model_name', 'reporter')
+    
+    optimized_messages = prepare_messages_with_context_evaluation(
+        messages=invoke_messages,
+        model_name=model_name,
+        operation_name="Reporter",
+        context="Generate the final report"
+    )
+    
     response = safe_llm_call(
-        get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke,
-        invoke_messages,
+        llm.invoke,
+        optimized_messages,
         operation_name="Reporter",
         context="Generate the final report",
-        enable_context_evaluation=True
+
     )
     response_content = response.content if hasattr(response, 'content') else str(response)
     logger.info(f"reporter response: {response_content}")
@@ -911,7 +1051,7 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
     dependencies = _analyze_step_dependencies(steps)
     logger.info(f"Step dependencies: {dependencies}")
     
-    observations = state.get("observations", [])
+    observations = list(state.get("observations", []))
     all_messages = []
     
     # Create parallel executor with rate limiting
@@ -965,12 +1105,14 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
     try:
         results = await executor.execute_all()
         
-        # Process results
+        # Process results and create updated steps list
+        updated_steps = list(steps)  # Create a copy of the steps list
         for task_id, task_result in results.items():
-            step = next((s for s in steps if s.title == task_id), None)
-            if not step:
+            step_index = next((i for i, s in enumerate(steps) if s.title == task_id), None)
+            if step_index is None:
                 continue
                 
+            step = steps[step_index]
             if task_result.status.value == "completed":
                 logger.info(f"Step '{task_id}' completed successfully")
                 if task_result.result and hasattr(task_result.result, 'content'):
@@ -978,6 +1120,10 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
                     # Get the agent type from the step
                     agent_type = "researcher" if step.step_type == StepType.RESEARCH else "coder"
                     all_messages.append(AIMessage(content=task_result.result.content, name=agent_type))
+                    
+                    # Update the step with the new one containing execution result
+                    if hasattr(task_result.result, 'updated_step'):
+                        updated_steps[step_index] = task_result.result.updated_step
             else:
                 logger.error(f"Step '{task_id}' failed with status: {task_result.status.value}")
                 if task_result.error:
@@ -985,7 +1131,8 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
                 # Ensure step has some result to prevent infinite loop
                 if not step.execution_res:
                     error_msg = str(task_result.error) if task_result.error else "Execution failed"
-                    step.execution_res = f"Execution failed: {error_msg}"
+                    # Create updated step with error message (immutable pattern)
+                    updated_steps[step_index] = step.copy(update={'execution_res': f"Execution failed: {error_msg}"})
         
         # Log execution statistics
         stats = executor.get_stats()
@@ -994,18 +1141,24 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
     except Exception as e:
         logger.error(f"Parallel executor failed: {e}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        # Mark all unexecuted steps as failed
-        for step in steps:
+        # Mark all unexecuted steps as failed (immutable pattern)
+        if 'updated_steps' not in locals():
+            updated_steps = list(steps)  # Create copy if not already created
+        for i, step in enumerate(steps):
             if not step.execution_res:
-                step.execution_res = f"Parallel Executor failed: {str(e)}"
+                updated_steps[i] = step.copy(update={'execution_res': f"Parallel Executor failed: {str(e)}"})
+    
+    # Create updated plan with new steps
+    updated_plan = current_plan.copy(update={'steps': updated_steps})
     
     # Check if all steps are completed
-    if all(step.execution_res for step in steps):
+    if all(step.execution_res for step in updated_steps):
         logger.info("All steps completed via parallel execution")
         return Command(
             update={
                 "messages": all_messages,
                 "observations": observations,
+                "current_plan": updated_plan,
             },
             goto="planner"
         )
@@ -1015,6 +1168,7 @@ async def _execute_steps_parallel(state: State, config: RunnableConfig, max_para
             update={
                 "messages": all_messages,
                 "observations": observations,
+                "current_plan": updated_plan,
             },
             goto="research_team"
         )
@@ -1024,9 +1178,18 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
     """Execute a single step in parallel context with proactive token budget management."""
     logger.info(f"Executing step in parallel: {step.title} with {agent_type}")
     
-    # Get completed steps for context
+    # Get completed steps for context - AGGRESSIVE LIMITATION FOR PARALLEL EXECUTION
     current_plan = state.get("current_plan")
     completed_steps = [s for s in current_plan.steps if s.execution_res and s.title != step.title]
+    
+    # CRITICAL: Limit context sharing in parallel execution to prevent token explosion
+    # Only keep the most recent 1-2 completed steps to minimize context accumulation
+    if len(completed_steps) > 2:
+        completed_steps = completed_steps[-2:]  # Only keep last 2 steps
+        logger.info(f"Limited context to last 2 completed steps for parallel execution")
+    elif len(completed_steps) > 1:
+        completed_steps = completed_steps[-1:]  # Only keep last 1 step if more than 1
+        logger.info(f"Limited context to last 1 completed step for parallel execution")
     
     # Initialize configuration and processors
     configurable = Configuration.from_runnable_config(config)
@@ -1094,9 +1257,12 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
         
         # Check if context sharing should be disabled
         disable_context_parallel = getattr(configurable, 'disable_context_parallel', False)
-        if disable_context_parallel:
-            logger.info("Context sharing disabled for parallel execution")
-            completed_steps = []
+        
+        # AGGRESSIVE: Default to disabling context sharing in parallel execution
+        # This prevents token explosion when multiple tasks run simultaneously
+        if disable_context_parallel or len(completed_steps) > 0:
+            logger.info("Context sharing disabled/limited for parallel execution to prevent token overflow")
+            completed_steps = []  # Completely disable context sharing for maximum token savings
         
         # Select compression strategy based on budget constraints
         strategy = CompressionStrategy.ADAPTIVE
@@ -1307,6 +1473,19 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
             aggressive_mode=True  # Enable aggressive mode for parallel execution
         )
     
+    # Apply context evaluation and optimization before LLM call
+    from src.utils.message_processor import prepare_messages_with_context_evaluation
+    
+    optimized_messages = prepare_messages_with_context_evaluation(
+        messages=agent_input["messages"],
+        model_name=model_name,
+        operation_name=f"{agent_type} executor (parallel)",
+        context=f"Parallel execution of step: {step.title}"
+    )
+    
+    # Update agent_input with optimized messages
+    agent_input["messages"] = optimized_messages
+    
     # Execute agent with budget tracking
     try:
         result = await safe_llm_call_async(
@@ -1316,7 +1495,7 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
             operation_name=f"{agent_type} executor (parallel)",
             context=f"Parallel execution of step: {step.title}",
             enable_smart_processing=True,
-            enable_context_evaluation=True,
+
             max_retries=2  # Reduce retries for parallel execution
         )
         
@@ -1357,11 +1536,11 @@ async def _execute_single_step_parallel(state: State, config: RunnableConfig, st
     else:
         response_content = result.content if hasattr(result, 'content') else str(result)
     
-    # Update step with result
-    step.execution_res = response_content
+    # Create new Step object with updated execution result (immutable pattern)
+    updated_step = step.copy(update={'execution_res': response_content})
     logger.info(f"Parallel step '{step.title}' completed by {agent_type}")
     
-    return type('StepResult', (), {'content': response_content})()
+    return type('StepResult', (), {'content': response_content, 'updated_step': updated_step})()
 
 
 async def _execute_steps_serial(state: State, config: RunnableConfig) -> Command:
@@ -1565,6 +1744,19 @@ async def _execute_agent_step(
     
     logger.info(f"Agent input (after truncation): {len(agent_input['messages'])} messages")
     
+    # Apply context evaluation and optimization before LLM call
+    from src.utils.message_processor import prepare_messages_with_context_evaluation
+    
+    optimized_messages = prepare_messages_with_context_evaluation(
+        messages=agent_input["messages"],
+        model_name=model_name,
+        operation_name=f"{agent_name} executor",
+        context=f"Execute step: {current_step.title}"
+    )
+    
+    # Update agent_input with optimized messages
+    agent_input["messages"] = optimized_messages
+    
     result = await safe_llm_call_async(
         agent.ainvoke,
         input=agent_input, 
@@ -1572,7 +1764,7 @@ async def _execute_agent_step(
         operation_name=f"{agent_name} executor",
         context=f"Execute step: {current_step.title}",
         enable_smart_processing=True,
-        enable_context_evaluation=True,
+
         max_retries=3
     )
     
@@ -1585,8 +1777,16 @@ async def _execute_agent_step(
     
     logger.debug(f"{agent_name.capitalize()} full response: {response_content}")
     
-    # Update the step with the execution result
-    current_step.execution_res = response_content
+    # Create updated step with execution result (immutable pattern)
+    updated_step = current_step.copy(update={'execution_res': response_content})
+    
+    # Create updated plan with the new step
+    updated_steps = list(current_plan.steps)
+    step_index = next((i for i, s in enumerate(current_plan.steps) if s.title == current_step.title), None)
+    if step_index is not None:
+        updated_steps[step_index] = updated_step
+    
+    updated_plan = current_plan.copy(update={'steps': updated_steps})
     logger.info(f"Step '{current_step.title}' execution completed by {agent_name}")
 
     return Command(
@@ -1598,6 +1798,7 @@ async def _execute_agent_step(
                 )
             ],
             "observations": observations + [response_content],
+            "current_plan": updated_plan,
         },
         goto="research_team",
     )

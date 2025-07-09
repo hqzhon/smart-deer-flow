@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.language_models import BaseChatModel
+from .token_counter import get_token_counter, TokenCountResult, check_token_limit
 
 logger = logging.getLogger(__name__)
 
@@ -325,16 +326,41 @@ class ContentProcessor:
         logger.warning(f"Token limit configuration not found for model '{model_name}' in available configurations: {list(self.model_limits.keys())}, using default configuration")
         return self.default_limits
     
-    def estimate_tokens(self, text: str) -> int:
-        """Estimate text token count (simple estimation: 1 token ≈ 4 characters)"""
-        # For Chinese, 1 character is approximately equal to 1 token
-        # For English, 1 token is approximately equal to 4 characters
-        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
-        english_chars = len(text) - chinese_chars
-        return chinese_chars + (english_chars // 4)
+    def estimate_tokens(self, text: str, model_name: str = "deepseek-chat") -> int:
+        """Get accurate token count using tiktoken"""
+        try:
+            token_counter = get_token_counter()
+            result = token_counter.count_tokens(text, model_name)
+            logger.debug(f"Accurate token count for model {model_name}: {result.total_tokens} tokens")
+            return result.total_tokens
+        except Exception as e:
+            logger.warning(f"Failed to get accurate token count, falling back to estimation: {e}")
+            # Fallback to conservative estimation
+            chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+            english_chars = len(text) - chinese_chars
+            
+            # Apply conservative multipliers
+            chinese_tokens = int(chinese_chars * 1.2)
+            english_tokens = int(english_chars / 3)
+            
+            # Add safety buffer
+            total_tokens = chinese_tokens + english_tokens
+            safety_buffer = int(total_tokens * 0.15)  # 15% safety buffer for fallback
+            
+            return total_tokens + safety_buffer
     
-    def chunk_text_by_sentences(self, text: str, max_tokens: int) -> List[str]:
-        """Chunk text by sentences"""
+    def count_tokens_accurate(self, text: str, model_name: str) -> TokenCountResult:
+        """Get detailed token count information"""
+        token_counter = get_token_counter()
+        return token_counter.count_tokens(text, model_name)
+    
+    def check_content_token_limit(self, content: str, model_name: str, max_tokens: int, safety_margin: float = 0.9) -> Tuple[bool, TokenCountResult]:
+        """Check if content exceeds token limit with detailed information"""
+        token_counter = get_token_counter()
+        return token_counter.check_token_limit(content, model_name, max_tokens, safety_margin)
+    
+    def chunk_text_by_sentences(self, text: str, max_tokens: int, model_name: str = "deepseek-chat") -> List[str]:
+        """Chunk text by sentences with accurate token counting"""
         # Split by sentences
         sentences = re.split(r'[.!?。！？]\s*', text)
         chunks = []
@@ -345,8 +371,8 @@ class ContentProcessor:
                 continue
                 
             sentence = sentence.strip() + "。"  # Add period
-            sentence_tokens = self.estimate_tokens(sentence)
-            current_tokens = self.estimate_tokens(current_chunk)
+            sentence_tokens = self.count_tokens_accurate(sentence, model_name).total_tokens
+            current_tokens = self.count_tokens_accurate(current_chunk, model_name).total_tokens if current_chunk else 0
             
             if current_tokens + sentence_tokens <= max_tokens:
                 current_chunk += sentence
@@ -360,8 +386,8 @@ class ContentProcessor:
         
         return chunks
     
-    def chunk_text_by_paragraphs(self, text: str, max_tokens: int) -> List[str]:
-        """Chunk text by paragraphs"""
+    def chunk_text_by_paragraphs(self, text: str, max_tokens: int, model_name: str = "deepseek-chat") -> List[str]:
+        """Chunk text by paragraphs with accurate token counting"""
         paragraphs = text.split('\n\n')
         chunks = []
         current_chunk = ""
@@ -370,8 +396,8 @@ class ContentProcessor:
             if not paragraph.strip():
                 continue
                 
-            paragraph_tokens = self.estimate_tokens(paragraph)
-            current_tokens = self.estimate_tokens(current_chunk)
+            paragraph_tokens = self.count_tokens_accurate(paragraph, model_name).total_tokens
+            current_tokens = self.count_tokens_accurate(current_chunk, model_name).total_tokens if current_chunk else 0
             
             if current_tokens + paragraph_tokens <= max_tokens:
                 current_chunk += "\n\n" + paragraph if current_chunk else paragraph
@@ -381,7 +407,7 @@ class ContentProcessor:
                 
                 # If a single paragraph is too long, chunk by sentences
                 if paragraph_tokens > max_tokens:
-                    sentence_chunks = self.chunk_text_by_sentences(paragraph, max_tokens)
+                    sentence_chunks = self.chunk_text_by_sentences(paragraph, max_tokens, model_name)
                     chunks.extend(sentence_chunks)
                     current_chunk = ""
                 else:
@@ -393,12 +419,12 @@ class ContentProcessor:
         return chunks
     
     def smart_chunk_content(self, content: str, model_name: str, chunk_strategy: str = "auto") -> List[str]:
-        """Smart chunk content with security validation
+        """Smart chunk content with security validation and accurate token counting
         
         Args:
             content: Content to be chunked
             model_name: Model name
-            chunk_strategy: Chunking strategy ("sentences", "paragraphs", "auto")
+            chunk_strategy: Chunking strategy ("sentences", "paragraphs", "auto", "aggressive")
         
         Returns:
             List of chunked content
@@ -417,21 +443,34 @@ class ContentProcessor:
         limits = self.get_model_limits(model_name)
         max_tokens = limits.safe_input_limit
         
-        # If content doesn't exceed limit, return directly
-        if self.estimate_tokens(content) <= max_tokens:
+        # Preemptive token check with accurate counting
+        is_within_limit, token_result = self.check_content_token_limit(
+            content, model_name, max_tokens, limits.safety_margin
+        )
+        
+        if is_within_limit:
+            logger.debug(f"Content within token limit ({token_result.total_tokens} <= {max_tokens}), no chunking needed")
             return [content]
         
-        logger.info(f"Content exceeds token limit for model {model_name}, starting chunking process")
+        logger.info(
+            f"Content exceeds token limit for model {model_name} "
+            f"({token_result.total_tokens} > {max_tokens}), starting chunking process"
+        )
         
         if chunk_strategy == "auto":
             # Auto strategy: try paragraph chunking first, then sentence chunking if chunks are too large
-            chunks = self.chunk_text_by_paragraphs(content, max_tokens)
+            chunks = self.chunk_text_by_paragraphs(content, max_tokens, model_name)
             
-            # Check if any chunks are still too large
+            # Check if any chunks are still too large using accurate counting
             final_chunks = []
-            for chunk in chunks:
-                if self.estimate_tokens(chunk) > max_tokens:
-                    sentence_chunks = self.chunk_text_by_sentences(chunk, max_tokens)
+            for i, chunk in enumerate(chunks):
+                chunk_within_limit, chunk_token_result = self.check_content_token_limit(
+                    chunk, model_name, max_tokens, limits.safety_margin
+                )
+                
+                if not chunk_within_limit:
+                    logger.debug(f"Chunk {i+1} still too large ({chunk_token_result.total_tokens} tokens), using sentence chunking")
+                    sentence_chunks = self.chunk_text_by_sentences(chunk, max_tokens, model_name)
                     final_chunks.extend(sentence_chunks)
                 else:
                     final_chunks.append(chunk)
@@ -439,10 +478,10 @@ class ContentProcessor:
             return final_chunks
         
         elif chunk_strategy == "paragraphs":
-            return self.chunk_text_by_paragraphs(content, max_tokens)
+            return self.chunk_text_by_paragraphs(content, max_tokens, model_name)
         
         elif chunk_strategy == "sentences":
-            return self.chunk_text_by_sentences(content, max_tokens)
+            return self.chunk_text_by_sentences(content, max_tokens, model_name)
         
         elif chunk_strategy == "aggressive":
             # Aggressive strategy: use much smaller chunks for extremely long content
@@ -450,14 +489,40 @@ class ContentProcessor:
             logger.info(f"Using aggressive chunking with max {aggressive_max_tokens} tokens per chunk")
             
             # Try sentence chunking first with reduced limit
-            chunks = self.chunk_text_by_sentences(content, aggressive_max_tokens)
+            chunks = self.chunk_text_by_sentences(content, aggressive_max_tokens, model_name)
             
             # If still too large, use character-based chunking
             final_chunks = []
             for chunk in chunks:
-                if self.estimate_tokens(chunk) > aggressive_max_tokens:
+                chunk_within_limit, chunk_token_result = self.check_content_token_limit(
+                    chunk, model_name, aggressive_max_tokens, limits.safety_margin
+                )
+                
+                if not chunk_within_limit:
+                    logger.debug(f"Chunk still too large ({chunk_token_result.total_tokens} tokens), using character-based chunking")
                     # Character-based chunking as last resort
-                    char_limit = aggressive_max_tokens * 3  # Rough estimate: 1 token ≈ 3-4 characters
+                    # Use precise token-based truncation instead of character estimation
+                    # Binary search for precise truncation
+                    content = chunk
+                    left, right = 0, len(content)
+                    best_content = ""
+                    
+                    while left <= right:
+                        mid = (left + right) // 2
+                        test_content = content[:mid] + "...[truncated]"
+                        test_tokens = self.estimate_tokens(test_content, model_name)
+                        
+                        if test_tokens <= aggressive_max_tokens:
+                            best_content = test_content
+                            left = mid + 1
+                        else:
+                            right = mid - 1
+                    
+                    if best_content:
+                        final_chunks.append(best_content)
+                    else:
+                        # Fallback to conservative character limit
+                        char_limit = aggressive_max_tokens * 2.5  # More conservative estimate
                     chunk_parts = [chunk[i:i+char_limit] for i in range(0, len(chunk), char_limit)]
                     final_chunks.extend(chunk_parts)
                 else:
@@ -516,7 +581,7 @@ Abstract:"""
                          llm: BaseChatModel, 
                          model_name: str,
                          summary_type: str = "comprehensive") -> str:
-        """Summarize content
+        """Summarize content with accurate token counting and preemptive checks
         
         Args:
             content: Content to be summarized
@@ -529,28 +594,48 @@ Abstract:"""
         """
         limits = self.get_model_limits(model_name)
         
-        # If content doesn't exceed limit, can summarize directly
-        if self.estimate_tokens(content) <= limits.safe_input_limit:
+        # Preemptive token check for content
+        is_within_limit, token_result = self.check_content_token_limit(
+            content, model_name, limits.safe_input_limit, limits.safety_margin
+        )
+        
+        if is_within_limit:
+            logger.debug(f"Content within token limit ({token_result.total_tokens} tokens), direct summarization")
             prompt = self.create_summary_prompt(content, summary_type)
-            messages = [HumanMessage(content=prompt)]
             
-            try:
-                from src.llms.error_handler import safe_llm_call
-                response = safe_llm_call(
-                    llm.invoke,
-                    messages,
-                    operation_name="Content Summarization",
-                    context="Summarizing content within token limits",
-                    max_retries=3,
-                    enable_context_evaluation=True
+            # Check prompt token count before sending
+            prompt_within_limit, prompt_token_result = self.check_content_token_limit(
+                prompt, model_name, limits.safe_input_limit, limits.safety_margin
+            )
+            
+            if not prompt_within_limit:
+                logger.warning(
+                    f"Prompt exceeds token limit ({prompt_token_result.total_tokens} > {limits.safe_input_limit}), "
+                    "falling back to chunked summarization"
                 )
-                return response.content
-            except Exception as e:
-                logger.error(f"Error occurred while summarizing content: {e}")
-                return content  # Return original content
+            else:
+                messages = [HumanMessage(content=prompt)]
+                
+                try:
+                    from src.llms.error_handler import safe_llm_call
+                    response = safe_llm_call(
+                        llm.invoke,
+                        messages,
+                        operation_name="Content Summarization",
+                        context="Summarizing content within token limits",
+                        max_retries=3,
+            
+                    )
+                    return response.content
+                except Exception as e:
+                    logger.error(f"Error occurred while summarizing content: {e}")
+                    return content  # Return original content
         
         # Content too long, need chunked summarization
-        logger.info("Content too long, using chunked summarization strategy")
+        logger.info(
+            f"Content too long ({token_result.total_tokens} > {limits.safe_input_limit}), "
+            "using chunked summarization strategy"
+        )
         chunks = self.smart_chunk_content(content, model_name)
         
         summaries = []
@@ -558,6 +643,20 @@ Abstract:"""
             logger.info(f"Summarizing chunk {i+1}/{len(chunks)}")
             
             prompt = self.create_summary_prompt(chunk, summary_type)
+            
+            # Check each prompt before sending
+            prompt_within_limit, prompt_token_result = self.check_content_token_limit(
+                prompt, model_name, limits.safe_input_limit, limits.safety_margin
+            )
+            
+            if not prompt_within_limit:
+                logger.warning(
+                    f"Chunk {i+1} prompt exceeds token limit ({prompt_token_result.total_tokens} tokens), "
+                    "using original chunk content"
+                )
+                summaries.append(chunk)
+                continue
+            
             messages = [HumanMessage(content=prompt)]
             
             try:
@@ -568,7 +667,7 @@ Abstract:"""
                     operation_name="Chunk Summarization",
                     context=f"Summarizing chunk {i+1}/{len(chunks)}",
                     max_retries=3,
-                    enable_context_evaluation=True
+        
                 )
                 summaries.append(response.content)
             except Exception as e:
@@ -578,9 +677,16 @@ Abstract:"""
         # Merge all summaries
         combined_summary = "\n\n".join(summaries)
         
-        # If merged summary is still too long, summarize again
-        if self.estimate_tokens(combined_summary) > limits.safe_input_limit:
-            logger.info("Merged summary still too long, performing secondary summarization")
+        # Check if merged summary is still too long
+        combined_within_limit, combined_token_result = self.check_content_token_limit(
+            combined_summary, model_name, limits.safe_input_limit, limits.safety_margin
+        )
+        
+        if not combined_within_limit:
+            logger.info(
+                f"Merged summary still too long ({combined_token_result.total_tokens} > {limits.safe_input_limit}), "
+                "performing secondary summarization"
+            )
             return self.summarize_content(combined_summary, llm, model_name, "abstract")
         
         return combined_summary
@@ -648,15 +754,22 @@ Content: {content}
         # Get model limits for token checking
         limits = self.get_model_limits(model_name)
         
+        # Preemptive token check for combined results
+        results_within_limit, results_token_result = self.check_content_token_limit(
+            combined_results, model_name, limits.safe_input_limit, limits.safety_margin
+        )
+        
         # Use smart filtering if enabled, query is provided, and threshold is met
         if enable_smart_filtering and query and should_use_smart_filtering:
             try:
                 # Get threshold info for logging
                 from src.utils.search_result_filter import SearchResultFilter
                 filter_instance = SearchResultFilter(self)
-                current_tokens = self.estimate_tokens(combined_results)
                 smart_filtering_threshold = filter_instance.get_smart_filtering_threshold(model_name)
-                logger.info(f"Using smart filtering for search results (tokens: {current_tokens}, threshold: {smart_filtering_threshold})")
+                logger.info(
+                    f"Using smart filtering for search results "
+                    f"(tokens: {results_token_result.total_tokens}, threshold: {smart_filtering_threshold})"
+                )
                 
                 filtered_data = filter_instance.filter_search_results(
                     query=query,
@@ -670,11 +783,22 @@ Content: {content}
                 filtered_formatted_results = filter_instance.format_filtered_results(filtered_data)
                 
                 # Check if the filtered results are within token limits
-                if self.estimate_tokens(filtered_formatted_results) <= limits.safe_input_limit:
-                    logger.info(f"Smart filtering successful: {filtered_data.get('total_filtered', 0)}/{filtered_data.get('total_original', 0)} results")
+                filtered_within_limit, filtered_token_result = self.check_content_token_limit(
+                    filtered_formatted_results, model_name, limits.safe_input_limit, limits.safety_margin
+                )
+                
+                if filtered_within_limit:
+                    logger.info(
+                        f"Smart filtering successful: {filtered_data.get('total_filtered', 0)}/"
+                        f"{filtered_data.get('total_original', 0)} results "
+                        f"({filtered_token_result.total_tokens} tokens)"
+                    )
                     return filtered_formatted_results
                 else:
-                    logger.info("Filtered results still too long, applying additional summarization")
+                    logger.info(
+                        f"Filtered results still too long ({filtered_token_result.total_tokens} tokens), "
+                        "applying additional summarization"
+                    )
                     return self.summarize_content(filtered_formatted_results, llm, model_name, "key_points")
                     
             except Exception as e:
@@ -685,8 +809,11 @@ Content: {content}
         # Use the already formatted results from above
         
         # Check if summarization is needed
-        if self.estimate_tokens(combined_results) > limits.safe_input_limit:
-            logger.info("Search results too long, starting intelligent summarization")
+        if not results_within_limit:
+            logger.info(
+                f"Search results too long ({results_token_result.total_tokens} > {limits.safe_input_limit}), "
+                "starting intelligent summarization"
+            )
             return self.summarize_content(combined_results, llm, model_name, "key_points")
         
         # Final security check on combined results

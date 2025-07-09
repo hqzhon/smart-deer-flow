@@ -39,6 +39,7 @@ def apply_prompt_template(
 ) -> list:
     """
     Apply template variables to a prompt template and return formatted messages.
+    CRITICAL: This function now includes context evaluation to prevent token overflow.
 
     Args:
         prompt_name: Name of the prompt template to use
@@ -47,10 +48,86 @@ def apply_prompt_template(
     Returns:
         List of messages with the system prompt as the first message
     """
-    # Convert state to dict for template rendering
+    from src.utils.context_evaluator import ContextStateEvaluator, get_global_context_evaluator
+    from src.config.config_loader import config_loader
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # CRITICAL: Apply context evaluation before template rendering
+    try:
+        config = config_loader.create_configuration()
+        evaluator = get_global_context_evaluator(config)
+        
+        # Get messages from state, with aggressive limitation
+        messages = state.get("messages", [])
+        
+        # AGGRESSIVE: Limit messages to prevent token explosion in template rendering
+        if len(messages) > 10:  # Only keep last 10 messages
+            messages = messages[-10:]
+            logger.info(f"Limited messages to last 10 for template rendering to prevent token overflow")
+        elif len(messages) > 5:  # Only keep last 5 messages if more than 5
+            messages = messages[-5:]
+            logger.info(f"Limited messages to last 5 for template rendering")
+        
+        # Apply context evaluation to messages
+        model_name = getattr(config, 'model', 'deepseek-chat')
+        
+        # Convert messages to proper format if needed
+        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+        formatted_messages = []
+        for msg in messages:
+            if isinstance(msg, dict):
+                role = msg.get('role', 'human')
+                content = msg.get('content', '')
+                if role == 'system':
+                    formatted_messages.append(SystemMessage(content=content))
+                elif role == 'assistant':
+                    formatted_messages.append(AIMessage(content=content))
+                else:
+                    formatted_messages.append(HumanMessage(content=content))
+            else:
+                formatted_messages.append(msg)
+        
+        # Evaluate context and optimize if needed
+        metrics = evaluator.evaluate_context_before_llm_call(
+            formatted_messages, 
+            model_name,
+            "template_rendering"
+        )
+        
+        if metrics.compression_needed:
+            optimized_messages, optimization_info = evaluator.optimize_context_for_llm_call(
+                formatted_messages,
+                model_name,
+                metrics.recommended_strategy,
+                "template_rendering"
+            )
+            logger.info(f"Context optimization applied: {optimization_info}")
+            evaluated_messages = optimized_messages
+        else:
+            evaluated_messages = formatted_messages
+        
+        # Convert back to dict format for consistency
+        evaluated_messages = [
+            {
+                'role': 'system' if isinstance(msg, SystemMessage) else 
+                       'assistant' if isinstance(msg, AIMessage) else 'user',
+                'content': msg.content
+            }
+            for msg in evaluated_messages
+        ]
+        
+        logger.info(f"Context evaluation applied in template rendering: {len(messages)} -> {len(evaluated_messages)} messages")
+        
+    except Exception as e:
+        logger.warning(f"Context evaluation failed in template rendering, using original messages: {e}")
+        evaluated_messages = state.get("messages", [])
+    
+    # Convert state to dict for template rendering, but exclude messages to avoid duplication
     state_vars = {
         "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
-        **state,
+        **{k: v for k, v in state.items() if k != "messages"},  # CRITICAL: Exclude messages from state_vars
     }
 
     # Add configurable variables
@@ -60,6 +137,6 @@ def apply_prompt_template(
     try:
         template = env.get_template(f"{prompt_name}.md")
         system_prompt = template.render(**state_vars)
-        return [{"role": "system", "content": system_prompt}] + state["messages"]
+        return [{"role": "system", "content": system_prompt}] + evaluated_messages
     except Exception as e:
         raise ValueError(f"Error applying template {prompt_name}: {e}")

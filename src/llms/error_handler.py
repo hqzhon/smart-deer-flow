@@ -303,7 +303,7 @@ def _handle_content_too_long_error(llm_func: Callable, error: Exception, *args, 
         
         # Try to extract messages and model information from parameters
         messages = None
-        model_name = "unknown"
+        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
         llm = None
         
         # Check messages in args
@@ -346,7 +346,7 @@ def _handle_content_too_long_error(llm_func: Callable, error: Exception, *args, 
         max_tokens = int(model_limits.input_limit * model_limits.safety_margin)
         
         # If content is extremely long, use aggressive chunking
-        if processor.estimate_tokens(combined_content) > max_tokens * 2:
+        if processor.count_tokens_accurate(combined_content, model_name).total_tokens > max_tokens * 2:
             logger.info("Content is extremely long, using aggressive chunking")
             # Use aggressive chunking strategy for extremely long content
             chunks = processor.smart_chunk_content(combined_content, model_name, "aggressive")
@@ -355,18 +355,65 @@ def _handle_content_too_long_error(llm_func: Callable, error: Exception, *args, 
                 truncated_content = chunks[0]
                 
                 # Double-check the chunk size and further truncate if needed
-                if processor.estimate_tokens(truncated_content) > max_tokens:
+                if processor.count_tokens_accurate(truncated_content, model_name).total_tokens > max_tokens:
                     # Emergency truncation: use character-based limit
-                    char_limit = int(max_tokens * 3)  # Rough estimate: 1 token ≈ 3-4 characters
-                    truncated_content = truncated_content[:char_limit]
-                    logger.warning(f"Applied emergency character-based truncation to {char_limit} characters")
+                    # Use precise token-based truncation instead of character estimation
+                    from src.utils.content_processor import ContentProcessor
+                    processor = ContentProcessor()
                 
-                # Add a note about truncation
-                truncated_content += "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
+                    # Binary search for precise truncation
+                    content = str(message.content)
+                    left, right = 0, len(content)
+                    best_content = ""
+                    
+                    while left <= right:
+                        mid = (left + right) // 2
+                        test_content = content[:mid] + "...[truncated]"
+                        test_tokens = processor.estimate_tokens(test_content, model_name)
+                        
+                        if test_tokens <= max_tokens:
+                            best_content = test_content
+                            left = mid + 1
+                        else:
+                            right = mid - 1
+                    
+                    if best_content:
+                        message.content = best_content
+                    else:
+                        # Fallback to conservative character limit if binary search fails
+                        char_limit = int(max_tokens * 2.5)  # More conservative estimate
+                        truncated_content = truncated_content[:char_limit]
+                        logger.warning(f"Applied emergency character-based truncation to {char_limit} characters")
+                    
+                    # Add a note about truncation
+                    truncated_content += "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
             else:
                 # Fallback: take first portion based on character count
-                char_limit = max_tokens * 3  # Rough estimate: 1 token ≈ 3-4 characters
-                truncated_content = combined_content[:char_limit] + "\n\n[Content truncated due to length constraints]"
+                # Use precise token-based truncation
+                from src.utils.content_processor import ContentProcessor
+                processor = ContentProcessor()
+                
+                # Binary search for precise truncation
+                left, right = 0, len(combined_content)
+                best_content = ""
+                
+                while left <= right:
+                    mid = (left + right) // 2
+                    test_content = combined_content[:mid] + "...[truncated]"
+                    test_tokens = processor.estimate_tokens(test_content, model_name)
+                    
+                    if test_tokens <= max_tokens:
+                        best_content = test_content
+                        left = mid + 1
+                    else:
+                        right = mid - 1
+                
+                if best_content:
+                    truncated_content = best_content
+                else:
+                    # Fallback to conservative character limit
+                    char_limit = int(max_tokens * 2.5)  # More conservative estimate
+                    truncated_content = combined_content[:char_limit] + "\n\n[Content truncated due to length constraints]"
         else:
             # Try summarization first if LLM is available
             if config.enable_content_summarization and llm:
@@ -387,13 +434,37 @@ def _handle_content_too_long_error(llm_func: Callable, error: Exception, *args, 
                 # Use chunking with aggressive strategy for very long content
                 logger.info("Attempting smart content chunking")
                 # Use aggressive strategy if content is extremely long
-                strategy = "aggressive" if processor.estimate_tokens(combined_content) > max_tokens * 2 else "auto"
+                strategy = "aggressive" if processor.count_tokens_accurate(combined_content, model_name).total_tokens > max_tokens * 2 else "auto"
                 chunks = processor.smart_chunk_content(combined_content, model_name, strategy)
                 if chunks:
                     truncated_content = chunks[0]
                     # Ensure the chunk fits within limits
-                    if processor.estimate_tokens(truncated_content) > max_tokens:
-                        char_limit = int(max_tokens * 3)
+                    if processor.count_tokens_accurate(truncated_content, model_name).total_tokens > max_tokens:
+                        # Use precise token-based truncation
+                        from src.utils.content_processor import ContentProcessor
+                        processor = ContentProcessor()
+                        
+                        # Binary search for precise truncation
+                        content = truncated_content
+                        left, right = 0, len(content)
+                        best_content = ""
+                        
+                        while left <= right:
+                            mid = (left + right) // 2
+                            test_content = content[:mid] + "...[truncated]"
+                            test_tokens = processor.estimate_tokens(test_content, model_name)
+                            
+                            if test_tokens <= max_tokens:
+                                best_content = test_content
+                                left = mid + 1
+                            else:
+                                right = mid - 1
+                        
+                        if best_content:
+                            truncated_content = best_content
+                        else:
+                            # Fallback to conservative character limit
+                            char_limit = int(max_tokens * 2.5)  # More conservative estimate
                         truncated_content = truncated_content[:char_limit]
                 else:
                     truncated_content = combined_content[:max_tokens * 3]
@@ -428,7 +499,7 @@ def _handle_content_too_long_error(llm_func: Callable, error: Exception, *args, 
                     break
         
         # Re-invoke the function
-        logger.info(f"Retrying with truncated content (reduced from {processor.estimate_tokens(combined_content)} to ~{processor.estimate_tokens(truncated_content)} tokens)")
+        logger.info(f"Retrying with truncated content (reduced from {processor.count_tokens_accurate(combined_content, model_name).total_tokens} to ~{processor.count_tokens_accurate(truncated_content, model_name).total_tokens} tokens)")
         result = llm_func(*new_args, **new_kwargs)
         return result
         
@@ -458,7 +529,7 @@ async def _handle_content_too_long_error_async(llm_func: Callable, error: Except
         
         # Try to extract messages and model information from parameters
         messages = None
-        model_name = "unknown"
+        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
         llm = None
         
         # Check messages in args
@@ -503,7 +574,7 @@ async def _handle_content_too_long_error_async(llm_func: Callable, error: Except
         max_tokens = int(model_limits.input_limit * model_limits.safety_margin)
         
         # If content is extremely long, use aggressive chunking
-        if processor.estimate_tokens(combined_content) > max_tokens * 2:
+        if processor.count_tokens_accurate(combined_content, model_name).total_tokens > max_tokens * 2:
             logger.info("Content is extremely long, using aggressive chunking")
             # Use aggressive chunking strategy for extremely long content
             chunks = processor.smart_chunk_content(combined_content, model_name, "aggressive")
@@ -512,9 +583,33 @@ async def _handle_content_too_long_error_async(llm_func: Callable, error: Except
                 truncated_content = chunks[0]
                 
                 # Double-check the chunk size and further truncate if needed
-                if processor.estimate_tokens(truncated_content) > max_tokens:
+                if processor.count_tokens_accurate(truncated_content, model_name).total_tokens > max_tokens:
                     # Emergency truncation: use character-based limit
-                    char_limit = int(max_tokens * 3)  # Rough estimate: 1 token ≈ 3-4 characters
+                    # Use precise token-based truncation instead of character estimation
+                    from src.utils.content_processor import ContentProcessor
+                    processor = ContentProcessor()
+                    
+                    # Binary search for precise truncation
+                    content = truncated_content
+                    left, right = 0, len(content)
+                    best_content = ""
+                    
+                    while left <= right:
+                        mid = (left + right) // 2
+                        test_content = content[:mid] + "...[truncated]"
+                        test_tokens = processor.estimate_tokens(test_content, model_name)
+                        
+                        if test_tokens <= max_tokens:
+                            best_content = test_content
+                            left = mid + 1
+                        else:
+                            right = mid - 1
+                    
+                    if best_content:
+                        truncated_content = best_content
+                    else:
+                        # Fallback to conservative character limit
+                        char_limit = int(max_tokens * 2.5)  # More conservative estimate
                     truncated_content = truncated_content[:char_limit]
                     logger.warning(f"Applied emergency character-based truncation to {char_limit} characters")
                 
@@ -544,12 +639,12 @@ async def _handle_content_too_long_error_async(llm_func: Callable, error: Except
                 # Use chunking with aggressive strategy for very long content
                 logger.info("Attempting smart content chunking")
                 # Use aggressive strategy if content is extremely long
-                strategy = "aggressive" if processor.estimate_tokens(combined_content) > max_tokens * 2 else "auto"
+                strategy = "aggressive" if processor.count_tokens_accurate(combined_content, model_name).total_tokens > max_tokens * 2 else "auto"
                 chunks = processor.smart_chunk_content(combined_content, model_name, strategy)
                 if chunks:
                     truncated_content = chunks[0]
                     # Ensure the chunk fits within limits
-                    if processor.estimate_tokens(truncated_content) > max_tokens:
+                    if processor.count_tokens_accurate(truncated_content, model_name).total_tokens > max_tokens:
                         char_limit = int(max_tokens * 3)
                         truncated_content = truncated_content[:char_limit]
                 else:
@@ -589,7 +684,7 @@ async def _handle_content_too_long_error_async(llm_func: Callable, error: Except
                     break
         
         # Re-invoke the function
-        logger.info(f"Retrying with truncated content (reduced from {processor.estimate_tokens(combined_content)} to ~{processor.estimate_tokens(truncated_content)} tokens)")
+        logger.info(f"Retrying with truncated content (reduced from {processor.count_tokens_accurate(combined_content, model_name).total_tokens} to ~{processor.count_tokens_accurate(truncated_content, model_name).total_tokens} tokens)")
         result = await llm_func(*new_args, **new_kwargs)
         return result
         
@@ -628,7 +723,7 @@ async def _evaluate_and_optimize_context_before_call(llm_func: Callable,
         
         # Extract messages and model information
         messages = None
-        model_name = "unknown"
+        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
         
         # Look for messages in kwargs
         if 'input' in kwargs and isinstance(kwargs['input'], dict) and 'messages' in kwargs['input']:
@@ -659,7 +754,7 @@ async def _evaluate_and_optimize_context_before_call(llm_func: Callable,
                 model_name = llm_instance.model
         
         # Look for model name in kwargs
-        if model_name == "unknown":
+        if model_name == "deepseek-chat":  # Check if still using default
             if 'model' in kwargs:
                 model_name = kwargs['model']
             elif 'config' in kwargs and isinstance(kwargs['config'], dict) and 'model' in kwargs['config']:
@@ -706,6 +801,45 @@ async def _evaluate_and_optimize_context_before_call(llm_func: Callable,
                 logger.info(f"Context optimized: {optimization_info['original_tokens']} -> "
                            f"{optimization_info['optimized_tokens']} tokens "
                            f"({optimization_info['tokens_saved']} saved)")
+                
+                # Final token validation before returning
+                try:
+                    from src.utils.content_processor import ContentProcessor
+                    processor = ContentProcessor()
+                    
+                    # Calculate total tokens in optimized messages
+                    total_content = ""
+                    for msg in optimized_messages:
+                        if hasattr(msg, 'content'):
+                            total_content += str(msg.content) + " "
+                    
+                    estimated_tokens = processor.estimate_tokens(total_content, model_name)
+                    model_limits = processor.get_model_limits(model_name)
+                    model_limit = model_limits.safe_input_limit  # Use configured limit
+                    
+                    if estimated_tokens > model_limit * 0.9:  # 90% threshold for final check
+                        logger.warning(f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})")
+                        # Emergency truncation
+                        max_chars = int(model_limit * 0.8 * 3)  # Conservative character limit
+                        if len(total_content) > max_chars:
+                            truncated_content = total_content[:max_chars] + "...[truncated]"
+                            # Update the last message with truncated content
+                            if optimized_messages and hasattr(optimized_messages[-1], 'content'):
+                                optimized_messages[-1].content = truncated_content
+                                
+                                # Update the arguments again with emergency truncation
+                                if 'input' in new_kwargs and isinstance(new_kwargs['input'], dict) and 'messages' in new_kwargs['input']:
+                                    new_kwargs['input']['messages'] = optimized_messages
+                                elif 'messages' in new_kwargs:
+                                    new_kwargs['messages'] = optimized_messages
+                                else:
+                                    for i, arg in enumerate(new_args):
+                                        if isinstance(arg, list) and arg and hasattr(arg[0], 'content'):
+                                            new_args[i] = optimized_messages
+                                            break
+                                            
+                except Exception as e:
+                    logger.warning(f"Final token validation failed: {e}")
                 
                 return tuple(new_args), new_kwargs
             else:
@@ -746,7 +880,7 @@ def _evaluate_and_optimize_context_before_call_sync(llm_func: Callable,
         
         # Extract messages and model information (same logic as async version)
         messages = None
-        model_name = "unknown"
+        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
         
         # Look for messages in kwargs
         if 'input' in kwargs and isinstance(kwargs['input'], dict) and 'messages' in kwargs['input']:
@@ -776,7 +910,7 @@ def _evaluate_and_optimize_context_before_call_sync(llm_func: Callable,
             elif hasattr(llm_instance, 'model'):
                 model_name = llm_instance.model
         
-        if model_name == "unknown":
+        if model_name == "deepseek-chat":  # Check if still using default
             if 'model' in kwargs:
                 model_name = kwargs['model']
             elif 'config' in kwargs and isinstance(kwargs['config'], dict) and 'model' in kwargs['config']:
@@ -823,6 +957,45 @@ def _evaluate_and_optimize_context_before_call_sync(llm_func: Callable,
                 logger.info(f"Context optimized: {optimization_info['original_tokens']} -> "
                            f"{optimization_info['optimized_tokens']} tokens "
                            f"({optimization_info['tokens_saved']} saved)")
+                
+                # Final token validation before returning
+                try:
+                    from src.utils.content_processor import ContentProcessor
+                    processor = ContentProcessor()
+                    
+                    # Calculate total tokens in optimized messages
+                    total_content = ""
+                    for msg in optimized_messages:
+                        if hasattr(msg, 'content'):
+                            total_content += str(msg.content) + " "
+                    
+                    estimated_tokens = processor.estimate_tokens(total_content, model_name)
+                    model_limits = processor.get_model_limits(model_name)
+                    model_limit = model_limits.safe_input_limit  # Use configured limit
+                    
+                    if estimated_tokens > model_limit * 0.9:  # 90% threshold for final check
+                        logger.warning(f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})")
+                        # Emergency truncation
+                        max_chars = int(model_limit * 0.8 * 3)  # Conservative character limit
+                        if len(total_content) > max_chars:
+                            truncated_content = total_content[:max_chars] + "...[truncated]"
+                            # Update the last message with truncated content
+                            if optimized_messages and hasattr(optimized_messages[-1], 'content'):
+                                optimized_messages[-1].content = truncated_content
+                                
+                                # Update the arguments again with emergency truncation
+                                if 'input' in new_kwargs and isinstance(new_kwargs['input'], dict) and 'messages' in new_kwargs['input']:
+                                    new_kwargs['input']['messages'] = optimized_messages
+                                elif 'messages' in new_kwargs:
+                                    new_kwargs['messages'] = optimized_messages
+                                else:
+                                    for i, arg in enumerate(new_args):
+                                        if isinstance(arg, list) and arg and hasattr(arg[0], 'content'):
+                                            new_args[i] = optimized_messages
+                                            break
+                                            
+                except Exception as e:
+                    logger.warning(f"Final token validation failed: {e}")
                 
                 return tuple(new_args), new_kwargs
             else:
@@ -891,9 +1064,10 @@ def safe_llm_call(llm_func: Callable,
                   context: str = "",
                   max_retries: int = 3,
                   enable_smart_processing: bool = True,
-                  enable_context_evaluation: bool = True,
                   **kwargs) -> Any:
-    """Safe LLM call function with retry mechanism, smart content processing, and context evaluation
+    """Safe LLM call function with retry mechanism and smart content processing
+    
+    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
     
     Args:
         llm_func: LLM call function
@@ -902,7 +1076,6 @@ def safe_llm_call(llm_func: Callable,
         context: Context information
         max_retries: Maximum retry attempts
         enable_smart_processing: Whether to enable smart content processing
-        enable_context_evaluation: Whether to enable pre-call context evaluation
         **kwargs: Keyword arguments
         
     Returns:
@@ -910,14 +1083,13 @@ def safe_llm_call(llm_func: Callable,
     """
     import time
     
-    # Pre-call context evaluation and optimization
-    if enable_context_evaluation:
-        try:
-            args, kwargs = _evaluate_and_optimize_context_before_call_sync(
-                llm_func, args, kwargs, operation_name, context
-            )
-        except Exception as eval_error:
-            logger.warning(f"Context evaluation failed: {eval_error}, proceeding with original arguments")
+    # Apply context evaluation before the call
+    try:
+        args, kwargs = _evaluate_and_optimize_context_before_call_sync(
+            llm_func, args, kwargs, operation_name, context
+        )
+    except Exception as e:
+        logger.warning(f"Context evaluation failed: {e}, proceeding with original arguments")
     
     for attempt in range(max_retries + 1):
         try:
@@ -957,9 +1129,10 @@ async def safe_llm_call_async(llm_func: Callable,
                              context: str = "",
                              max_retries: int = 3,
                              enable_smart_processing: bool = True,
-                             enable_context_evaluation: bool = True,
                              **kwargs) -> Any:
-    """Safe async LLM call function with retry mechanism, smart content processing, and context evaluation
+    """Safe async LLM call function with retry mechanism and smart content processing
+    
+    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
     
     Args:
         llm_func: Async LLM call function
@@ -968,7 +1141,6 @@ async def safe_llm_call_async(llm_func: Callable,
         context: Context information
         max_retries: Maximum retry attempts
         enable_smart_processing: Whether to enable smart content processing
-        enable_context_evaluation: Whether to enable pre-call context evaluation
         **kwargs: Keyword arguments
         
     Returns:
@@ -976,14 +1148,13 @@ async def safe_llm_call_async(llm_func: Callable,
     """
     import asyncio
     
-    # Pre-call context evaluation and optimization
-    if enable_context_evaluation:
-        try:
-            args, kwargs = await _evaluate_and_optimize_context_before_call(
-                llm_func, args, kwargs, operation_name, context
-            )
-        except Exception as eval_error:
-            logger.warning(f"Context evaluation failed: {eval_error}, proceeding without optimization")
+    # Apply context evaluation before the call
+    try:
+        args, kwargs = await _evaluate_and_optimize_context_before_call(
+            llm_func, args, kwargs, operation_name, context
+        )
+    except Exception as e:
+        logger.warning(f"Context evaluation failed: {e}, proceeding with original arguments")
     
     for attempt in range(max_retries + 1):
         try:

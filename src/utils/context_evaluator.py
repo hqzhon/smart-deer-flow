@@ -221,7 +221,7 @@ class ContextStateEvaluator:
         total_tokens = 0
         for message in messages:
             content = message.content if hasattr(message, 'content') else str(message)
-            total_tokens += self.content_processor.estimate_tokens(content, model_name)
+            total_tokens += self.content_processor.count_tokens_accurate(content, model_name).total_tokens
         return total_tokens
     
     def _calculate_critical_content_ratio(self, messages: List[BaseMessage]) -> float:
@@ -317,9 +317,9 @@ class ContextStateEvaluator:
         
         # Add other messages from most recent
         for message in reversed(other_messages):
-            message_tokens = self.content_processor.estimate_tokens(
+            message_tokens = self.content_processor.count_tokens_accurate(
                 message.content if hasattr(message, 'content') else str(message), model_name
-            )
+            ).total_tokens
             
             if used_tokens + message_tokens <= target_tokens:
                 result_messages.insert(-len(system_messages) if system_messages else 0, message)
@@ -365,9 +365,9 @@ class ContextStateEvaluator:
         used_tokens = 0
         
         for message, priority in prioritized_messages:
-            message_tokens = self.content_processor.estimate_tokens(
+            message_tokens = self.content_processor.count_tokens_accurate(
                 message.content if hasattr(message, 'content') else str(message), model_name
-            )
+            ).total_tokens
             
             if used_tokens + message_tokens <= target_tokens:
                 selected_messages.append(message)

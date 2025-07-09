@@ -16,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
 from langgraph.types import Command
+from functools import wraps
+from typing import Callable, Any
+from src.utils.decorators import safe_background_task
 
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
@@ -89,6 +92,9 @@ def set_global_component(name: str, value):
 
 # Initialize request queue
 request_queue = asyncio.Queue(maxsize=1000)
+
+
+
 
 
 @asynccontextmanager
@@ -371,10 +377,24 @@ async def _acquire_connection():
         logger.debug(f"Acquired connection (active: {current_usage})")
 
 
+@safe_background_task
 async def _release_connection():
-    """Release a connection back to the enhanced pool with metrics tracking."""
+    """Release a connection back to the enhanced pool with metrics tracking.
+    
+    This function is decorated with @safe_background_task to ensure any exceptions
+    are properly caught and logged without causing silent failures.
+    """
     conn_pool = get_global_component("connection_pool")
-    if conn_pool:
+    if not conn_pool:
+        logger.warning("Connection pool not available for release")
+        return
+    
+    try:
+        # Validate connection pool state before modification
+        if conn_pool["active_connections"] <= 0:
+            logger.warning("Attempting to release connection when none are active")
+            return
+        
         conn_pool["active_connections"] -= 1
         conn_pool["connection_metrics"]["total_released"] += 1
         conn_pool["semaphore"].release()
@@ -383,9 +403,15 @@ async def _release_connection():
         logger.debug(f"Released connection (active: {current_usage})")
         
         # Log warning if connection pool is getting full
-        utilization = current_usage / conn_pool["max_connections"]
-        if utilization > 0.8:
-            logger.warning(f"High connection pool utilization: {utilization:.1%}")
+        max_connections = conn_pool.get("max_connections", 1)
+        if max_connections > 0:
+            utilization = current_usage / max_connections
+            if utilization > 0.8:
+                logger.warning(f"High connection pool utilization: {utilization:.1%}")
+    except KeyError as e:
+        logger.error(f"Missing key in connection pool: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in _release_connection: {e}", exc_info=True)
 
 
 async def _get_connection_metrics() -> Dict[str, Any]:
@@ -466,45 +492,106 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
         raise
 
 
+@safe_background_task
 async def _log_enhanced_request_completion(
     connection_id: str, 
     start_time: float, 
     message_length: int = 0
 ):
-    """Log enhanced request completion metrics with detailed performance data."""
-    completion_time = time.time()
-    processing_time = completion_time - start_time
+    """Log enhanced request completion metrics with detailed performance data.
     
-    # Get current system metrics
-    connection_metrics = await _get_connection_metrics()
+    This function is decorated with @safe_background_task to ensure any exceptions
+    are properly caught and logged without causing silent failures.
+    """
+    try:
+        # Validate input parameters
+        if not connection_id:
+            logger.warning("Empty connection_id provided to _log_enhanced_request_completion")
+            return
+        
+        if not isinstance(start_time, (int, float)) or start_time <= 0:
+            logger.warning(f"Invalid start_time provided: {start_time}")
+            return
+        
+        if not isinstance(message_length, int) or message_length < 0:
+            logger.warning(f"Invalid message_length provided: {message_length}")
+            message_length = 0
+        
+        completion_time = time.time()
+        if completion_time < start_time:
+            logger.warning(f"Completion time {completion_time} is before start_time {start_time}")
+            return
+        
+        processing_time = completion_time - start_time
+        
+        # Get current system metrics with error handling
+        try:
+            connection_metrics = await _get_connection_metrics()
+        except Exception as e:
+            logger.warning(f"Failed to get connection metrics: {e}")
+            connection_metrics = {"utilization": 0}
+        
+        # Calculate throughput metrics
+        chars_per_second = message_length / processing_time if processing_time > 0 else 0
+        
+        # Log comprehensive metrics
+        logger.info(
+            f"Enhanced request completed - Connection: {connection_id}, "
+            f"Processing time: {processing_time:.2f}s, "
+            f"Message length: {message_length} chars, "
+            f"Throughput: {chars_per_second:.1f} chars/s, "
+            f"Pool utilization: {connection_metrics.get('utilization', 0):.1%}"
+        )
+        
+        # Log performance warnings if needed
+        if processing_time > 10.0:
+            logger.warning(f"Slow request detected: {processing_time:.2f}s")
+        
+        utilization = connection_metrics.get('utilization', 0)
+        if isinstance(utilization, (int, float)) and utilization > 0.9:
+            logger.warning("High connection pool utilization detected")
+        
+        # Release connection with additional error handling
+        try:
+            await _release_connection()
+        except Exception as e:
+            logger.error(f"Failed to release connection in enhanced completion: {e}")
     
-    # Calculate throughput metrics
-    chars_per_second = message_length / processing_time if processing_time > 0 else 0
-    
-    # Log comprehensive metrics
-    logger.info(
-        f"Enhanced request completed - Connection: {connection_id}, "
-        f"Processing time: {processing_time:.2f}s, "
-        f"Message length: {message_length} chars, "
-        f"Throughput: {chars_per_second:.1f} chars/s, "
-        f"Pool utilization: {connection_metrics.get('utilization', 0):.1%}"
-    )
-    
-    # Log performance warnings if needed
-    if processing_time > 10.0:
-        logger.warning(f"Slow request detected: {processing_time:.2f}s")
-    
-    if connection_metrics.get('utilization', 0) > 0.9:
-        logger.warning("High connection pool utilization detected")
-    
-    # Release connection
-    await _release_connection()
+    except Exception as e:
+        logger.error(f"Unexpected error in _log_enhanced_request_completion: {e}", exc_info=True)
 
 
+@safe_background_task
 async def _log_request_completion(thread_id: str, start_time: float):
-    """Legacy request completion logging for backward compatibility."""
-    execution_time = time.time() - start_time
-    logger.info(f"Chat stream completed for thread {thread_id} in {execution_time:.2f} seconds")
+    """Legacy request completion logging for backward compatibility.
+    
+    This function is decorated with @safe_background_task to ensure any exceptions
+    are properly caught and logged without causing silent failures.
+    """
+    try:
+        # Validate input parameters
+        if not thread_id:
+            logger.warning("Empty thread_id provided to _log_request_completion")
+            return
+        
+        if not isinstance(start_time, (int, float)) or start_time <= 0:
+            logger.warning(f"Invalid start_time provided: {start_time}")
+            return
+        
+        current_time = time.time()
+        if current_time < start_time:
+            logger.warning(f"Current time {current_time} is before start_time {start_time}")
+            return
+        
+        execution_time = current_time - start_time
+        logger.info(f"Chat stream completed for thread {thread_id} in {execution_time:.2f} seconds")
+        
+        # Log performance warnings for slow requests
+        if execution_time > 30.0:
+            logger.warning(f"Slow request detected for thread {thread_id}: {execution_time:.2f}s")
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in _log_request_completion: {e}", exc_info=True)
 
 
 async def _astream_workflow_generator(

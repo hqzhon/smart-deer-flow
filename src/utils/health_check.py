@@ -202,10 +202,25 @@ class LLMServiceHealthCheck(HealthCheck):
             # Send simple test request
             test_messages = [{"role": "user", "content": "ping"}]
             
+            # Use safe LLM call functions to ensure proper context management
+            from src.llms.error_handler import safe_llm_call_async, safe_llm_call
+            
             if hasattr(self.llm_service, 'ainvoke'):
-                response = await self.llm_service.ainvoke(test_messages)
+                response = await safe_llm_call_async(
+                    self.llm_service.ainvoke,
+                    test_messages,
+                    operation_name="Health Check",
+                    context="LLM service health check",
+            
+                )
             elif hasattr(self.llm_service, 'invoke'):
-                response = self.llm_service.invoke(test_messages)
+                response = safe_llm_call(
+                    self.llm_service.invoke,
+                    test_messages,
+                    operation_name="Health Check",
+                    context="LLM service health check",
+            
+                )
             else:
                 raise ValueError("LLM service does not have invoke method")
             

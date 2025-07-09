@@ -15,6 +15,9 @@ import hashlib
 import pickle
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
+
+from src.utils.decorators import safe_background_task
 
 logger = logging.getLogger(__name__)
 
@@ -366,6 +369,7 @@ class HierarchicalMemoryManager(Generic[T]):
         if entry:
             self.l3_current_size -= entry.size_bytes
     
+    @safe_background_task
     async def _background_cleanup(self):
         """Background task for cache cleanup."""
         while True:

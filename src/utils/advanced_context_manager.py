@@ -67,11 +67,11 @@ class AdvancedContextManager:
         self.config = config
         self.content_processor = content_processor or ContentProcessor(config.model_token_limits)
         
-        # Context management settings
-        self.max_context_ratio = 0.6  # Use 60% of model limit for context
-        self.sliding_window_size = 5   # Number of recent interactions to keep
-        self.overlap_ratio = 0.2       # Overlap between sliding windows
-        self.compression_threshold = 0.8  # Trigger compression at 80% capacity
+        # Context management settings - More conservative ratios to prevent token overflow
+        self.max_context_ratio = 0.4  # Use 40% of model limit for context (reduced from 60%)
+        self.sliding_window_size = 3   # Number of recent interactions to keep (reduced from 5)
+        self.overlap_ratio = 0.1       # Overlap between sliding windows (reduced from 0.2)
+        self.compression_threshold = 0.6  # Trigger compression at 60% capacity (reduced from 80%)
         
         # Hierarchical weights for different content types
         self.priority_weights = {
@@ -94,7 +94,11 @@ class AdvancedContextManager:
         if timestamp is None:
             timestamp = time.time()
         
-        token_count = self.content_processor.estimate_tokens(content)
+        # Use accurate token counting with safety check
+        within_limit, token_result = self.content_processor.check_content_token_limit(
+            content, "deepseek-chat", 100000, 1.0  # High limit for segment creation
+        )
+        token_count = token_result.total_tokens
         importance_score = self._calculate_importance_score(content, segment_type, priority)
         
         return ContextSegment(
@@ -444,7 +448,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
                     content=summarized_content,
                     priority=ContextPriority.MEDIUM,
                     timestamp=max(seg.timestamp for seg in other_segments),
-                    token_count=self.content_processor.estimate_tokens(summarized_content),
+                    token_count=self.content_processor.count_tokens_accurate(summarized_content, "deepseek-chat").total_tokens,
                     segment_type='summary',
                     importance_score=0.6,
                     compressed_version=summarized_content
@@ -470,7 +474,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
         
         for sentence in sentences:
             test_content = truncated + sentence + ". "
-            if self.content_processor.estimate_tokens(test_content) <= max_tokens:
+            if self.content_processor.count_tokens_accurate(test_content, "deepseek-chat").total_tokens <= max_tokens:
                 truncated = test_content
             else:
                 break
@@ -486,7 +490,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
         truncated = self._truncate_content(content, max_tokens)
         
         # If still too long, apply more aggressive compression
-        if self.content_processor.estimate_tokens(truncated) > max_tokens:
+        if self.content_processor.count_tokens_accurate(truncated, "deepseek-chat").total_tokens > max_tokens:
             # Extract key information using regex patterns
             key_patterns = [
                 r'Error: [^\n]+',
@@ -503,7 +507,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
             
             if key_info:
                 compressed = "\n".join(key_info[:3])  # Top 3 key pieces
-                if self.content_processor.estimate_tokens(compressed) <= max_tokens:
+                if self.content_processor.count_tokens_accurate(compressed, "deepseek-chat").total_tokens <= max_tokens:
                     return compressed
         
         return truncated
