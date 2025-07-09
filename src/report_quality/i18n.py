@@ -1,25 +1,23 @@
 # DeerFlow Report Quality - Internationalization Support
 
-import json
-import os
-from typing import Dict, Any, Optional
 from enum import Enum
 
 
 class Language(Enum):
     """Supported languages"""
+
     ZH_CN = "zh_cn"  # Simplified Chinese
     EN_US = "en_us"  # English
 
 
 class I18nManager:
     """Internationalization manager"""
-    
+
     def __init__(self, default_language: Language = Language.ZH_CN):
         self.current_language = default_language
         self.translations = {}
         self._load_translations()
-    
+
     def _load_translations(self):
         """Load translation files"""
         # Define translations directly in code for now
@@ -35,33 +33,25 @@ class I18nManager:
                     "data_quality": "数据质量",
                     "bias": "偏差",
                     "external_validity": "外部效度",
-                    "statistical_power": "统计功效"
+                    "statistical_power": "统计功效",
                 },
-                
                 # Confidence levels
                 "confidence_levels": {
                     "very_high": "非常高",
                     "high": "高",
                     "medium": "中等",
                     "low": "低",
-                    "very_low": "非常低"
+                    "very_low": "非常低",
                 },
-                
                 # Evidence quality
                 "evidence_quality": {
                     "strong": "强",
                     "moderate": "中等",
                     "weak": "弱",
-                    "insufficient": "不足"
+                    "insufficient": "不足",
                 },
-                
                 # Impact levels
-                "impact_levels": {
-                    "high": "高",
-                    "medium": "中等",
-                    "low": "低"
-                },
-                
+                "impact_levels": {"high": "高", "medium": "中等", "low": "低"},
                 # Limitation descriptions
                 "limitation_descriptions": {
                     "small_sample_size": "样本规模较小（n={sample_size}），可能影响结果的普适性",
@@ -72,9 +62,8 @@ class I18nManager:
                     "single_data_source": "依赖单一数据源可能引入数据偏差",
                     "no_control_group": "缺乏对照组使得难以建立因果关系",
                     "convenience_sampling": "便利抽样可能导致样本不具代表性",
-                    "temporal_bias": "特殊时期收集的数据可能缺乏普适性"
+                    "temporal_bias": "特殊时期收集的数据可能缺乏普适性",
                 },
-                
                 # Mitigation suggestions
                 "mitigation_suggestions": {
                     "multiple_data_sources": "使用多个数据源进行交叉验证",
@@ -96,9 +85,8 @@ class I18nManager:
                     "explain_geographic_limits": "说明地理局限性",
                     "improve_methodology": "改进研究方法",
                     "use_validated_methods": "使用经过验证的方法",
-                    "explain_method_limits": "说明方法局限性"
+                    "explain_method_limits": "说明方法局限性",
                 },
-                
                 # Bias types and descriptions
                 "bias_types": {
                     "confirmation_bias": "确认偏差：倾向于寻找支持既有观点的证据",
@@ -106,9 +94,8 @@ class I18nManager:
                     "availability_bias": "可得性偏差：过度依赖容易获得的信息",
                     "anchoring_bias": "锚定偏差：过度依赖初始信息",
                     "selection_bias": "选择偏差",
-                    "temporal_bias": "时间偏差"
+                    "temporal_bias": "时间偏差",
                 },
-                
                 # Bias mitigation measures
                 "bias_mitigation": {
                     "seek_opposing_views": "主动寻找反对观点",
@@ -122,9 +109,8 @@ class I18nManager:
                     "consider_hard_to_obtain_info": "考虑难以获得的信息",
                     "multiple_perspectives": "从多个角度评估",
                     "different_reference_points": "使用不同参考点",
-                    "conduct_sensitivity_analysis": "进行敏感性分析"
+                    "conduct_sensitivity_analysis": "进行敏感性分析",
                 },
-                
                 # Confidence reasoning
                 "confidence_reasoning": {
                     "very_high": "基于{count}项高质量证据，结论具有很高可信度",
@@ -132,16 +118,14 @@ class I18nManager:
                     "medium": "有{count}项证据支持，但需要更多验证",
                     "low": "证据有限（{count}项），结论应谨慎对待",
                     "very_low": "证据不足（{count}项），结论具有较高不确定性",
-                    "error": "置信度评估错误"
+                    "error": "置信度评估错误",
                 },
-                
                 # Potential impacts
                 "potential_impacts": {
                     "affect_objectivity_accuracy": "可能影响结论的客观性和准确性",
                     "not_generalizable": "结果可能无法推广到总体",
-                    "not_apply_normal_periods": "结论可能不适用于正常时期"
+                    "not_apply_normal_periods": "结论可能不适用于正常时期",
                 },
-                
                 # Section headers
                 "section_headers": {
                     "data_limitations": "## 数据局限性\n\n",
@@ -153,9 +137,8 @@ class I18nManager:
                     "supporting_evidence": "**支持证据**",
                     "suggested_improvements": "建议改进：\n",
                     "mitigation_measures": "缓解措施：\n",
-                    "potential_impact": "潜在影响"
+                    "potential_impact": "潜在影响",
                 },
-                
                 # Interactive elements
                 "interactive_elements": {
                     "chart_title": "图表",
@@ -184,10 +167,9 @@ class I18nManager:
                     "enhanced_interactive_report": "增强交互式报告",
                     "data_source_description": "数据源：{name}",
                     "external_data_source_description": "外部数据源：{name}",
-                    "default_report_title": "交互式报告"
-                }
+                    "default_report_title": "交互式报告",
+                },
             },
-            
             Language.EN_US: {
                 # Limitation types
                 "limitation_types": {
@@ -195,33 +177,25 @@ class I18nManager:
                     "time_range": "Time Range",
                     "geographic_scope": "Geographic Scope",
                     "methodology": "Methodology",
-                    "data_quality": "Data Quality"
+                    "data_quality": "Data Quality",
                 },
-                
                 # Confidence levels
                 "confidence_levels": {
                     "very_high": "Very High",
                     "high": "High",
                     "medium": "Medium",
                     "low": "Low",
-                    "very_low": "Very Low"
+                    "very_low": "Very Low",
                 },
-                
                 # Evidence quality
                 "evidence_quality": {
                     "strong": "Strong",
                     "moderate": "Moderate",
                     "weak": "Weak",
-                    "insufficient": "Insufficient"
+                    "insufficient": "Insufficient",
                 },
-                
                 # Impact levels
-                "impact_levels": {
-                    "high": "High",
-                    "medium": "Medium",
-                    "low": "Low"
-                },
-                
+                "impact_levels": {"high": "High", "medium": "Medium", "low": "Low"},
                 # Limitation descriptions
                 "limitation_descriptions": {
                     "small_sample": "Small sample size may affect statistical significance",
@@ -230,9 +204,8 @@ class I18nManager:
                     "limited_geographic_scope": "Analysis limited to specific geographic regions",
                     "methodology_constraints": "Research methodology has certain limitations",
                     "single_data_source": "Reliance on single data source may introduce data bias",
-                    "no_control_group": "Lack of control group makes it difficult to establish causal relationships"
+                    "no_control_group": "Lack of control group makes it difficult to establish causal relationships",
                 },
-                
                 # Mitigation suggestions
                 "mitigation_suggestions": {
                     "multiple_data_sources": "Use multiple data sources for cross-validation",
@@ -254,7 +227,7 @@ class I18nManager:
                     "explain_geographic_limits": "Explain geographic limitations",
                     "improve_methodology": "Improve research methodology",
                     "use_validated_methods": "Use validated methods",
-                    "explain_method_limits": "Explain methodological limitations"
+                    "explain_method_limits": "Explain methodological limitations",
                 },
                 "confidence_reasoning": {
                     "very_high": "Based on {count} high-quality evidence items, conclusion has very high confidence",
@@ -269,7 +242,7 @@ class I18nManager:
                     "low_indicator": "Low confidence indicator found: '{indicator}'",
                     "very_low_indicator": "Very low confidence indicator found: '{indicator}'",
                     "evidence_count": "Supporting evidence count: {count}",
-                    "no_evidence": "No supporting evidence provided"
+                    "no_evidence": "No supporting evidence provided",
                 },
                 "bias_types": {
                     "confirmation_bias": "Confirmation bias: tendency to seek evidence supporting existing views",
@@ -277,7 +250,7 @@ class I18nManager:
                     "availability_bias": "Availability bias: over-reliance on easily accessible information",
                     "anchoring_bias": "Anchoring bias: over-reliance on initial information",
                     "selection_bias": "Selection bias: convenience sampling may lead to non-representative samples",
-                    "temporal_bias": "Temporal bias: data collected during special periods may lack generalizability"
+                    "temporal_bias": "Temporal bias: data collected during special periods may lack generalizability",
                 },
                 "potential_impacts": {
                     "confirmation_bias": "May affect objectivity and accuracy of conclusions",
@@ -285,39 +258,39 @@ class I18nManager:
                     "availability_bias": "May lead to decisions based on incomplete information",
                     "anchoring_bias": "May limit consideration of alternative options",
                     "selection_bias": "Results may not be generalizable to the population",
-                    "temporal_bias": "Conclusions may not apply to normal periods"
+                    "temporal_bias": "Conclusions may not apply to normal periods",
                 },
                 "bias_mitigation": {
                     "confirmation_bias": [
                         "Actively seek opposing viewpoints",
                         "Consider multiple possible explanations",
-                        "Establish systematic evidence collection process"
+                        "Establish systematic evidence collection process",
                     ],
                     "survivorship_bias": [
                         "Include failure case analysis",
                         "Consider companies that exited the market",
-                        "Analyze complete datasets"
+                        "Analyze complete datasets",
                     ],
                     "availability_bias": [
                         "Use systematic data collection",
                         "Avoid reliance on single information source",
-                        "Consider hard-to-obtain information"
+                        "Consider hard-to-obtain information",
                     ],
                     "anchoring_bias": [
                         "Evaluate from multiple perspectives",
                         "Use different reference points",
-                        "Conduct sensitivity analysis"
+                        "Conduct sensitivity analysis",
                     ],
                     "selection_bias": [
                         "Use random sampling",
                         "Ensure sample representativeness",
-                        "Analyze sample characteristics"
+                        "Analyze sample characteristics",
                     ],
                     "temporal_bias": [
                         "Include data from multiple periods",
                         "Analyze impact of period characteristics",
-                        "Explain temporal limitations"
-                    ]
+                        "Explain temporal limitations",
+                    ],
                 },
                 "section_titles": {
                     "data_limitations": "Data Limitations",
@@ -329,9 +302,8 @@ class I18nManager:
                     "statement": "Statement",
                     "confidence": "Confidence",
                     "reasoning": "Reasoning",
-                    "supporting_evidence": "Supporting evidence"
+                    "supporting_evidence": "Supporting evidence",
                 },
-                
                 # Interactive elements
                 "interactive_elements": {
                     "chart_title": "Chart",
@@ -360,15 +332,15 @@ class I18nManager:
                     "enhanced_interactive_report": "Enhanced Interactive Report",
                     "data_source_description": "Data source: {name}",
                     "external_data_source_description": "External data source: {name}",
-                    "default_report_title": "Interactive Report"
-                }
-            }
+                    "default_report_title": "Interactive Report",
+                },
+            },
         }
-    
+
     def set_language(self, language: Language):
         """Set current language"""
         self.current_language = language
-    
+
     def get_text(self, category: str, key: str, **kwargs) -> str:
         """Get translated text"""
         try:
@@ -385,15 +357,15 @@ class I18nManager:
                 return text
             except KeyError:
                 return f"[Missing translation: {category}.{key}]"
-    
+
     def get_limitation_type_text(self, limitation_type: str) -> str:
         """Get limitation type text"""
         return self.get_text("limitation_types", limitation_type)
-    
+
     def get_confidence_level_text(self, confidence_level: str) -> str:
         """Get confidence level text"""
         return self.get_text("confidence_levels", confidence_level)
-    
+
     def get_impact_level_text(self, impact_level: str) -> str:
         """Get impact level text"""
         return self.get_text("impact_levels", impact_level)

@@ -25,8 +25,9 @@ def prose_continue_node(state: ProseState):
         messages,
         operation_name="Prose Continue",
         context="Continuing prose content",
-
     )
-    response_content = response.content if hasattr(response, 'content') else str(response)
+    response_content = (
+        response.content if hasattr(response, "content") else str(response)
+    )
     logger.info(f"prose_continue_node response: {response_content}")
     return {"prose_content": response_content}

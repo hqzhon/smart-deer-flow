@@ -29,7 +29,6 @@ def script_writer_node(state: PodcastState):
         ],
         operation_name="Podcast Script Writer",
         context="Generating podcast script",
-
     )
     print(script)
     return {"script": script, "audio_chunks": []}

@@ -19,34 +19,34 @@ logger = logging.getLogger(__name__)
 
 class RetrieverInput(BaseModel):
     keywords: str = Field(description="search keywords to look up", max_length=1000)
-    
-    @validator('keywords')
+
+    @validator("keywords")
     def validate_keywords(cls, v):
         if not v.strip():
-            raise ValueError('Keywords cannot be empty')
+            raise ValueError("Keywords cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*=',
-            r'<iframe[^>]*>',
-            r'<object[^>]*>',
-            r'<embed[^>]*>'
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
+            r"<iframe[^>]*>",
+            r"<object[^>]*>",
+            r"<embed[^>]*>",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in keywords')
+                raise ValueError("Potentially unsafe content in keywords")
         # Check for SQL injection patterns
         sql_patterns = [
-            r'\bunion\b.*\bselect\b',
-            r'\bdrop\b.*\btable\b',
-            r'\binsert\b.*\binto\b',
-            r'\bdelete\b.*\bfrom\b',
-            r'\bupdate\b.*\bset\b'
+            r"\bunion\b.*\bselect\b",
+            r"\bdrop\b.*\btable\b",
+            r"\binsert\b.*\binto\b",
+            r"\bdelete\b.*\bfrom\b",
+            r"\bupdate\b.*\bset\b",
         ]
         for pattern in sql_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe SQL pattern in keywords')
+                raise ValueError("Potentially unsafe SQL pattern in keywords")
         return v
 
 

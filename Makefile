@@ -7,7 +7,7 @@ format:
 	uv run black --preview .
 
 lint:
-	uv run black --check .
+	uv run black --check . && uv run ruff check .
 
 serve:
 	uv run server.py --reload

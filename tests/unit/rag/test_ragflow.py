@@ -1,9 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import os
 import pytest
-import requests
 from unittest.mock import patch, MagicMock
 from src.rag.ragflow import RAGFlowProvider, parse_uri
 

@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 
 from src.prompt_enhancer.graph.builder import build_graph
 from src.prompt_enhancer.graph.state import PromptEnhancerState
-from src.config.report_style import ReportStyle
 
 
 class TestBuildGraph:

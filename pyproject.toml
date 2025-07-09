@@ -38,6 +38,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black>=24.2.0",
+    "ruff>=0.12.2",
     "langgraph-cli[inmem]>=0.2.10",
 ]
 test = [

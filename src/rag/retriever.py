@@ -56,53 +56,55 @@ class Resource(BaseModel):
 
     uri: str = Field(..., description="The URI of the resource", max_length=2048)
     title: str = Field(..., description="The title of the resource", max_length=500)
-    description: str | None = Field("", description="The description of the resource", max_length=2000)
-    
-    @validator('uri')
+    description: str | None = Field(
+        "", description="The description of the resource", max_length=2000
+    )
+
+    @validator("uri")
     def validate_uri(cls, v):
         if not v.strip():
-            raise ValueError('URI cannot be empty')
+            raise ValueError("URI cannot be empty")
         # Check for valid URI format (basic validation)
-        if not re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*:', v):
-            raise ValueError('Invalid URI format')
+        if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", v):
+            raise ValueError("Invalid URI format")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in URI')
+                raise ValueError("Potentially unsafe content in URI")
         return v
-    
-    @validator('title')
+
+    @validator("title")
     def validate_title(cls, v):
         if not v.strip():
-            raise ValueError('Title cannot be empty')
+            raise ValueError("Title cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in title')
+                raise ValueError("Potentially unsafe content in title")
         return v
-    
-    @validator('description')
+
+    @validator("description")
     def validate_description(cls, v):
         if v:
             # Check for suspicious patterns
             suspicious_patterns = [
-                r'<script[^>]*>.*?</script>',
-                r'javascript:',
-                r'on\w+\s*='
+                r"<script[^>]*>.*?</script>",
+                r"javascript:",
+                r"on\w+\s*=",
             ]
             for pattern in suspicious_patterns:
                 if re.search(pattern, v, re.IGNORECASE):
-                    raise ValueError('Potentially unsafe content in description')
+                    raise ValueError("Potentially unsafe content in description")
         return v
 
 

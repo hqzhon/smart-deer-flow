@@ -16,61 +16,65 @@ class StepType(str, Enum):
 class Step(BaseModel):
     need_search: bool = Field(..., description="Must be explicitly set for each step")
     title: str = Field(..., max_length=200)
-    description: str = Field(..., description="Specify exactly what data to collect", max_length=1000)
+    description: str = Field(
+        ..., description="Specify exactly what data to collect", max_length=1000
+    )
     step_type: StepType = Field(..., description="Indicates the nature of the step")
     execution_res: Optional[str] = Field(
         default=None, description="The Step execution result", max_length=50000
     )
-    
-    @validator('title')
+
+    @validator("title")
     def validate_title(cls, v):
         if not v.strip():
-            raise ValueError('Title cannot be empty')
+            raise ValueError("Title cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in title')
+                raise ValueError("Potentially unsafe content in title")
         return v
-    
-    @validator('description')
+
+    @validator("description")
     def validate_description(cls, v):
         if not v.strip():
-            raise ValueError('Description cannot be empty')
+            raise ValueError("Description cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in description')
+                raise ValueError("Potentially unsafe content in description")
         return v
-    
-    @validator('execution_res')
+
+    @validator("execution_res")
     def validate_execution_res(cls, v):
         if v is not None:
             # Check for suspicious patterns
             suspicious_patterns = [
-                r'<script[^>]*>.*?</script>',
-                r'javascript:',
-                r'on\w+\s*='
+                r"<script[^>]*>.*?</script>",
+                r"javascript:",
+                r"on\w+\s*=",
             ]
             for pattern in suspicious_patterns:
                 if re.search(pattern, v, re.IGNORECASE):
-                    raise ValueError('Potentially unsafe content in execution result')
+                    raise ValueError("Potentially unsafe content in execution result")
         return v
 
 
 class Plan(BaseModel):
     locale: str = Field(
-        ..., description="e.g. 'en-US' or 'zh-CN', based on the user's language", 
-        pattern=r"^[a-z]{2}-[A-Z]{2}$", max_length=10
+        ...,
+        description="e.g. 'en-US' or 'zh-CN', based on the user's language",
+        pattern=r"^[a-z]{2}-[A-Z]{2}$",
+        max_length=10,
     )
     has_enough_context: bool
     thought: str = Field(..., max_length=5000)
@@ -79,41 +83,41 @@ class Plan(BaseModel):
         default_factory=list,
         description="Research & Processing steps to get more context",
     )
-    
-    @validator('thought')
+
+    @validator("thought")
     def validate_thought(cls, v):
         if not v.strip():
-            raise ValueError('Thought cannot be empty')
+            raise ValueError("Thought cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in thought')
+                raise ValueError("Potentially unsafe content in thought")
         return v
-    
-    @validator('title')
+
+    @validator("title")
     def validate_title(cls, v):
         if not v.strip():
-            raise ValueError('Title cannot be empty')
+            raise ValueError("Title cannot be empty")
         # Check for suspicious patterns
         suspicious_patterns = [
-            r'<script[^>]*>.*?</script>',
-            r'javascript:',
-            r'on\w+\s*='
+            r"<script[^>]*>.*?</script>",
+            r"javascript:",
+            r"on\w+\s*=",
         ]
         for pattern in suspicious_patterns:
             if re.search(pattern, v, re.IGNORECASE):
-                raise ValueError('Potentially unsafe content in title')
+                raise ValueError("Potentially unsafe content in title")
         return v
-    
-    @validator('steps')
+
+    @validator("steps")
     def validate_steps(cls, v):
         if len(v) > 50:  # Limit number of steps
-            raise ValueError('Too many steps in plan')
+            raise ValueError("Too many steps in plan")
         return v
 
     class Config:

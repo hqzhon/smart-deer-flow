@@ -4,7 +4,6 @@
 from pathlib import Path
 from typing import Any, Dict
 import os
-import ssl
 import httpx
 
 from langchain_openai import ChatOpenAI
@@ -34,7 +33,7 @@ def _store_model_token_limits(model_name: str, token_limits: Dict[str, Any]) -> 
             input_limit=token_limits.get("input_limit", 32000),
             output_limit=token_limits.get("output_limit", 4096),
             context_window=token_limits.get("context_window", 32000),
-            safety_margin=token_limits.get("safety_margin", 0.8)
+            safety_margin=token_limits.get("safety_margin", 0.8),
         )
         _model_token_limits_registry[model_name] = limits
     except Exception as e:
@@ -98,11 +97,11 @@ def _create_llm_use_conf(
 
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
-    
+
     # Store token_limits for ContentProcessor before removing from LLM config
     # token_limits is used by ContentProcessor for intelligent content processing
     token_limits = merged_conf.pop("token_limits", None)
-    
+
     # Store token_limits in a global registry for ContentProcessor access
     if token_limits and merged_conf.get("model"):
         _store_model_token_limits(merged_conf["model"], token_limits)

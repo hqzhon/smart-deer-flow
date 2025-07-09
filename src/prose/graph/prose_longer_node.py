@@ -17,17 +17,16 @@ def prose_longer_node(state: ProseState):
     logger.info("Generating prose longer content...")
     model = get_llm_by_type(AGENT_LLM_MAP["prose_writer"])
     prompt_template = get_prompt_template("prose_longer")
-    messages = [
-        HumanMessage(content=prompt_template.format(content=state['content']))
-    ]
-    
+    messages = [HumanMessage(content=prompt_template.format(content=state["content"]))]
+
     response = safe_llm_call(
         model.invoke,
         messages,
         operation_name="Prose Longer",
         context="Making prose longer",
-
     )
-    response_content = response.content if hasattr(response, 'content') else str(response)
+    response_content = (
+        response.content if hasattr(response, "content") else str(response)
+    )
     logger.info(f"prose_longer_node response: {response_content}")
     return {"prose_content": response_content}

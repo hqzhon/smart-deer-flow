@@ -1,13 +1,11 @@
 # DeerFlow Report Quality Optimization - Interactive Report Output Feature
 
 import logging
-import json
 import re
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
-import base64
 from pathlib import Path
 import hashlib
 import os
@@ -18,29 +16,30 @@ from .i18n import Language, get_text
 @dataclass
 class InteractiveReportConfig:
     """Configuration for interactive report generation"""
+
     output_dir: Optional[str] = None
     filename_template: str = "interactive_report_{language}_{timestamp}.html"
     auto_create_dirs: bool = True
     encoding: str = "utf-8"
     use_timestamp: bool = True
-    
+
     def get_output_path(self, language: Language, report_id: str = None) -> str:
         """Get the full output path for a given language"""
         from datetime import datetime
-        
+
         # Prepare template variables
         template_vars = {
-            'language': language.value,
-            'timestamp': datetime.now().strftime('%Y%m%d_%H%M%S'),
-            'report_id': report_id or f"report_{uuid.uuid4().hex[:8]}"
+            "language": language.value,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "report_id": report_id or f"report_{uuid.uuid4().hex[:8]}",
         }
-        
+
         # If timestamp is disabled, use simple template
         if not self.use_timestamp:
             filename = f"interactive_report_{language.value}.html"
         else:
             filename = self.filename_template.format(**template_vars)
-        
+
         if self.output_dir:
             if self.auto_create_dirs:
                 os.makedirs(self.output_dir, exist_ok=True)
@@ -48,11 +47,13 @@ class InteractiveReportConfig:
         else:
             return filename
 
+
 logger = logging.getLogger(__name__)
 
 
 class InteractiveElementType(Enum):
     """Interactive element types"""
+
     CLICKABLE_CHART = "clickable_chart"
     EXPANDABLE_SECTION = "expandable_section"
     DATA_DRILL_DOWN = "data_drill_down"
@@ -66,6 +67,7 @@ class InteractiveElementType(Enum):
 @dataclass
 class InteractiveElement:
     """Interactive element"""
+
     element_id: str
     element_type: InteractiveElementType
     title: str
@@ -78,6 +80,7 @@ class InteractiveElement:
 @dataclass
 class DataSource:
     """Data source information"""
+
     source_id: str
     name: str
     description: str
@@ -90,6 +93,7 @@ class DataSource:
 @dataclass
 class CodeBlock:
     """Code block"""
+
     code_id: str
     language: str
     code: str
@@ -101,6 +105,7 @@ class CodeBlock:
 @dataclass
 class InteractiveReport:
     """Interactive report"""
+
     report_id: str
     title: str
     content: str
@@ -113,464 +118,524 @@ class InteractiveReport:
 
 class InteractiveElementGenerator:
     """Interactive element generator"""
-    
+
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
         self.element_patterns = self._get_element_patterns()
-        
+
     def _get_element_patterns(self) -> Dict[InteractiveElementType, List[str]]:
         """Get element patterns based on language"""
         if self.language == Language.ZH_CN:
             return {
                 InteractiveElementType.CLICKABLE_CHART: [
-                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Standard markdown images
-                    r'!\s+https?://[^\s]+',  # New simple format: ! https://...
-                    r'图\s*\d+',
-                    r'图表\s*\d+',
-                    r'chart|graph|plot'
+                    r"!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)",  # Standard markdown images
+                    r"!\s+https?://[^\s]+",  # New simple format: ! https://...
+                    r"图\s*\d+",
+                    r"图表\s*\d+",
+                    r"chart|graph|plot",
                 ],
                 InteractiveElementType.DATA_DRILL_DOWN: [
-                    r'\|.*?\|.*?\|',  # Tables
-                    r'数据显示',
-                    r'统计结果',
-                    r'分析数据'
+                    r"\|.*?\|.*?\|",  # Tables
+                    r"数据显示",
+                    r"统计结果",
+                    r"分析数据",
                 ],
                 InteractiveElementType.SOURCE_LINK: [
-                    r'\[.*?\]\(https?://.*?\)',  # Links
-                    r'来源[:：]',
-                    r'数据来源',
-                    r'参考文献'
+                    r"\[.*?\]\(https?://.*?\)",  # Links
+                    r"来源[:：]",
+                    r"数据来源",
+                    r"参考文献",
                 ],
                 InteractiveElementType.CODE_VIEWER: [
-                    r'```.*?```',  # Code blocks
-                    r'SQL查询',
-                    r'Python代码',
-                    r'分析代码'
-                ]
+                    r"```.*?```",  # Code blocks
+                    r"SQL查询",
+                    r"Python代码",
+                    r"分析代码",
+                ],
             }
         else:  # English
             return {
                 InteractiveElementType.CLICKABLE_CHART: [
-                    r'!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)',  # Standard markdown images
-                    r'!\s+https?://[^\s]+',  # New simple format: ! https://...
-                    r'figure\s*\d+',
-                    r'chart\s*\d+',
-                    r'chart|graph|plot'
+                    r"!\[.*?\]\(.*?\.(?:png|jpg|jpeg|svg)\)",  # Standard markdown images
+                    r"!\s+https?://[^\s]+",  # New simple format: ! https://...
+                    r"figure\s*\d+",
+                    r"chart\s*\d+",
+                    r"chart|graph|plot",
                 ],
                 InteractiveElementType.DATA_DRILL_DOWN: [
-                    r'\|.*?\|.*?\|',  # Tables
-                    r'data shows',
-                    r'statistics',
-                    r'analysis data'
+                    r"\|.*?\|.*?\|",  # Tables
+                    r"data shows",
+                    r"statistics",
+                    r"analysis data",
                 ],
                 InteractiveElementType.SOURCE_LINK: [
-                    r'\[.*?\]\(https?://.*?\)',  # Links
-                    r'source[::]',
-                    r'data source',
-                    r'references'
+                    r"\[.*?\]\(https?://.*?\)",  # Links
+                    r"source[::]",
+                    r"data source",
+                    r"references",
                 ],
                 InteractiveElementType.CODE_VIEWER: [
-                    r'```.*?```',  # Code blocks
-                    r'SQL query',
-                    r'Python code',
-                    r'analysis code'
-                ]
+                    r"```.*?```",  # Code blocks
+                    r"SQL query",
+                    r"Python code",
+                    r"analysis code",
+                ],
             }
-        
+
     def extract_interactive_elements(self, content: str) -> List[InteractiveElement]:
         """Extract interactive elements"""
         elements = []
-        
+
         # Extract chart elements
         chart_elements = self._extract_chart_elements(content)
         elements.extend(chart_elements)
-        
+
         # Extract table elements
         table_elements = self._extract_table_elements(content)
         elements.extend(table_elements)
-        
+
         # Extract link elements
         link_elements = self._extract_link_elements(content)
         elements.extend(link_elements)
-        
+
         # Extract code elements
         code_elements = self._extract_code_elements(content)
         elements.extend(code_elements)
-        
+
         return elements
-        
+
     def _extract_chart_elements(self, content: str) -> List[InteractiveElement]:
         """Extract chart elements"""
         elements = []
-        
+
         # Find standard markdown image references: ![alt](url)
-        img_pattern = r'!\[(.*?)\]\((.*?)\)'
+        img_pattern = r"!\[(.*?)\]\((.*?)\)"
         matches = re.finditer(img_pattern, content)
-        
+
         for match in matches:
             alt_text = match.group(1)
             img_path = match.group(2)
-            
+
             # Only process chart-type images
-            chart_keywords = ['chart', 'graph', 'plot', '图表', '图'] if self.language == Language.ZH_CN else ['chart', 'graph', 'plot', 'figure']
+            chart_keywords = (
+                ["chart", "graph", "plot", "图表", "图"]
+                if self.language == Language.ZH_CN
+                else ["chart", "graph", "plot", "figure"]
+            )
             if any(keyword in alt_text.lower() for keyword in chart_keywords):
                 element = InteractiveElement(
                     element_id=self._generate_element_id("chart"),
                     element_type=InteractiveElementType.CLICKABLE_CHART,
-                    title=get_text(self.language, "interactive_elements", "clickable_chart_title").format(alt_text=alt_text),
-                    description=get_text(self.language, "interactive_elements", "clickable_chart_description"),
+                    title=get_text(
+                        self.language, "interactive_elements", "clickable_chart_title"
+                    ).format(alt_text=alt_text),
+                    description=get_text(
+                        self.language,
+                        "interactive_elements",
+                        "clickable_chart_description",
+                    ),
                     target_content=img_path,
                     trigger_text=match.group(0),
                     metadata={
                         "alt_text": alt_text,
                         "image_path": img_path,
-                        "chart_type": self._detect_chart_type(alt_text)
-                    }
+                        "chart_type": self._detect_chart_type(alt_text),
+                    },
                 )
                 elements.append(element)
-        
+
         # Find new format image references: ! https://...
-        simple_img_pattern = r'!\s+(https?://[^\s]+)'
+        simple_img_pattern = r"!\s+(https?://[^\s]+)"
         simple_matches = re.finditer(simple_img_pattern, content)
-        
+
         for match in simple_matches:
             img_path = match.group(1)
-            
+
             # Extract filename or use URL as alt text
             alt_text = self._extract_filename_from_url(img_path) or "Image"
-            
+
             # Create element for simple format images (assume they could be charts)
             element = InteractiveElement(
                 element_id=self._generate_element_id("chart"),
                 element_type=InteractiveElementType.CLICKABLE_CHART,
-                title=get_text(self.language, "interactive_elements", "clickable_chart_title").format(alt_text=alt_text),
-                description=get_text(self.language, "interactive_elements", "clickable_chart_description"),
+                title=get_text(
+                    self.language, "interactive_elements", "clickable_chart_title"
+                ).format(alt_text=alt_text),
+                description=get_text(
+                    self.language, "interactive_elements", "clickable_chart_description"
+                ),
                 target_content=img_path,
                 trigger_text=match.group(0),
                 metadata={
                     "alt_text": alt_text,
                     "image_path": img_path,
                     "chart_type": self._detect_chart_type(alt_text),
-                    "format_type": "simple"
-                }
+                    "format_type": "simple",
+                },
             )
             elements.append(element)
-                
+
         return elements
-        
+
     def _extract_table_elements(self, content: str) -> List[InteractiveElement]:
         """Extract table elements"""
         elements = []
-        
+
         # Remove code blocks to avoid false positives
-        content_without_code = re.sub(r'```.*?```', '', content, flags=re.DOTALL)
-        
+        content_without_code = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
+
         # Find Markdown tables
-        table_pattern = r'(\|.*?\|.*?\n(?:\|.*?\|.*?\n)*)'
+        table_pattern = r"(\|.*?\|.*?\n(?:\|.*?\|.*?\n)*)"
         matches = re.finditer(table_pattern, content_without_code, re.MULTILINE)
-        
+
         for i, match in enumerate(matches):
             table_content = match.group(1)
-            
+
             # Additional validation: ensure it's a real table (has at least 2 rows)
-            lines = table_content.strip().split('\n')
+            lines = table_content.strip().split("\n")
             if len(lines) < 2:
                 continue
-                
+
             element = InteractiveElement(
                 element_id=self._generate_element_id("table"),
                 element_type=InteractiveElementType.DYNAMIC_TABLE,
-                title=get_text(self.language, "interactive_elements", "dynamic_table_title").format(index=i+1),
-                description=get_text(self.language, "interactive_elements", "dynamic_table_description"),
+                title=get_text(
+                    self.language, "interactive_elements", "dynamic_table_title"
+                ).format(index=i + 1),
+                description=get_text(
+                    self.language, "interactive_elements", "dynamic_table_description"
+                ),
                 target_content=table_content,
                 trigger_text=table_content,
                 metadata={
                     "table_index": i,
-                    "row_count": len(table_content.split('\n')) - 2,  # Subtract header and separator rows
+                    "row_count": len(table_content.split("\n"))
+                    - 2,  # Subtract header and separator rows
                     "supports_sorting": True,
-                    "supports_filtering": True
-                }
+                    "supports_filtering": True,
+                },
             )
             elements.append(element)
-            
+
         return elements
-        
+
     def _extract_link_elements(self, content: str) -> List[InteractiveElement]:
         """Extract link elements"""
         elements = []
-        
+
         # Find Markdown links
-        link_pattern = r'\[(.*?)\]\((https?://.*?)\)'
+        link_pattern = r"\[(.*?)\]\((https?://.*?)\)"
         matches = re.finditer(link_pattern, content)
-        
+
         for match in matches:
             link_text = match.group(1)
             url = match.group(2)
-            
+
             element = InteractiveElement(
                 element_id=self._generate_element_id("link"),
                 element_type=InteractiveElementType.SOURCE_LINK,
-                title=get_text(self.language, "interactive_elements", "source_link_title").format(link_text=link_text),
-                description=get_text(self.language, "interactive_elements", "source_link_description"),
+                title=get_text(
+                    self.language, "interactive_elements", "source_link_title"
+                ).format(link_text=link_text),
+                description=get_text(
+                    self.language, "interactive_elements", "source_link_description"
+                ),
                 target_content=url,
                 trigger_text=match.group(0),
                 metadata={
                     "link_text": link_text,
                     "url": url,
                     "domain": self._extract_domain(url),
-                    "is_external": True
-                }
+                    "is_external": True,
+                },
             )
             elements.append(element)
-            
+
         return elements
-        
+
     def _extract_code_elements(self, content: str) -> List[InteractiveElement]:
         """Extract code elements"""
         elements = []
-        
+
         # Find code blocks
-        code_pattern = r'```(\w+)?\n(.*?)\n```'
+        code_pattern = r"```(\w+)?\n(.*?)\n```"
         matches = re.finditer(code_pattern, content, re.DOTALL)
-        
+
         for i, match in enumerate(matches):
             language = match.group(1) or "text"
             code_content = match.group(2)
-            
+
             element = InteractiveElement(
                 element_id=self._generate_element_id("code"),
                 element_type=InteractiveElementType.CODE_VIEWER,
-                title=get_text(self.language, "interactive_elements", "code_viewer_title").format(language=language.upper()),
-                description=get_text(self.language, "interactive_elements", "code_viewer_description"),
+                title=get_text(
+                    self.language, "interactive_elements", "code_viewer_title"
+                ).format(language=language.upper()),
+                description=get_text(
+                    self.language, "interactive_elements", "code_viewer_description"
+                ),
                 target_content=code_content,
                 trigger_text=match.group(0),
                 metadata={
                     "language": language,
                     "code_length": len(code_content),
                     "is_executable": language in ["python", "sql", "r"],
-                    "code_index": i
-                }
+                    "code_index": i,
+                },
             )
             elements.append(element)
-            
+
         return elements
-        
+
     def _generate_element_id(self, prefix: str) -> str:
         """Generate element ID"""
         return f"{prefix}_{uuid.uuid4().hex[:8]}"
-        
+
     def _detect_chart_type(self, alt_text: str) -> str:
         """Detect chart type"""
         alt_lower = alt_text.lower()
-        
-        if any(keyword in alt_lower for keyword in ['bar', '柱状', '条形']):
+
+        if any(keyword in alt_lower for keyword in ["bar", "柱状", "条形"]):
             return "bar_chart"
-        elif any(keyword in alt_lower for keyword in ['line', '折线', '趋势']):
+        elif any(keyword in alt_lower for keyword in ["line", "折线", "趋势"]):
             return "line_chart"
-        elif any(keyword in alt_lower for keyword in ['pie', '饼图', '圆饼']):
+        elif any(keyword in alt_lower for keyword in ["pie", "饼图", "圆饼"]):
             return "pie_chart"
-        elif any(keyword in alt_lower for keyword in ['scatter', '散点', '散布']):
+        elif any(keyword in alt_lower for keyword in ["scatter", "散点", "散布"]):
             return "scatter_plot"
         else:
             return "unknown"
-            
+
     def _extract_domain(self, url: str) -> str:
         """Extract domain"""
         try:
             from urllib.parse import urlparse
+
             return urlparse(url).netloc
-        except:
+        except Exception:
             return "unknown"
-    
+
     def _extract_filename_from_url(self, url: str) -> str:
         """Extract filename from URL"""
         try:
             from urllib.parse import urlparse
+
             path = urlparse(url).path
-            filename = path.split('/')[-1]
+            filename = path.split("/")[-1]
             # Remove file extension for cleaner alt text
-            if '.' in filename:
-                filename = filename.rsplit('.', 1)[0]
-            return filename.replace('-', ' ').replace('_', ' ').title()
-        except:
+            if "." in filename:
+                filename = filename.rsplit(".", 1)[0]
+            return filename.replace("-", " ").replace("_", " ").title()
+        except Exception:
             return "Image"
 
 
 class ReportEnhancer:
     """Report enhancer"""
-    
-    def __init__(self, language: Language = Language.ZH_CN, config: InteractiveReportConfig = None):
+
+    def __init__(
+        self,
+        language: Language = Language.ZH_CN,
+        config: InteractiveReportConfig = None,
+    ):
         self.language = language
         self.config = config or InteractiveReportConfig()
         self.element_generator = InteractiveElementGenerator(language)
-        
-    def enhance_report(self, content: str, metadata: Dict[str, Any] = None) -> InteractiveReport:
+
+    def enhance_report(
+        self, content: str, metadata: Dict[str, Any] = None
+    ) -> InteractiveReport:
         """Enhance report to interactive version"""
         if metadata is None:
             metadata = {}
-            
+
         report_id = self._generate_report_id()
-        
+
         # Extract interactive elements
-        interactive_elements = self.element_generator.extract_interactive_elements(content)
-        
+        interactive_elements = self.element_generator.extract_interactive_elements(
+            content
+        )
+
         # Generate data source information
         data_sources = self._extract_data_sources(content, metadata)
-        
+
         # Extract code blocks
         code_blocks = self._extract_code_blocks(content)
-        
+
         # Generate navigation tree
         navigation_tree = self._generate_navigation_tree(content)
-        
+
         # Enhance content
-        enhanced_content = self._enhance_content_with_interactivity(content, interactive_elements)
-        
+        enhanced_content = self._enhance_content_with_interactivity(
+            content, interactive_elements
+        )
+
         return InteractiveReport(
             report_id=report_id,
-            title=metadata.get("title", get_text(self.language, "interactive_elements", "default_report_title")),
+            title=metadata.get(
+                "title",
+                get_text(self.language, "interactive_elements", "default_report_title"),
+            ),
             content=enhanced_content,
             interactive_elements=interactive_elements,
             data_sources=data_sources,
             code_blocks=code_blocks,
             navigation_tree=navigation_tree,
-            metadata=metadata
+            metadata=metadata,
         )
-        
-    def generate_html_report(self, content: str, metadata: Dict[str, Any] = None, output_dir: str = None) -> str:
+
+    def generate_html_report(
+        self, content: str, metadata: Dict[str, Any] = None, output_dir: str = None
+    ) -> str:
         """Generate and save interactive HTML report
-        
+
         Args:
             content: Report content in markdown format
             metadata: Report metadata
             output_dir: Output directory for generated files. If None, uses config or current directory.
-            
+
         Returns:
             Path to the generated HTML file
         """
         # Generate interactive report
         interactive_report = self.enhance_report(content, metadata)
-        
+
         # Generate HTML
         html_generator = HTMLGenerator(language=self.language)
         html_content = html_generator.generate_interactive_html(interactive_report)
-        
+
         # Determine output path
         if output_dir:
             # Use provided output_dir, override config
-            temp_config = InteractiveReportConfig(output_dir=output_dir, use_timestamp=self.config.use_timestamp)
-            output_file = temp_config.get_output_path(self.language, interactive_report.report_id)
+            temp_config = InteractiveReportConfig(
+                output_dir=output_dir, use_timestamp=self.config.use_timestamp
+            )
+            output_file = temp_config.get_output_path(
+                self.language, interactive_report.report_id
+            )
         else:
             # Use instance config
-            output_file = self.config.get_output_path(self.language, interactive_report.report_id)
-        
+            output_file = self.config.get_output_path(
+                self.language, interactive_report.report_id
+            )
+
         # Save HTML file
-        with open(output_file, 'w', encoding=self.config.encoding) as f:
+        with open(output_file, "w", encoding=self.config.encoding) as f:
             f.write(html_content)
-            
+
         return output_file
-        
+
     def _generate_report_id(self) -> str:
         """Generate report ID"""
         return f"report_{uuid.uuid4().hex[:12]}"
-        
-    def _extract_data_sources(self, content: str, metadata: Dict[str, Any]) -> List[DataSource]:
+
+    def _extract_data_sources(
+        self, content: str, metadata: Dict[str, Any]
+    ) -> List[DataSource]:
         """Extract data sources"""
         sources = []
-        
+
         # Extract from metadata
         if "data_sources" in metadata:
             for i, source_name in enumerate(metadata["data_sources"]):
                 source = DataSource(
                     source_id=f"ds_{i:03d}",
                     name=source_name,
-                    description=get_text(self.language, "interactive_elements", "data_source_description").format(name=source_name),
-                    last_updated=metadata.get("last_updated")
+                    description=get_text(
+                        self.language, "interactive_elements", "data_source_description"
+                    ).format(name=source_name),
+                    last_updated=metadata.get("last_updated"),
                 )
                 sources.append(source)
-                
+
         # Extract links from content as data sources
-        link_pattern = r'\[(.*?)\]\((https?://.*?)\)'
+        link_pattern = r"\[(.*?)\]\((https?://.*?)\)"
         matches = re.finditer(link_pattern, content)
-        
+
         for i, match in enumerate(matches, start=len(sources)):
             link_text = match.group(1)
             url = match.group(2)
-            
+
             source = DataSource(
                 source_id=f"ds_{i:03d}",
                 name=link_text,
-                description=get_text(self.language, "interactive_elements", "external_data_source_description").format(name=link_text),
+                description=get_text(
+                    self.language,
+                    "interactive_elements",
+                    "external_data_source_description",
+                ).format(name=link_text),
                 file_path=url,
-                last_updated=None
+                last_updated=None,
             )
             sources.append(source)
-            
+
         return sources
-        
+
     def _extract_code_blocks(self, content: str) -> List[CodeBlock]:
         """Extract code blocks"""
         blocks = []
-        
-        code_pattern = r'```(\w+)?\n(.*?)\n```'
+
+        code_pattern = r"```(\w+)?\n(.*?)\n```"
         matches = re.finditer(code_pattern, content, re.DOTALL)
-        
+
         for i, match in enumerate(matches):
             language = match.group(1) or "text"
             code = match.group(2).strip()
-            
+
             block = CodeBlock(
                 code_id=f"code_{i:03d}",
                 language=language,
                 code=code,
-                description=get_text(self.language, "interactive_elements", "code_block_description").format(language=language.upper(), index=i+1),
-                dependencies=self._extract_dependencies(code, language)
+                description=get_text(
+                    self.language, "interactive_elements", "code_block_description"
+                ).format(language=language.upper(), index=i + 1),
+                dependencies=self._extract_dependencies(code, language),
             )
             blocks.append(block)
-            
+
         return blocks
-        
+
     def _extract_dependencies(self, code: str, language: str) -> List[str]:
         """Extract code dependencies"""
         dependencies = []
-        
+
         if language.lower() == "python":
             # Extract import statements
-            import_pattern = r'(?:import|from)\s+(\w+)'
+            import_pattern = r"(?:import|from)\s+(\w+)"
             matches = re.findall(import_pattern, code)
             dependencies.extend(matches)
-            
+
         elif language.lower() == "sql":
             # Extract table names
-            table_pattern = r'FROM\s+(\w+)|JOIN\s+(\w+)'
+            table_pattern = r"FROM\s+(\w+)|JOIN\s+(\w+)"
             matches = re.findall(table_pattern, code, re.IGNORECASE)
             for match in matches:
                 dependencies.extend([t for t in match if t])
-                
+
         return list(set(dependencies))  # Remove duplicates
-        
+
     def _generate_navigation_tree(self, content: str) -> Dict[str, Any]:
         """Generate navigation tree"""
         tree = {"sections": []}
-        
+
         # Extract heading levels (支持1-6级标题)
-        heading_pattern = r'^(#{1,6})\s+(.*?)$'
+        heading_pattern = r"^(#{1,6})\s+(.*?)$"
         matches = re.finditer(heading_pattern, content, re.MULTILINE)
-        
+
         current_section = None
         current_subsection = None
-        
+
         for match in matches:
             level = len(match.group(1))
             title = match.group(2).strip()
-            
+
             section = {
                 "level": level,
                 "title": title,
                 "id": self._generate_section_id(title),
-                "subsections": []
+                "subsections": [],
             }
-            
+
             if level == 1:
                 tree["sections"].append(section)
                 current_section = section
@@ -580,27 +645,31 @@ class ReportEnhancer:
                 current_subsection = section
             elif level == 3 and current_subsection:
                 current_subsection["subsections"].append(section)
-            elif level == 4 and current_subsection and current_subsection["subsections"]:
+            elif (
+                level == 4 and current_subsection and current_subsection["subsections"]
+            ):
                 # 四级标题作为三级标题的子项
                 if current_subsection["subsections"]:
                     last_l3 = current_subsection["subsections"][-1]
                     if "subsections" not in last_l3:
                         last_l3["subsections"] = []
                     last_l3["subsections"].append(section)
-                
+
         return tree
-        
+
     def _generate_section_id(self, title: str) -> str:
         """Generate section ID"""
         # Convert to URL-friendly ID
-        section_id = re.sub(r'[^\w\u4e00-\u9fff]+', '-', title.lower())
-        section_id = section_id.strip('-')
+        section_id = re.sub(r"[^\w\u4e00-\u9fff]+", "-", title.lower())
+        section_id = section_id.strip("-")
         return section_id or "section"
-        
-    def _enhance_content_with_interactivity(self, content: str, elements: List[InteractiveElement]) -> str:
+
+    def _enhance_content_with_interactivity(
+        self, content: str, elements: List[InteractiveElement]
+    ) -> str:
         """Enhance content with interactivity"""
         enhanced = content
-        
+
         # Add markers for each interactive element
         for element in elements:
             if element.trigger_text in enhanced:
@@ -609,41 +678,58 @@ class ReportEnhancer:
                 enhanced = enhanced.replace(
                     element.trigger_text,
                     f"{interactive_marker}{element.trigger_text}</interactive>",
-                    1  # Only replace first match
+                    1,  # Only replace first match
                 )
-                
+
         return enhanced
 
 
 class HTMLGenerator:
     """HTML generator"""
-    
+
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
         self.template_dir = Path(__file__).parent / "templates"
-        
+
     def generate_interactive_html(self, report: InteractiveReport) -> str:
         """Generate interactive HTML"""
         html_template = self._get_html_template()
-        
+
         # Replace template variables
         lang_code = "zh-CN" if self.language == Language.ZH_CN else "en-US"
         html = html_template.replace("{lang_code}", lang_code)
         html = html.replace("{{TITLE}}", report.title)
-        html = html.replace("{{CONTENT}}", self._convert_markdown_to_html(report.content))
-        html = html.replace("{{NAVIGATION}}", self._generate_navigation_html(report.navigation_tree))
-        html = html.replace("{{INTERACTIVE_ELEMENTS}}", self._generate_elements_js(report.interactive_elements))
-        html = html.replace("{{DATA_SOURCES}}", self._generate_data_sources_html(report.data_sources))
-        html = html.replace("{{CODE_BLOCKS}}", self._generate_code_blocks_html(report.code_blocks))
-        html = html.replace("{{DATA_SOURCES_TITLE}}", get_text(self.language, 'interactive_elements', 'data_sources'))
-        html = html.replace("{{CODE_BLOCKS_TITLE}}", get_text(self.language, 'interactive_elements', 'code_blocks'))
-        
+        html = html.replace(
+            "{{CONTENT}}", self._convert_markdown_to_html(report.content)
+        )
+        html = html.replace(
+            "{{NAVIGATION}}", self._generate_navigation_html(report.navigation_tree)
+        )
+        html = html.replace(
+            "{{INTERACTIVE_ELEMENTS}}",
+            self._generate_elements_js(report.interactive_elements),
+        )
+        html = html.replace(
+            "{{DATA_SOURCES}}", self._generate_data_sources_html(report.data_sources)
+        )
+        html = html.replace(
+            "{{CODE_BLOCKS}}", self._generate_code_blocks_html(report.code_blocks)
+        )
+        html = html.replace(
+            "{{DATA_SOURCES_TITLE}}",
+            get_text(self.language, "interactive_elements", "data_sources"),
+        )
+        html = html.replace(
+            "{{CODE_BLOCKS_TITLE}}",
+            get_text(self.language, "interactive_elements", "code_blocks"),
+        )
+
         return html
-        
+
     def _get_html_template(self) -> str:
         """Get HTML template"""
         lang_code = "zh-CN" if self.language == Language.ZH_CN else "en-US"
-        return '''
+        return """
 <!DOCTYPE html>
 <html lang="{lang_code}">
 <head>
@@ -921,171 +1007,194 @@ class HTMLGenerator:
     </script>
 </body>
 </html>
-'''
-        
+"""
+
     def _convert_markdown_to_html(self, markdown: str) -> str:
         """Convert Markdown to HTML (simplified version)"""
         html = markdown
-        
+
         # Horizontal rules (分割线)
-        html = re.sub(r'^---+\s*$', r'<hr>', html, flags=re.MULTILINE)
-        
+        html = re.sub(r"^---+\s*$", r"<hr>", html, flags=re.MULTILINE)
+
         # Headers (支持1-6级标题)
-        html = re.sub(r'^###### (.*?)$', r'<h6>\1</h6>', html, flags=re.MULTILINE)
-        html = re.sub(r'^##### (.*?)$', r'<h5>\1</h5>', html, flags=re.MULTILINE)
-        html = re.sub(r'^#### (.*?)$', r'<h4>\1</h4>', html, flags=re.MULTILINE)
-        html = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
-        
+        html = re.sub(r"^###### (.*?)$", r"<h6>\1</h6>", html, flags=re.MULTILINE)
+        html = re.sub(r"^##### (.*?)$", r"<h5>\1</h5>", html, flags=re.MULTILINE)
+        html = re.sub(r"^#### (.*?)$", r"<h4>\1</h4>", html, flags=re.MULTILINE)
+        html = re.sub(r"^### (.*?)$", r"<h3>\1</h3>", html, flags=re.MULTILINE)
+        html = re.sub(r"^## (.*?)$", r"<h2>\1</h2>", html, flags=re.MULTILINE)
+        html = re.sub(r"^# (.*?)$", r"<h1>\1</h1>", html, flags=re.MULTILINE)
+
         # Lists (支持-号列表)
         html = self._convert_lists_to_html(html)
-        
+
         # Links
-        html = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" target="_blank">\1</a>', html)
-        
+        html = re.sub(
+            r"\[(.*?)\]\((.*?)\)", r'<a href="\2" target="_blank">\1</a>', html
+        )
+
         # Bold
-        html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html)
-        
+        html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
+
         # Paragraphs
-        html = re.sub(r'\n\n', '</p><p>', html)
-        html = f'<p>{html}</p>'
-        
+        html = re.sub(r"\n\n", "</p><p>", html)
+        html = f"<p>{html}</p>"
+
         # Tables
         html = self._convert_tables_to_html(html)
-        
+
         # Code blocks and Mermaid diagrams
         html = self._convert_code_blocks_to_html(html)
-        
+
         return html
-        
+
     def _convert_lists_to_html(self, content: str) -> str:
         """Convert Markdown lists to HTML"""
-        lines = content.split('\n')
+        lines = content.split("\n")
         result = []
         in_list = False
         list_level = 0
-        
+
         for line in lines:
             # 检测列表项 (支持 - 和 * 开头的列表)
-            list_match = re.match(r'^(\s*)[-*]\s+(.*)', line)
-            
+            list_match = re.match(r"^(\s*)[-*]\s+(.*)", line)
+
             if list_match:
                 indent = len(list_match.group(1))
                 content = list_match.group(2)
                 current_level = indent // 2  # 假设每级缩进2个空格
-                
+
                 if not in_list:
-                    result.append('<ul>')
+                    result.append("<ul>")
                     in_list = True
                     list_level = current_level
                 elif current_level > list_level:
                     # 嵌套列表
-                    result.append('<ul>')
+                    result.append("<ul>")
                     list_level = current_level
                 elif current_level < list_level:
                     # 结束嵌套
                     for _ in range(list_level - current_level):
-                        result.append('</ul>')
+                        result.append("</ul>")
                     list_level = current_level
-                
-                result.append(f'<li>{content}</li>')
+
+                result.append(f"<li>{content}</li>")
             else:
                 if in_list:
                     # 结束列表
                     for _ in range(list_level + 1):
-                        result.append('</ul>')
+                        result.append("</ul>")
                     in_list = False
                     list_level = 0
                 result.append(line)
-        
+
         # 如果文件结束时还在列表中，关闭列表
         if in_list:
             for _ in range(list_level + 1):
-                result.append('</ul>')
-        
-        return '\n'.join(result)
-        
+                result.append("</ul>")
+
+        return "\n".join(result)
+
     def _convert_tables_to_html(self, content: str) -> str:
         """Convert Markdown tables to HTML"""
         # Simplified table conversion
-        table_pattern = r'(\|.*?\|.*?\n(?:\|.*?\|.*?\n)*)'
-        
+        table_pattern = r"(\|.*?\|.*?\n(?:\|.*?\|.*?\n)*)"
+
         def convert_table(match):
             table_md = match.group(1)
-            lines = table_md.strip().split('\n')
-            
+            lines = table_md.strip().split("\n")
+
             if len(lines) < 2:
                 return match.group(0)
-                
+
             # Header row
             header_line = lines[0]
-            headers = [cell.strip() for cell in header_line.split('|')[1:-1]]
-            
+            headers = [cell.strip() for cell in header_line.split("|")[1:-1]]
+
             # Data rows
             data_lines = lines[2:]  # Skip separator row
-            
+
             html = '<table class="sortable">\n<thead>\n<tr>\n'
             for i, header in enumerate(headers):
-                html += f'<th onclick="sortTable(this.closest(\'table\'), {i})">{header}</th>\n'
-            html += '</tr>\n</thead>\n<tbody>\n'
-            
+                html += f"<th onclick=\"sortTable(this.closest('table'), {i})\">{header}</th>\n"
+            html += "</tr>\n</thead>\n<tbody>\n"
+
             for line in data_lines:
-                if '|' in line:
-                    cells = [cell.strip() for cell in line.split('|')[1:-1]]
-                    html += '<tr>\n'
+                if "|" in line:
+                    cells = [cell.strip() for cell in line.split("|")[1:-1]]
+                    html += "<tr>\n"
                     for cell in cells:
-                        html += f'<td>{cell}</td>\n'
-                    html += '</tr>\n'
-                    
-            html += '</tbody>\n</table>\n'
+                        html += f"<td>{cell}</td>\n"
+                    html += "</tr>\n"
+
+            html += "</tbody>\n</table>\n"
             return html
-            
+
         return re.sub(table_pattern, convert_table, content, flags=re.MULTILINE)
-        
+
     def _convert_code_blocks_to_html(self, content: str) -> str:
         """Convert code blocks and Mermaid diagrams to HTML"""
+
         def convert_code_block(match):
             language = match.group(1) or "text"
             code_content = match.group(2).strip()
-            
+
             # Check if it's a Mermaid diagram
-            if language.lower() == "mermaid" or code_content.strip().startswith(("graph TD", "graph LR", "graph TB", "graph RL", "flowchart TD", "flowchart LR", "sequenceDiagram", "classDiagram", "stateDiagram", "erDiagram", "journey", "gantt", "pie")):
+            if language.lower() == "mermaid" or code_content.strip().startswith(
+                (
+                    "graph TD",
+                    "graph LR",
+                    "graph TB",
+                    "graph RL",
+                    "flowchart TD",
+                    "flowchart LR",
+                    "sequenceDiagram",
+                    "classDiagram",
+                    "stateDiagram",
+                    "erDiagram",
+                    "journey",
+                    "gantt",
+                    "pie",
+                )
+            ):
                 # Generate unique ID for the diagram
-                diagram_id = f"mermaid-{hashlib.md5(code_content.encode()).hexdigest()[:8]}"
-                return f'''
+                diagram_id = (
+                    f"mermaid-{hashlib.md5(code_content.encode()).hexdigest()[:8]}"
+                )
+                return f"""
 <div class="mermaid-diagram" id="{diagram_id}">
     <div class="mermaid">{code_content}</div>
 </div>
-'''
+"""
             else:
                 # Regular code block
                 return f'<div class="code-block"><pre><code class="language-{language}">{code_content}</code></pre></div>'
-        
+
         # Convert code blocks
-        html = re.sub(r'```(\w+)?\n(.*?)\n```', convert_code_block, content, flags=re.DOTALL)
+        html = re.sub(
+            r"```(\w+)?\n(.*?)\n```", convert_code_block, content, flags=re.DOTALL
+        )
         return html
-        
+
     def _generate_navigation_html(self, nav_tree: Dict[str, Any]) -> str:
         """Generate navigation HTML"""
         if not nav_tree.get("sections"):
             return f"<ul><li>{get_text(self.language, 'interactive_elements', 'no_navigation_items')}</li></ul>"
-            
+
         html = "<ul>"
         for section in nav_tree["sections"]:
             html += f'<li><a href="#{section["id"]}">{section["title"]}</a></li>'
         html += "</ul>"
-        
+
         return html
-        
+
     def _generate_elements_js(self, elements: List[InteractiveElement]) -> str:
         """Generate interactive elements JavaScript"""
         js = "// Interactive element handling\n"
-        
+
         for element in elements:
             if element.element_type == InteractiveElementType.CLICKABLE_CHART:
                 chart_type = element.metadata.get("chart_type", "Unknown")
-                js += f'''
+                js += f"""
 document.addEventListener('DOMContentLoaded', function() {{
     const element = document.querySelector('[id="{element.element_id}"]');
     if (element) {{
@@ -1094,10 +1203,10 @@ document.addEventListener('DOMContentLoaded', function() {{
         }});
     }}
 }});
-'''
+"""
             elif element.element_type == InteractiveElementType.CODE_VIEWER:
                 safe_code = element.target_content.replace("'", "\\'")
-                js += f'''
+                js += f"""
 document.addEventListener('DOMContentLoaded', function() {{
     const element = document.querySelector('[id="{element.element_id}"]');
     if (element) {{
@@ -1106,33 +1215,33 @@ document.addEventListener('DOMContentLoaded', function() {{
         }});
     }}
 }});
-'''
-        
+"""
+
         return js
-        
+
     def _generate_data_sources_html(self, sources: List[DataSource]) -> str:
         """Generate data sources HTML"""
         if not sources:
             return f"<p>{get_text(self.language, 'interactive_elements', 'no_data_sources')}</p>"
-            
+
         html = "<ul>"
         for source in sources:
-            html += f'''
+            html += f"""
             <li>
                 <strong>{source.name}</strong><br>
                 <small>{source.description}</small>
                 {f'<br><a href="{source.file_path}" target="_blank">{get_text(self.language, "interactive_elements", "view_source_file")}</a>' if source.file_path else ''}
             </li>
-            '''
+            """
         html += "</ul>"
-        
+
         return html
-        
+
     def _generate_code_blocks_html(self, blocks: List[CodeBlock]) -> str:
         """Generate code blocks HTML"""
         if not blocks:
             return f"<p>{get_text(self.language, 'interactive_elements', 'no_code_blocks')}</p>"
-            
+
         html = "<ul>"
         for block in blocks:
             html += f'''
@@ -1143,24 +1252,25 @@ document.addEventListener('DOMContentLoaded', function() {{
             </li>
             '''
         html += "</ul>"
-        
+
         return html
 
 
-def demo_interactive_report(language: Language = Language.ZH_CN, output_dir: str = None):
+def demo_interactive_report(
+    language: Language = Language.ZH_CN, output_dir: str = None
+):
     """Demo interactive report generation
-    
+
     Args:
         language: Report language
         output_dir: Output directory for generated files. If None, uses current directory.
     """
-    import os
-    
+
     enhancer = ReportEnhancer(language=language)
     html_generator = HTMLGenerator(language=language)
-    
+
     # Sample report content
-    sample_content = '''
+    sample_content = """
 # 2023年度财务分析报告
 
 ## 执行摘要
@@ -1268,29 +1378,29 @@ plt.show()
 - 2024年：进入新市场
 - 2025年：实现IPO准备
 - 2026年：国际化扩张
-'''
-    
+"""
+
     # Generate interactive report
     interactive_report = enhancer.enhance_report(
         sample_content,
         metadata={
             "title": "2023 Financial Analysis Report",
             "data_sources": ["财务系统", "销售数据库", "市场调研报告"],
-            "last_updated": "2024-01-15"
-        }
+            "last_updated": "2024-01-15",
+        },
     )
-    
+
     # Generate HTML
     html_content = html_generator.generate_interactive_html(interactive_report)
-    
+
     # Prepare output path using config
     config = InteractiveReportConfig(output_dir=output_dir)
     output_file = config.get_output_path(language, interactive_report.report_id)
-    
+
     # Save HTML file
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_content)
-        
+
     print(f"Interactive report generated: {output_file}")
     return output_file
 

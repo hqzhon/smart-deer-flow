@@ -21,13 +21,17 @@ def prose_fix_node(state: ProseState):
         SystemMessage(content=get_prompt_template("prose/prose_fix")),
         HumanMessage(content=f"The existing text is: {state['content']}"),
     ]
-    
+
     prose_content = safe_llm_call(
         model.invoke,
         messages,
         operation_name="Prose Fixer",
         context="Fix prose content",
     )
-    response_content = prose_content.content if hasattr(prose_content, 'content') else str(prose_content)
+    response_content = (
+        prose_content.content
+        if hasattr(prose_content, "content")
+        else str(prose_content)
+    )
     logger.info(f"prose_content: {response_content}")
     return {"prose_content": response_content}

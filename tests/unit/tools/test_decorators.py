@@ -1,10 +1,8 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-import pytest
-import logging
-from unittest.mock import Mock, call, patch, MagicMock
-from src.tools.decorators import LoggedToolMixin, create_logged_tool
+from unittest.mock import Mock, call, patch
+from src.tools.decorators import create_logged_tool
 
 
 class MockBaseTool:
