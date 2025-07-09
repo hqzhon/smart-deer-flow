@@ -454,20 +454,20 @@ def _handle_content_too_long_error(
                                 left = mid + 1
                             else:
                                 right = mid - 1
-                        
-                        # Log if we hit max iterations
-                        if iteration_count >= max_iterations:
-                            logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
+                            
+                            # Log if we hit max iterations
+                            if iteration_count >= max_iterations:
+                                logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
 
                     if best_content:
                         truncated_content = best_content
                     else:
-                            # Fallback to conservative character limit if binary search fails
-                            char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
-                            truncated_content = truncated_content[:char_limit]
-                            logger.warning(
-                                f"Applied emergency character-based truncation to {char_limit} characters"
-                            )
+                        # Fallback to conservative character limit if binary search fails
+                        char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
+                        truncated_content = truncated_content[:char_limit]
+                        logger.warning(
+                            f"Applied emergency character-based truncation to {char_limit} characters"
+                        )
 
                     # Add a note about truncation
                     truncated_content += ErrorHandlerConfig.TRUNCATION_NOTE
@@ -540,12 +540,6 @@ def _handle_content_too_long_error(
                     )
                     # Re-raise unexpected errors after logging
                     raise
-                    chunks = processor.smart_chunk_content(
-                        combined_content, model_name, "auto"
-                    )
-                    truncated_content = (
-                        chunks[0] if chunks else combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
-                    )
             else:
                 # Use chunking with aggressive strategy for very long content
                 logger.info("Attempting smart content chunking")
@@ -761,15 +755,15 @@ async def _handle_content_too_long_error_async(
                     # Reuse existing processor instance
 
                     # Binary search for precise truncation
-                        content = truncated_content
-                        left, right = 0, len(content)
-                        best_content = ""
-                        max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
-                        iteration_count = 0
+                    content = truncated_content
+                    left, right = 0, len(content)
+                    best_content = ""
+                    max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
+                    iteration_count = 0
 
-                        # Handle edge case: empty content
-                        if not content:
-                            best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
+                    # Handle edge case: empty content
+                    if not content:
+                        best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
                     else:
                         while left <= right and iteration_count < max_iterations:
                             iteration_count += 1
@@ -837,12 +831,6 @@ async def _handle_content_too_long_error_async(
                     )
                     # Re-raise unexpected errors after logging
                     raise
-                    chunks = processor.smart_chunk_content(
-                        combined_content, model_name, "auto"
-                    )
-                    truncated_content = (
-                        chunks[0] if chunks else combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
-                    )
             else:
                 # Use chunking with aggressive strategy for very long content
                 logger.info("Attempting smart content chunking")
