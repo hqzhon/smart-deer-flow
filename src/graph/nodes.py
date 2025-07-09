@@ -132,9 +132,20 @@ def check_and_truncate_messages(
                 logger.info(
                     f"Built model_token_limits from config file: {list(model_token_limits.keys())}"
                 )
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, OSError) as e:
                 logger.warning(
-                    f"Failed to load model_token_limits from config file: {e}"
+                    f"Failed to load model_token_limits from config file due to file error: {type(e).__name__}: {e}"
+                )
+                model_token_limits = {}
+            except (ValueError, KeyError, TypeError) as e:
+                logger.warning(
+                    f"Failed to load model_token_limits from config file due to data error: {type(e).__name__}: {e}"
+                )
+                logger.warning(f"Full traceback: {traceback.format_exc()}")
+                model_token_limits = {}
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error loading model_token_limits from config file: {type(e).__name__}: {e}"
                 )
                 logger.warning(f"Full traceback: {traceback.format_exc()}")
                 model_token_limits = {}
@@ -297,11 +308,17 @@ def check_and_truncate_messages(
 
             return result
 
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
         logger.warning(
-            f"Token-based truncation failed, falling back to message count: {e}"
+            f"Token-based truncation failed due to data/type error: {type(e).__name__}: {e}, falling back to message count"
         )
         logger.warning(f"Full traceback: {traceback.format_exc()}")
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in token-based truncation: {type(e).__name__}: {e}, falling back to message count"
+        )
+        logger.warning(f"Full traceback: {traceback.format_exc()}")
+        # For unexpected errors, we still want to continue with fallback
 
     # Fallback to original message count-based truncation
     if len(messages) > max_messages:

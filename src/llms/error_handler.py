@@ -343,7 +343,8 @@ def _handle_content_too_long_error(
                     if all(hasattr(item, "content") for item in arg):
                         messages = arg
                         break
-                except Exception:
+                except (TypeError, AttributeError, ValueError) as e:
+                    logger.debug(f"Failed to check message list format: {e}")
                     continue
             elif hasattr(arg, "invoke"):  # LLM object
                 llm = arg
@@ -505,10 +506,16 @@ def _handle_content_too_long_error(
                         combined_content, basic_llm, model_name, config.summary_type
                     )
                     truncated_content = summarized_content
-                except Exception as summarize_error:
+                except (ImportError, AttributeError, ValueError, RuntimeError) as summarize_error:
                     logger.warning(
                         f"Summarization failed: {summarize_error}, falling back to chunking"
                     )
+                except Exception as summarize_error:
+                    logger.error(
+                        f"Unexpected error during summarization: {type(summarize_error).__name__}: {summarize_error}"
+                    )
+                    # Re-raise unexpected errors after logging
+                    raise
                     chunks = processor.smart_chunk_content(
                         combined_content, model_name, "auto"
                     )
@@ -629,12 +636,16 @@ def _handle_content_too_long_error(
         # If all smart processing fails, re-raise the original error
         raise error
 
-    except Exception as e:
-        logger.error(f"Smart content processing failed: {e}")
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
+        logger.error(f"Smart content processing failed due to data/type error: {type(e).__name__}: {e}")
         # Create a new exception with more context information
         enhanced_error = Exception(f"Smart processing failed: {e}. Original error: {error}")
         enhanced_error.__cause__ = e
         raise enhanced_error
+    except Exception as e:
+        logger.error(f"Unexpected error in smart content processing: {type(e).__name__}: {e}")
+        # For unexpected errors, preserve the original error
+        raise error from e
 
 
 async def _handle_content_too_long_error_async(
@@ -792,10 +803,16 @@ async def _handle_content_too_long_error_async(
                         combined_content, basic_llm, model_name, config.summary_type
                     )
                     truncated_content = summarized_content
-                except Exception as summarize_error:
+                except (ImportError, AttributeError, ValueError, RuntimeError) as summarize_error:
                     logger.warning(
                         f"Summarization failed: {summarize_error}, falling back to chunking"
                     )
+                except Exception as summarize_error:
+                    logger.error(
+                        f"Unexpected error during async summarization: {type(summarize_error).__name__}: {summarize_error}"
+                    )
+                    # Re-raise unexpected errors after logging
+                    raise
                     chunks = processor.smart_chunk_content(
                         combined_content, model_name, "auto"
                     )
@@ -873,12 +890,16 @@ async def _handle_content_too_long_error_async(
         result = await llm_func(*new_args, **new_kwargs)
         return result
 
-    except Exception as e:
-        logger.error(f"Async smart content processing failed: {e}")
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
+        logger.error(f"Async smart content processing failed due to data/type error: {type(e).__name__}: {e}")
         # Create a new exception with more context information
         enhanced_error = Exception(f"Async smart processing failed: {e}. Original error: {error}")
         enhanced_error.__cause__ = e
         raise enhanced_error
+    except Exception as e:
+        logger.error(f"Unexpected error in async smart content processing: {type(e).__name__}: {e}")
+        # For unexpected errors, preserve the original error
+        raise error from e
 
 
 # Global error handler instance
@@ -931,7 +952,8 @@ async def _evaluate_and_optimize_context_before_call(
                         if all(hasattr(item, "content") for item in arg):
                             messages = list(arg)
                             break
-                    except Exception:
+                    except (TypeError, AttributeError, ValueError) as e:
+                        logger.debug(f"Failed to check async message list format: {e}")
                         continue
 
         # Try to extract model name from LLM function or arguments
