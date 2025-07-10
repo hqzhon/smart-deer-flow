@@ -25,9 +25,17 @@ from src.tools import (
 
 from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
+# ContextService will be imported dynamically to avoid circular imports
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call, safe_llm_call_async
+from src.prompts.template import apply_prompt_template
+from src.utils.json_utils import repair_json_output
+from src.utils.token_manager import TokenManager
+
+from .types import State
+from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 from src.prompts.planner_model import Plan, Step, StepType
+
 
 
 def check_and_truncate_messages(
@@ -217,13 +225,12 @@ def check_and_truncate_messages(
                                 processor.estimate_tokens(truncated_content)
                                 > token_limit
                             ):
-                                # Emergency truncation: use character-based limit
-                                char_limit = int(
-                                    token_limit * 3
-                                )  # Rough estimate: 1 token ≈ 3-4 characters
-                                truncated_content = truncated_content[:char_limit]
+                                # Emergency truncation: use precise token-based truncation
+                                truncated_content = _apply_precise_token_truncation(
+                                    truncated_content, token_limit, processor, model_name
+                                )
                                 logger.warning(
-                                    f"Applied emergency character-based truncation to {char_limit} characters"
+                                    f"Applied emergency token-based truncation to fit {token_limit} tokens"
                                 )
 
                             if hasattr(messages[0], "content"):
@@ -330,13 +337,37 @@ def check_and_truncate_messages(
     return messages
 
 
-from src.prompts.template import apply_prompt_template
-from src.utils.json_utils import repair_json_output
-
-from .types import State
-from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
-
 logger = logging.getLogger(__name__)
+
+
+# Global TokenManager instance for reuse
+_token_manager = None
+
+def _get_token_manager(processor=None):
+    """Get or create a global TokenManager instance."""
+    global _token_manager
+    if _token_manager is None:
+        _token_manager = TokenManager(processor)
+    return _token_manager
+
+def _apply_precise_token_truncation(
+    content: str, token_limit: int, processor, model_name: str
+) -> str:
+    """Apply precise token-based truncation using TokenManager.
+    
+    Args:
+        content: Content to truncate
+        token_limit: Maximum token limit
+        processor: ContentProcessor instance
+        model_name: Model name for token calculation
+        
+    Returns:
+        Truncated content that fits within token limit
+    """
+    token_manager = _get_token_manager(processor)
+    return token_manager.truncate_to_token_limit(
+        content, token_limit, model_name, preserve_start=True, preserve_end=False
+    )
 
 
 def _apply_aggressive_truncation(messages, processor, token_limit, model_name):
@@ -372,25 +403,11 @@ def _apply_aggressive_truncation(messages, processor, token_limit, model_name):
         logger.warning(
             f"Single message too long ({msg_tokens} tokens), applying aggressive truncation"
         )
-        max_chars = int(token_limit * 2.5)  # Conservative char estimate
-
-        # Always truncate if we exceed token limit, regardless of char length
-        if max_chars > 200:
-            # Keep first 1/3 and last 2/3 of available space
-            keep_start = max_chars // 3
-            keep_end = max_chars - keep_start - 50  # Reserve for truncation marker
-
-            if keep_end > 0 and len(content) > max_chars:
-                truncated_content = (
-                    content[:keep_start]
-                    + "\n\n...[content aggressively truncated]...\n\n"
-                    + content[-keep_end:]
-                )
-            else:
-                # Simple truncation for shorter content or when keep_end <= 0
-                truncated_content = content[:max_chars] + "\n\n[truncated]"
-        else:
-            truncated_content = content[:max_chars] + "\n\n[truncated]"
+        
+        # Use precise token-based truncation instead of character estimation
+        truncated_content = _apply_precise_token_truncation(
+            content, token_limit, processor, model_name
+        )
 
         if hasattr(msg, "content"):
             msg.content = truncated_content
@@ -536,7 +553,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             return {"background_investigation_results": ""}
     else:
         background_investigation_results = safe_llm_call(
-            get_web_search_tool(configurable.max_search_results).invoke,
+            get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering).invoke,
             query,
             operation_name="Background Investigation - Web Search",
             context="Search for background information",
@@ -607,56 +624,14 @@ def background_investigation_node(state: State, config: RunnableConfig):
             )
             token_limit_exceeded = not results_within_limit
 
-            # Use SearchResultFilter to determine if smart filtering should be enabled
-            enable_smart_filtering = getattr(
-                configurable, "enable_smart_filtering", True
-            )
-            should_use_smart_filtering = False
-
-            if enable_smart_filtering and isinstance(searched_content, list):
-                from src.utils.search_result_filter import SearchResultFilter
-
-                filter_instance = SearchResultFilter(processor)
-                should_use_smart_filtering = (
-                    filter_instance.should_enable_smart_filtering(
-                        searched_content, model_name
-                    )
-                )
-                smart_filtering_threshold = (
-                    filter_instance.get_smart_filtering_threshold(model_name)
-                )
-
-            if token_limit_exceeded or should_use_smart_filtering:
+            # Check if token limit is exceeded and apply fallback processing if needed
+            if token_limit_exceeded:
                 logger.info(
-                    f"Applying smart processing to search results "
-                    f"(tokens: {results_token_result.total_tokens}, limit: {model_limits.safe_input_limit}, "
-                    f"threshold: {smart_filtering_threshold if 'smart_filtering_threshold' in locals() else 'N/A'})"
+                    f"Applying fallback processing to search results "
+                    f"(tokens: {results_token_result.total_tokens}, limit: {model_limits.safe_input_limit})"
                 )
 
-                # Try smart filtering first if enabled and threshold is met
-                if (
-                    enable_smart_filtering
-                    and should_use_smart_filtering
-                    and isinstance(searched_content, list)
-                ):
-                    logger.info(
-                        f"Using smart filtering for search results "
-                        f"(tokens: {results_token_result.total_tokens} > 80% of {model_limits.safe_input_limit})"
-                    )
-                    processed_results = processor.process_search_results(
-                        search_results=searched_content,
-                        llm=current_llm,
-                        model_name=model_name,
-                        max_results=configurable.max_search_results,
-                        query=query,
-                        enable_smart_filtering=True,
-                    )
-                    logger.info(
-                        f"Search results processed with smart filtering: {len(raw_results)} -> {len(processed_results)} characters"
-                    )
-                    return {"background_investigation_results": processed_results}
-
-                # Fallback to traditional processing
+                # Use traditional processing as fallback
                 if configurable.enable_content_summarization:
                     # Use smart summarization
                     processed_results = processor.summarize_content(
@@ -816,34 +791,13 @@ def planner_node(
     if plan_iterations >= configurable.max_plan_iterations:
         return Command(goto="reporter")
 
-    # Prepare messages with context evaluation
-    from src.utils.message_processor import prepare_messages_with_context_evaluation
-
-    # Get model name for context evaluation
-    model_name = "deepseek-chat"  # Default fallback
-    try:
-        model_name = getattr(llm, "model_name", getattr(llm, "model", None))
-        if not model_name or model_name == "unknown":
-            agent_model = AGENT_LLM_MAP.get("planner", "basic")
-            model_name = (
-                "deepseek-reasoner" if agent_model == "reasoning" else "deepseek-chat"
-            )
-    except Exception:
-        pass
-
-    # Apply context evaluation and optimization
-    optimized_messages = prepare_messages_with_context_evaluation(
-        messages,
-        model_name=model_name,
-        operation_name="Planner",
-        context="Generate the full plan",
-    )
+    # Context evaluation will be handled automatically by safe_llm_call
 
     full_response = ""
     if use_structured_output:
         response = safe_llm_call(
             llm.invoke,
-            optimized_messages,
+            messages,
             operation_name="Planner",
             context="Generate the full plan.",
         )
@@ -857,7 +811,7 @@ def planner_node(
         def stream_llm():
             response = safe_llm_call(
                 llm.stream,
-                optimized_messages,
+                messages,
                 operation_name="LLM streaming call",
                 context="Stream LLM response",
             )
@@ -988,22 +942,12 @@ def coordinator_node(
     configurable = Configuration.from_runnable_config(config)
     messages = apply_prompt_template("coordinator", state)
 
-    # Apply context evaluation and optimization before LLM call
-    from src.utils.message_processor import prepare_messages_with_context_evaluation
-
+    # Context evaluation will be handled automatically by safe_llm_call
     llm = get_llm_by_type(AGENT_LLM_MAP["coordinator"]).bind_tools([handoff_to_planner])
-    model_name = getattr(llm, "model_name", "coordinator")
-
-    optimized_messages = prepare_messages_with_context_evaluation(
-        messages=messages,
-        model_name=model_name,
-        operation_name="Coordinator",
-        context="Coordinating with customers",
-    )
 
     response = safe_llm_call(
         llm.invoke,
-        optimized_messages,
+        messages,
         operation_name="Coordinator",
         context="Coordinating with customers",
     )
@@ -1080,22 +1024,12 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
 
-    # Apply context evaluation and optimization before LLM call
-    from src.utils.message_processor import prepare_messages_with_context_evaluation
-
+    # Context evaluation will be handled automatically by safe_llm_call
     llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
-    model_name = getattr(llm, "model_name", "reporter")
-
-    optimized_messages = prepare_messages_with_context_evaluation(
-        messages=invoke_messages,
-        model_name=model_name,
-        operation_name="Reporter",
-        context="Generate the final report",
-    )
 
     response = safe_llm_call(
         llm.invoke,
-        optimized_messages,
+        invoke_messages,
         operation_name="Reporter",
         context="Generate the final report",
     )
@@ -1453,160 +1387,68 @@ async def _execute_single_step_parallel(
         budget_manager = None
         task_allocation = None
 
-    # Context management with budget-aware optimization
-    try:
-        from src.utils.advanced_context_manager import (
-            AdvancedContextManager,
-            CompressionStrategy,
-        )
-
-        if budget_manager:
-            # Get available context budget
-            context_budget = budget_manager.get_context_budget(task_id)
-            logger.info(
-                f"Available context budget for task {task_id}: {context_budget} tokens"
-            )
-        else:
-            context_budget = None
-
-        context_manager = AdvancedContextManager(configurable, content_processor)
-
-        # Check if context sharing should be disabled
-        disable_context_parallel = getattr(
-            configurable, "disable_context_parallel", False
-        )
-
-        # AGGRESSIVE: Default to disabling context sharing in parallel execution
-        # This prevents token explosion when multiple tasks run simultaneously
-        if disable_context_parallel or len(completed_steps) > 0:
-            logger.info(
-                "Context sharing disabled/limited for parallel execution to prevent token overflow"
-            )
-            completed_steps = (
-                []
-            )  # Completely disable context sharing for maximum token savings
-
-        # Select compression strategy based on budget constraints
-        strategy = CompressionStrategy.ADAPTIVE
-        if disable_context_parallel:
-            strategy = CompressionStrategy.NONE
-        elif context_budget and context_budget < 1000:  # Very limited budget
-            strategy = CompressionStrategy.HIERARCHICAL
-            logger.info(
-                f"Using hierarchical compression due to limited context budget: {context_budget}"
-            )
-        elif len(completed_steps) > 3:
-            strategy = CompressionStrategy.HIERARCHICAL
-        elif len(completed_steps) > 1:
-            strategy = CompressionStrategy.SLIDING_WINDOW
-
-        # Optimize context using advanced manager with budget constraints
-        current_task = f"Title: {step.title}\n\nDescription: {step.description}\n\nLocale: {state.get('locale', 'en-US')}"
-
-        # If we have budget constraints, modify the context manager's max_context_ratio
-        if budget_manager and context_budget:
-            # Calculate what ratio of model limit this budget represents
-            limits = content_processor.get_model_limits(model_name)
-            budget_ratio = min(0.6, context_budget / limits.safe_input_limit)
-            context_manager.max_context_ratio = budget_ratio
-            logger.info(
-                f"Adjusted context ratio to {budget_ratio:.2f} based on budget constraints"
-            )
-
-        context_window = context_manager.optimize_context_for_parallel(
-            completed_steps=completed_steps,
-            current_task=current_task,
-            model_name=model_name,
-            strategy=strategy,
-        )
-
-        # Format optimized context
-        main_content = context_manager.format_context_window(context_window)
-
-        # Log optimization statistics
-        stats = context_manager.get_optimization_stats(context_window)
-        logger.info(
-            f"Context optimization stats: {stats['total_tokens']}/{stats['max_tokens']} tokens, "
-            f"compression: {stats['compression_ratio']:.2%}, strategy: {stats['strategy_used']}"
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Advanced context management failed: {e}, attempting recovery with conservative settings"
-        )
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-
-        # Instead of falling back to simple management, retry with more conservative settings
-        try:
-            # Create a new context manager with very conservative settings
-            context_manager = AdvancedContextManager(configurable, content_processor)
-            context_manager.max_context_ratio = 0.3  # Very conservative ratio
-            context_manager.sliding_window_size = 2  # Minimal window
-            context_manager.compression_threshold = 0.5  # Early compression
-
-            # Force hierarchical compression for maximum token reduction
-            strategy = CompressionStrategy.HIERARCHICAL
-
-            # Limit completed steps more aggressively
-            if len(completed_steps) > 2:
-                completed_steps = completed_steps[-2:]  # Only keep last 2 steps
-
-            logger.info("Retrying context optimization with conservative settings")
-
-            context_window = context_manager.optimize_context_for_parallel(
-                completed_steps=completed_steps,
-                current_task=current_task,
-                model_name=model_name,
-                strategy=strategy,
-            )
-
-            # Format optimized context
-            main_content = context_manager.format_context_window(context_window)
-
-            # Log recovery statistics
-            stats = context_manager.get_optimization_stats(context_window)
-            logger.info(
-                f"Recovery context stats: {stats['total_tokens']}/{stats['max_tokens']} tokens, "
-                f"compression: {stats['compression_ratio']:.2%}, strategy: {stats['strategy_used']}"
-            )
-
-        except Exception as recovery_error:
-            logger.error(f"Context management recovery also failed: {recovery_error}")
-            logger.error(f"Recovery traceback: {traceback.format_exc()}")
-
-            # Last resort: use minimal context with only current task
-            logger.warning("Using minimal context with current task only")
-            main_content = f"# Current Task\n\n## Title\n\n{step.title}\n\n## Description\n\n{step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
-
-    agent_input = {"messages": [HumanMessage(content=main_content)]}
-
-    # Add agent-specific configurations
+    # Initialize context service
+    # Ensure content_processor and budget_manager are initialized before this block
+    from src.utils.context_service import ContextService
+    context_service = ContextService(
+        configurable=configurable,
+        content_processor=content_processor,
+        budget_manager=budget_manager
+    )
+    
+    # Prepare additional messages for agent-specific configurations
+    additional_messages = []
+    
     if agent_type == "researcher":
         if state.get("resources"):
             resources_info = "**The user mentioned the following resource files:**\n\n"
             for resource in state.get("resources"):
                 resources_info += f"- {resource.title} ({resource.description})\n"
+            resources_info += "\n\nYou MUST use the **local_search_tool** to retrieve the information from the resource files."
+            
+            additional_messages.append(HumanMessage(content=resources_info))
 
-            agent_input["messages"].append(
-                HumanMessage(
-                    content=resources_info
-                    + "\n\n"
-                    + "You MUST use the **local_search_tool** to retrieve the information from the resource files.",
-                )
-            )
-
-        agent_input["messages"].append(
+        additional_messages.append(
             HumanMessage(
                 content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
                 name="system",
             )
         )
+    
+    # Use the comprehensive message preparation pipeline
+    optimized_messages, context_result = context_service.prepare_agent_messages(
+        state=state,
+        step=step,
+        current_plan=current_plan,
+        agent_type=agent_type,
+        config=config,
+        model_name=model_name,
+        task_id=task_id,
+        parallel_tasks=parallel_tasks,
+        additional_messages=additional_messages
+    )
+    
+    # Log context optimization results
+    if context_result.success:
+        logger.info(
+            f"Message preparation successful for {agent_type}: "
+            f"{context_result.total_tokens}/{context_result.max_tokens} tokens, "
+            f"compression: {context_result.compression_ratio:.2%}, "
+            f"strategy: {context_result.strategy_used}"
+        )
+    else:
+        logger.warning(
+            f"Message preparation failed for {agent_type}, using fallback: "
+            f"strategy: {context_result.strategy_used}, error: {context_result.error_message}"
+        )
+
+    agent_input = {"messages": optimized_messages}
 
     # Create agent with appropriate tools
     configurable = Configuration.from_runnable_config(config)
 
     if agent_type == "researcher":
-        tools = [get_web_search_tool(configurable.max_search_results), crawl_tool]
+        tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
         retriever_tool = get_retriever_tool(state.get("resources", []))
         if retriever_tool:
             tools.insert(0, retriever_tool)
@@ -1668,71 +1510,10 @@ async def _execute_single_step_parallel(
             f"Using default model name: {model_name} for agent_model: {agent_model}"
         )
 
-    # Apply budget-aware message optimization
-    if budget_manager:
-        try:
-            # Use budget manager to optimize messages
-            agent_input["messages"] = budget_manager.optimize_message_for_budget(
-                task_id=task_id, messages=agent_input["messages"], model_name=model_name
-            )
+    # Budget optimization and validation are now handled by prepare_agent_messages
+    # No additional budget processing needed here
 
-            # Validate final message budget
-            is_valid, estimated_tokens, available_tokens = (
-                budget_manager.validate_message_budget(
-                    task_id, agent_input["messages"], model_name
-                )
-            )
-
-            if not is_valid:
-                logger.error(
-                    f"Message budget validation failed for task {task_id}: "
-                    f"{estimated_tokens} > {available_tokens}"
-                )
-            else:
-                logger.info(
-                    f"Message budget validated for task {task_id}: {estimated_tokens}/{available_tokens} tokens"
-                )
-
-        except Exception as e:
-            logger.warning(
-                f"Budget-aware message optimization failed: {e}, falling back to legacy truncation"
-            )
-            logger.warning(f"Full traceback: {traceback.format_exc()}")
-            # Fallback to legacy truncation with aggressive mode
-            agent_input["messages"] = check_and_truncate_messages(
-                agent_input["messages"],
-                model_name=model_name,
-                max_messages=10,  # Further reduced for parallel execution
-                max_tokens=int(
-                    content_processor.get_model_limits(model_name).safe_input_limit
-                    * 0.6
-                ),
-                aggressive_mode=True,  # Enable aggressive mode for parallel execution
-            )
-    else:
-        # Legacy truncation when budget manager is not available
-        agent_input["messages"] = check_and_truncate_messages(
-            agent_input["messages"],
-            model_name=model_name,
-            max_messages=10,  # Further reduced for parallel execution
-            max_tokens=int(
-                content_processor.get_model_limits(model_name).safe_input_limit * 0.6
-            ),
-            aggressive_mode=True,  # Enable aggressive mode for parallel execution
-        )
-
-    # Apply context evaluation and optimization before LLM call
-    from src.utils.message_processor import prepare_messages_with_context_evaluation
-
-    optimized_messages = prepare_messages_with_context_evaluation(
-        messages=agent_input["messages"],
-        model_name=model_name,
-        operation_name=f"{agent_type} executor (parallel)",
-        context=f"Parallel execution of step: {step.title}",
-    )
-
-    # Update agent_input with optimized messages
-    agent_input["messages"] = optimized_messages
+    # Context evaluation will be handled automatically by safe_llm_call_async
 
     # Execute agent with budget tracking
     try:
@@ -1746,42 +1527,17 @@ async def _execute_single_step_parallel(
             max_retries=2,  # Reduce retries for parallel execution
         )
 
-        # Update token usage tracking
-        if budget_manager:
-            try:
-                # Estimate tokens used in the request
-                input_tokens = budget_manager.estimate_message_tokens(
-                    agent_input["messages"]
-                )
-
-                # Estimate output tokens (rough approximation)
-                if hasattr(result, "get") and "messages" in result:
-                    output_content = result["messages"][-1].content
-                else:
-                    output_content = (
-                        result.content if hasattr(result, "content") else str(result)
-                    )
-
-                output_tokens = content_processor.estimate_tokens(output_content)
-                total_used = input_tokens + output_tokens
-
-                budget_manager.update_token_usage(task_id, total_used)
-
-                # Log budget utilization
-                stats = budget_manager.get_budget_stats()
-                logger.info(
-                    f"Token usage updated for task {task_id}: {total_used} tokens. "
-                    f"Overall utilization: {stats['utilization_rate']:.2%}"
-                )
-
-            except Exception as e:
-                logger.warning(f"Failed to update token usage tracking: {e}")
-                logger.warning(f"Full traceback: {traceback.format_exc()}")
+        # Update token usage tracking using ContextService
+        context_service.update_token_usage_tracking(
+            task_id=task_id,
+            input_messages=agent_input["messages"],
+            result=result,
+            model_name=model_name
+        )
 
     finally:
         # Always release budget allocation when task completes
-        if budget_manager:
-            budget_manager.release_task_budget(task_id)
+        context_service.release_task_resources(task_id)
 
     # Process result
     if hasattr(result, "get") and "messages" in result:
@@ -2018,18 +1774,7 @@ async def _execute_agent_step(
         f"Agent input (after truncation): {len(agent_input['messages'])} messages"
     )
 
-    # Apply context evaluation and optimization before LLM call
-    from src.utils.message_processor import prepare_messages_with_context_evaluation
-
-    optimized_messages = prepare_messages_with_context_evaluation(
-        messages=agent_input["messages"],
-        model_name=model_name,
-        operation_name=f"{agent_name} executor",
-        context=f"Execute step: {current_step.title}",
-    )
-
-    # Update agent_input with optimized messages
-    agent_input["messages"] = optimized_messages
+    # Context evaluation will be handled automatically by safe_llm_call_async
 
     result = await safe_llm_call_async(
         agent.ainvoke,
@@ -2145,7 +1890,7 @@ async def researcher_node(
     """Researcher node that do research"""
     logger.info("Researcher node is researching.")
     configurable = Configuration.from_runnable_config(config)
-    tools = [get_web_search_tool(configurable.max_search_results), crawl_tool]
+    tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)

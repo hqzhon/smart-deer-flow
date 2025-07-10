@@ -80,24 +80,13 @@ class SmartSearchTool(BaseTool):
         try:
             from src.utils.content_processor import ContentProcessor
             from src.utils.search_result_filter import SearchResultFilter
-            from src.llms.llm import get_llm_by_type
-            from src.config.agents import AGENT_LLM_MAP
 
             # Initialize content processor and filter
             processor = ContentProcessor()
             filter_instance = SearchResultFilter(processor)
 
-            # Get current LLM model name
-            model_name = "deepseek-chat"  # Default fallback
-            try:
-                current_llm = get_llm_by_type(AGENT_LLM_MAP.get("researcher", "basic"))
-                model_name = getattr(
-                    current_llm,
-                    "model_name",
-                    getattr(current_llm, "model", "deepseek-chat"),
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get LLM model name, using default: {e}")
+            # Use default model name for content processing
+            model_name = "deepseek-chat"  # Default model name for content processing
 
             # Check if smart filtering should be enabled
             should_filter = filter_instance.should_enable_smart_filtering(
@@ -113,7 +102,6 @@ class SmartSearchTool(BaseTool):
                 filtered_data = filter_instance.filter_search_results(
                     query=query,
                     search_results=search_results,
-                    llm=current_llm,
                     model_name=model_name,
                     max_results=self.max_search_results,
                 )
@@ -154,7 +142,7 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
         base_tool = LoggedTavilySearch(
             name="web_search_base",
             max_results=max_search_results,
-            include_raw_content=True,
+            include_raw_content=False,
             include_images=True,
             include_image_descriptions=True,
         )
@@ -204,7 +192,7 @@ def get_raw_web_search_tool(max_search_results: int):
         return LoggedTavilySearch(
             name="web_search",
             max_results=max_search_results,
-            include_raw_content=True,
+            include_raw_content=False,
             include_images=True,
             include_image_descriptions=True,
         )

@@ -24,8 +24,6 @@ from src.config.config_loader import config_loader
 # Import collaboration modules
 try:
     from src.collaboration.role_bidding import (
-        TaskRequirement,
-        TaskType,
         create_default_agents,
     )
 

@@ -23,7 +23,6 @@ try:
     )
     from src.utils.workflow_optimizer import (
         WorkflowOptimizationLevel,
-        optimize_single_research_task,
     )
     from src.utils.performance_optimizer import optimize_report_generation_workflow
 except ImportError as e:

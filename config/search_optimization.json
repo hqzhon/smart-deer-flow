@@ -1,0 +1,22 @@
+{
+  "profile": "balanced",
+  "created_at": "1752150829.3032315",
+  "version": "1.0",
+  "description": "平衡模式 - 在内容质量和长度之间取得平衡",
+  "search_config": {
+    "max_search_results": 10,
+    "enable_smart_filtering": true
+  },
+  "cleaning_config": {
+    "min_quality_score": 0.3,
+    "max_results": 12,
+    "enable_keyword_extraction": true,
+    "enable_enhanced_key_points": true,
+    "filter_invalid_urls": true,
+    "sort_by_quality": true
+  },
+  "content_limits": {
+    "max_content_length": 3000,
+    "max_raw_content_length": 4000
+  }
+}

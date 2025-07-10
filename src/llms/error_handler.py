@@ -7,38 +7,13 @@ import asyncio
 import time
 from typing import Any, Callable, Optional
 from functools import wraps
-from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
+from langchain_core.messages import AIMessage
 
-# Import new tool modules
-from src.utils.structured_logging import (
-    get_logger,
-)
+from src.utils.structured_logging import get_logger
+from src.llms.base_error_handler import BaseLLMErrorHandler
+from src.llms.llm_context_optimizer import LLMContextOptimizer
 
 logger = get_logger(__name__)
-
-
-class ErrorHandlerConfig:
-    """Configuration constants for error handler to avoid hardcoded values"""
-    
-    # Binary search and iteration limits
-    MAX_ITERATIONS = 50
-    
-    # Token to character ratio estimates
-    CHAR_TO_TOKEN_RATIO_CONSERVATIVE = 2.5  # More conservative estimate
-    CHAR_TO_TOKEN_RATIO_ROUGH = 3.0  # Rough estimate: 1 token ≈ 3-4 characters
-    
-    # Token multipliers for different strategies
-    TOKEN_SAFETY_MULTIPLIER = 2  # For checking if content is extremely long
-    TOKEN_AGGRESSIVE_MULTIPLIER = 3  # For aggressive truncation fallback
-    
-    # Optimization and safety thresholds
-    OPTIMIZATION_THRESHOLD = 0.9  # 90% threshold for optimization
-    SAFETY_MARGIN = 0.8  # 80% safety margin
-    
-    # Truncation messages
-    TRUNCATION_SUFFIX = "...[truncated]"
-    TRUNCATION_NOTE = "\n\n[Note: Content has been significantly truncated due to length constraints. Please provide more specific queries for detailed analysis.]"
-    SIMPLE_TRUNCATION_NOTE = "\n\n[Content truncated due to length constraints]"
 
 
 class LLMErrorType:
@@ -62,7 +37,7 @@ class LLMErrorType:
     UNKNOWN_ERROR = "unknown_error"
 
 
-class LLMErrorHandler:
+class LLMErrorHandler(BaseLLMErrorHandler):
     """LLM error handler"""
 
     def __init__(self):
@@ -337,1010 +312,16 @@ class LLMErrorHandler:
             raise error
 
 
-def _handle_content_too_long_error(
-    llm_func: Callable, error: Exception, *args, **kwargs
-) -> Any:
-    """Smart processing function for handling content too long errors"""
-    from src.config.config_loader import config_loader
-    from src.utils.content_processor import ContentProcessor
-
-    try:
-        # Load configuration
-        config = config_loader.create_configuration()
-
-        # Smart chunking is now always enabled
-        logger.info("Smart chunking is enabled by default")
-
-        # Create content processor
-        processor = ContentProcessor(config.model_token_limits)
-
-        # Try to extract messages and model information from parameters
-        messages = None
-        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
-        llm = None
-
-        # Check messages in args
-        for arg in args:
-            if hasattr(arg, "__iter__") and not isinstance(arg, str):
-                try:
-                    # Check if it's a message list
-                    if all(hasattr(item, "content") for item in arg):
-                        messages = arg
-                        break
-                except (TypeError, AttributeError, ValueError) as e:
-                    logger.debug(f"Failed to check message list format: {e}")
-                    continue
-            elif hasattr(arg, "invoke"):  # LLM object
-                llm = arg
-                if hasattr(arg, "model_name"):
-                    model_name = arg.model_name
-                elif hasattr(arg, "model"):
-                    model_name = arg.model
-
-        # Check messages and model information in kwargs
-        if "messages" in kwargs:
-            messages = kwargs["messages"]
-        if "model" in kwargs:
-            model_name = kwargs["model"]
-
-        if not messages:
-            logger.warning("Could not extract messages from function arguments")
-            raise error
-
-        # Extract text content
-        content_parts = []
-        for msg in messages:
-            if hasattr(msg, "content"):
-                content_parts.append(str(msg.content))
-
-        combined_content = "\n\n".join(content_parts)
-
-        # Get model limits for the specific model
-        model_limits = processor.get_model_limits(model_name)
-        max_tokens = int(model_limits.input_limit * model_limits.safety_margin)
-
-        # If content is extremely long, use aggressive chunking
-        if (
-            processor.count_tokens_accurate(combined_content, model_name).total_tokens
-            > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
-        ):
-            logger.info("Content is extremely long, using aggressive chunking")
-            # Use aggressive chunking strategy for extremely long content
-            chunks = processor.smart_chunk_content(
-                combined_content, model_name, "aggressive"
-            )
-            if chunks:
-                # Use only the first chunk for extremely long content
-                truncated_content = chunks[0]
-
-                # Double-check the chunk size and further truncate if needed
-                if (
-                    processor.count_tokens_accurate(
-                        truncated_content, model_name
-                    ).total_tokens
-                    > max_tokens
-                ):
-                    # Emergency truncation: use character-based limit
-                    # Use precise token-based truncation instead of character estimation
-                    # Reuse existing processor instance
-
-                    # Binary search for precise truncation
-                    content = truncated_content
-                    left, right = 0, len(content)
-                    best_content = ""
-                    max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
-                    iteration_count = 0
-
-                    # Handle edge case: empty content
-                    if not content:
-                        best_content = "...[truncated]"
-                    else:
-                        while left <= right and iteration_count < max_iterations:
-                            iteration_count += 1
-                            mid = (left + right) // 2
-                            
-                            # Handle edge case: mid is 0
-                            if mid == 0:
-                                test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            else:
-                                test_content = content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            
-                            test_tokens = processor.estimate_tokens(
-                                test_content, model_name
-                            )
-
-                            if test_tokens <= max_tokens:
-                                best_content = test_content
-                                left = mid + 1
-                            else:
-                                right = mid - 1
-                            
-                            # Log if we hit max iterations
-                            if iteration_count >= max_iterations:
-                                logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
-
-                    if best_content:
-                        truncated_content = best_content
-                    else:
-                        # Fallback to conservative character limit if binary search fails
-                        char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
-                        truncated_content = truncated_content[:char_limit]
-                        logger.warning(
-                            f"Applied emergency character-based truncation to {char_limit} characters"
-                        )
-
-                    # Add a note about truncation
-                    truncated_content += ErrorHandlerConfig.TRUNCATION_NOTE
-            else:
-                # Fallback: take first portion based on character count
-                # Use precise token-based truncation
-                # Reuse existing processor instance
-
-                # Binary search for precise truncation
-                left, right = 0, len(combined_content)
-                best_content = ""
-                max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
-                iteration_count = 0
-
-                # Handle edge case: empty content
-                if not combined_content:
-                    best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                else:
-                    while left <= right and iteration_count < max_iterations:
-                        iteration_count += 1
-                        mid = (left + right) // 2
-                        
-                        # Handle edge case: mid is 0
-                        if mid == 0:
-                            test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                        else:
-                            test_content = combined_content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
-                        
-                        test_tokens = processor.estimate_tokens(test_content, model_name)
-
-                        if test_tokens <= max_tokens:
-                            best_content = test_content
-                            left = mid + 1
-                        else:
-                            right = mid - 1
-                    
-                    # Log if we hit max iterations
-                    if iteration_count >= max_iterations:
-                        logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
-
-                if best_content:
-                    truncated_content = best_content
-                else:
-                    # Fallback to conservative character limit
-                    char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
-                    truncated_content = (
-                        combined_content[:char_limit]
-                        + ErrorHandlerConfig.SIMPLE_TRUNCATION_NOTE
-                    )
-        else:
-            # Try summarization first if LLM is available
-            if config.enable_content_summarization and llm:
-                logger.info("Attempting to summarize content to fit token limits")
-                try:
-                    # Use a basic model for summarization to avoid recursive errors
-                    from src.llms.llm import get_llm_by_type
-
-                    basic_llm = get_llm_by_type("basic")
-                    summarized_content = processor.summarize_content(
-                        combined_content, basic_llm, model_name, config.summary_type
-                    )
-                    truncated_content = summarized_content
-                except (ImportError, AttributeError, ValueError, RuntimeError) as summarize_error:
-                    logger.warning(
-                        f"Summarization failed: {summarize_error}, falling back to chunking"
-                    )
-                except Exception as summarize_error:
-                    logger.error(
-                        f"Unexpected error during summarization: {type(summarize_error).__name__}: {summarize_error}"
-                    )
-                    # Re-raise unexpected errors after logging
-                    raise
-            else:
-                # Use chunking with aggressive strategy for very long content
-                logger.info("Attempting smart content chunking")
-                # Use aggressive strategy if content is extremely long
-                strategy = (
-                    "aggressive"
-                    if processor.count_tokens_accurate(
-                        combined_content, model_name
-                    ).total_tokens
-                    > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
-                    else "auto"
-                )
-                chunks = processor.smart_chunk_content(
-                    combined_content, model_name, strategy
-                )
-                if chunks:
-                    truncated_content = chunks[0]
-                    # Ensure the chunk fits within limits
-                    if (
-                        processor.count_tokens_accurate(
-                            truncated_content, model_name
-                        ).total_tokens
-                        > max_tokens
-                    ):
-                        # Use precise token-based truncation
-                        # Reuse existing processor instance
-
-                        # Binary search for precise truncation
-                        content = truncated_content
-                        left, right = 0, len(content)
-                        best_content = ""
-                        max_iterations = 50  # Prevent infinite loops
-                        iteration_count = 0
-
-                        # Handle edge case: empty content
-                        if not content:
-                            best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                        else:
-                            while left <= right and iteration_count < max_iterations:
-                                iteration_count += 1
-                                mid = (left + right) // 2
-                                
-                                # Handle edge case: mid is 0
-                                if mid == 0:
-                                    test_content = "...[truncated]"
-                                else:
-                                    test_content = content[:mid] + "...[truncated]"
-                                
-                                test_tokens = processor.estimate_tokens(
-                                    test_content, model_name
-                                )
-
-                                if test_tokens <= max_tokens:
-                                    best_content = test_content
-                                    left = mid + 1
-                                else:
-                                    right = mid - 1
-                            
-                            # Log if we hit max iterations
-                            if iteration_count >= max_iterations:
-                                logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
-
-                        if best_content:
-                            truncated_content = best_content
-                        else:
-                            # Fallback to conservative character limit
-                            char_limit = int(
-                                max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE
-                            )  # More conservative estimate
-                        truncated_content = truncated_content[:char_limit]
-                else:
-                    truncated_content = combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
-
-        # Create new message list with truncated content
-        new_messages = []
-        for msg in messages[:-1]:  # Keep all messages except the last one
-            new_messages.append(msg)
-
-        # Replace the last message with truncated content
-        if messages:
-            last_msg = messages[-1]
-            if hasattr(last_msg, "content"):
-                if isinstance(last_msg, BaseMessage):
-                    # Use the same message type as the original
-                    new_msg = type(last_msg)(content=truncated_content)
-                else:
-                    # Default to HumanMessage for non-BaseMessage objects
-                    new_msg = HumanMessage(content=truncated_content)
-                new_messages.append(new_msg)
-
-        # Update parameters
-        new_args = list(args)
-        new_kwargs = kwargs.copy()
-
-        # Update messages in the appropriate location
-        if "messages" in kwargs:
-            new_kwargs["messages"] = new_messages
-        else:
-            # Update in args
-            for i, arg in enumerate(new_args):
-                if arg is messages:
-                    new_args[i] = new_messages
-                    break
-
-        # Re-invoke the function
-        logger.info(
-            f"Retrying with truncated content (reduced from {processor.count_tokens_accurate(combined_content, model_name).total_tokens} to ~{processor.count_tokens_accurate(truncated_content, model_name).total_tokens} tokens)"
-        )
-        result = llm_func(*new_args, **new_kwargs)
-        return result
-
-        # If all smart processing fails, re-raise the original error
-        raise error
-
-    except (ValueError, TypeError, AttributeError, KeyError) as e:
-        logger.error(f"Smart content processing failed due to data/type error: {type(e).__name__}: {e}")
-        # Create a new exception with more context information
-        enhanced_error = Exception(f"Smart processing failed: {e}. Original error: {error}")
-        enhanced_error.__cause__ = e
-        raise enhanced_error
-    except Exception as e:
-        logger.error(f"Unexpected error in smart content processing: {type(e).__name__}: {e}")
-        # For unexpected errors, preserve the original error
-        raise error from e
-
-
-async def _handle_content_too_long_error_async(
-    llm_func: Callable, error: Exception, *args, **kwargs
-) -> Any:
-    """Async smart processing function for handling content too long errors"""
-    from src.config.config_loader import config_loader
-    from src.utils.content_processor import ContentProcessor
-
-    try:
-        # Load configuration
-        config = config_loader.create_configuration()
-
-        # Smart chunking is now always enabled
-        logger.info("Smart chunking is enabled by default")
-
-        # Create content processor
-        processor = ContentProcessor(config.model_token_limits)
-
-        # Try to extract messages and model information from parameters
-        messages = None
-        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
-        llm = None
-
-        # Check messages in args
-        for arg in args:
-            if hasattr(arg, "__iter__") and not isinstance(arg, str):
-                try:
-                    # Check if it's a message list
-                    if all(hasattr(item, "content") for item in arg):
-                        messages = arg
-                        break
-                except Exception:
-                    continue
-            elif hasattr(arg, "ainvoke"):  # Async LLM object
-                llm = arg
-                if hasattr(arg, "model_name"):
-                    model_name = arg.model_name
-                elif hasattr(arg, "model"):
-                    model_name = arg.model
-
-        # Check messages and model information in kwargs
-        if "input" in kwargs and "messages" in kwargs["input"]:
-            messages = kwargs["input"]["messages"]
-        elif "messages" in kwargs:
-            messages = kwargs["messages"]
-        if "model" in kwargs:
-            model_name = kwargs["model"]
-
-        if not messages:
-            logger.warning("Could not extract messages from function arguments")
-            raise error
-
-        # Extract text content
-        content_parts = []
-        for msg in messages:
-            if hasattr(msg, "content"):
-                content_parts.append(str(msg.content))
-
-        combined_content = "\n\n".join(content_parts)
-
-        # Get model limits for the specific model
-        model_limits = processor.get_model_limits(model_name)
-        max_tokens = int(model_limits.input_limit * model_limits.safety_margin)
-
-        # If content is extremely long, use aggressive chunking
-        if (
-            processor.count_tokens_accurate(combined_content, model_name).total_tokens
-            > max_tokens * 2
-        ):
-            logger.info("Content is extremely long, using aggressive chunking")
-            # Use aggressive chunking strategy for extremely long content
-            chunks = processor.smart_chunk_content(
-                combined_content, model_name, "aggressive"
-            )
-            if chunks:
-                # Use only the first chunk for extremely long content
-                truncated_content = chunks[0]
-
-                # Double-check the chunk size and further truncate if needed
-                if (
-                    processor.count_tokens_accurate(
-                        truncated_content, model_name
-                    ).total_tokens
-                    > max_tokens
-                ):
-                    # Emergency truncation: use character-based limit
-                    # Use precise token-based truncation instead of character estimation
-                    # Reuse existing processor instance
-
-                    # Binary search for precise truncation
-                    content = truncated_content
-                    left, right = 0, len(content)
-                    best_content = ""
-                    max_iterations = ErrorHandlerConfig.MAX_ITERATIONS  # Prevent infinite loops
-                    iteration_count = 0
-
-                    # Handle edge case: empty content
-                    if not content:
-                        best_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                    else:
-                        while left <= right and iteration_count < max_iterations:
-                            iteration_count += 1
-                            mid = (left + right) // 2
-                            
-                            # Handle edge case: mid is 0
-                            if mid == 0:
-                                test_content = ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            else:
-                                test_content = content[:mid] + ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            
-                            test_tokens = processor.estimate_tokens(
-                                test_content, model_name
-                            )
-
-                            if test_tokens <= max_tokens:
-                                best_content = test_content
-                                left = mid + 1
-                            else:
-                                right = mid - 1
-                        
-                        # Log if we hit max iterations
-                        if iteration_count >= max_iterations:
-                            logger.warning(f"Binary search hit max iterations ({max_iterations}) for content truncation")
-
-                    if best_content:
-                        truncated_content = best_content
-                    else:
-                        # Fallback to conservative character limit if binary search fails
-                        char_limit = int(max_tokens * ErrorHandlerConfig.CHAR_TO_TOKEN_RATIO_CONSERVATIVE)  # More conservative estimate
-                        truncated_content = truncated_content[:char_limit]
-                        logger.warning(
-                            f"Applied emergency character-based truncation to {char_limit} characters"
-                        )
-
-                # Add a note about truncation
-                truncated_content += ErrorHandlerConfig.TRUNCATION_NOTE
-            else:
-                # Fallback: take first portion based on character count
-                char_limit = max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER  # Rough estimate: 1 token ≈ 3-4 characters
-                truncated_content = (
-                    combined_content[:char_limit]
-                    + ErrorHandlerConfig.SIMPLE_TRUNCATION_NOTE
-                )
-        else:
-            # Try summarization first if LLM is available
-            if config.enable_content_summarization and llm:
-                logger.info("Attempting to summarize content to fit token limits")
-                try:
-                    # Use a basic model for summarization to avoid recursive errors
-                    from src.llms.llm import get_llm_by_type
-
-                    basic_llm = get_llm_by_type("basic")
-                    summarized_content = processor.summarize_content(
-                        combined_content, basic_llm, model_name, config.summary_type
-                    )
-                    truncated_content = summarized_content
-                except (ImportError, AttributeError, ValueError, RuntimeError) as summarize_error:
-                    logger.warning(
-                        f"Summarization failed: {summarize_error}, falling back to chunking"
-                    )
-                except Exception as summarize_error:
-                    logger.error(
-                        f"Unexpected error during async summarization: {type(summarize_error).__name__}: {summarize_error}"
-                    )
-                    # Re-raise unexpected errors after logging
-                    raise
-            else:
-                # Use chunking with aggressive strategy for very long content
-                logger.info("Attempting smart content chunking")
-                # Use aggressive strategy if content is extremely long
-                strategy = (
-                    "aggressive"
-                    if processor.count_tokens_accurate(
-                        combined_content, model_name
-                    ).total_tokens
-                    > max_tokens * ErrorHandlerConfig.TOKEN_SAFETY_MULTIPLIER
-                    else "auto"
-                )
-                chunks = processor.smart_chunk_content(
-                    combined_content, model_name, strategy
-                )
-                if chunks:
-                    truncated_content = chunks[0]
-                    # Ensure the chunk fits within limits
-                    if (
-                        processor.count_tokens_accurate(
-                            truncated_content, model_name
-                        ).total_tokens
-                        > max_tokens
-                    ):
-                        char_limit = int(max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER)
-                        truncated_content = truncated_content[:char_limit]
-                else:
-                    truncated_content = combined_content[: max_tokens * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER]
-
-        # Create new message list with truncated content
-        new_messages = []
-        for msg in messages[:-1]:  # Keep all messages except the last one
-            new_messages.append(msg)
-
-        # Replace the last message with truncated content
-        if messages:
-            last_msg = messages[-1]
-            if hasattr(last_msg, "content"):
-                if isinstance(last_msg, BaseMessage):
-                    # Use the same message type as the original
-                    new_msg = type(last_msg)(content=truncated_content)
-                else:
-                    # Default to HumanMessage for non-BaseMessage objects
-                    new_msg = HumanMessage(content=truncated_content)
-                new_messages.append(new_msg)
-
-        # Update parameters
-        new_args = list(args)
-        new_kwargs = kwargs.copy()
-
-        # Update messages in the appropriate location
-        if "input" in kwargs and "messages" in kwargs["input"]:
-            new_input = kwargs["input"].copy()
-            new_input["messages"] = new_messages
-            new_kwargs["input"] = new_input
-        elif "messages" in kwargs:
-            new_kwargs["messages"] = new_messages
-        else:
-            # Update in args
-            for i, arg in enumerate(new_args):
-                if arg is messages:
-                    new_args[i] = new_messages
-                    break
-
-        # Re-invoke the function
-        logger.info(
-            f"Retrying with truncated content (reduced from {processor.count_tokens_accurate(combined_content, model_name).total_tokens} to ~{processor.count_tokens_accurate(truncated_content, model_name).total_tokens} tokens)"
-        )
-        result = await llm_func(*new_args, **new_kwargs)
-        return result
-
-    except (ValueError, TypeError, AttributeError, KeyError) as e:
-        logger.error(f"Async smart content processing failed due to data/type error: {type(e).__name__}: {e}")
-        # Create a new exception with more context information
-        enhanced_error = Exception(f"Async smart processing failed: {e}. Original error: {error}")
-        enhanced_error.__cause__ = e
-        raise enhanced_error
-    except Exception as e:
-        logger.error(f"Unexpected error in async smart content processing: {type(e).__name__}: {e}")
-        # For unexpected errors, preserve the original error
-        raise error from e
-
-
-# Global error handler instance
-error_handler = LLMErrorHandler()
-
-
-async def _evaluate_and_optimize_context_before_call(
-    llm_func: Callable, args: tuple, kwargs: dict, operation_name: str, context: str
-) -> tuple:
-    """Evaluate and optimize context before LLM call
-
-    Args:
-        llm_func: LLM function to be called
-        args: Function arguments
-        kwargs: Function keyword arguments
-        operation_name: Name of the operation
-        context: Context information
-
-    Returns:
-        Tuple of (optimized_args, optimized_kwargs)
-    """
-    from src.utils.context_evaluator import get_global_context_evaluator
-
-    try:
-        # Get context evaluator
-        evaluator = get_global_context_evaluator()
-
-        # Extract messages and model information
-        messages = None
-        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
-
-        # Look for messages in kwargs
-        if (
-            "input" in kwargs
-            and isinstance(kwargs["input"], dict)
-            and "messages" in kwargs["input"]
-        ):
-            messages = kwargs["input"]["messages"]
-        elif "messages" in kwargs:
-            messages = kwargs["messages"]
-
-        # Look for messages in args
-        if messages is None:
-            for arg in args:
-                if isinstance(arg, list) and arg and hasattr(arg[0], "content"):
-                    messages = arg
-                    break
-                elif hasattr(arg, "__iter__") and not isinstance(arg, str):
-                    try:
-                        if all(hasattr(item, "content") for item in arg):
-                            messages = list(arg)
-                            break
-                    except (TypeError, AttributeError, ValueError) as e:
-                        logger.debug(f"Failed to check async message list format: {e}")
-                        continue
-
-        # Try to extract model name from LLM function or arguments
-        if hasattr(llm_func, "__self__"):
-            llm_instance = llm_func.__self__
-            if hasattr(llm_instance, "model_name"):
-                model_name = llm_instance.model_name
-            elif hasattr(llm_instance, "model"):
-                model_name = llm_instance.model
-
-        # Look for model name in kwargs
-        if model_name == "deepseek-chat":  # Check if still using default
-            if "model" in kwargs:
-                model_name = kwargs["model"]
-            elif (
-                "config" in kwargs
-                and isinstance(kwargs["config"], dict)
-                and "model" in kwargs["config"]
-            ):
-                model_name = kwargs["config"]["model"]
-
-        # If we found messages, evaluate and optimize
-        if messages and isinstance(messages, list) and messages:
-            logger.debug(
-                f"Evaluating context for {operation_name}: {len(messages)} messages, model: {model_name}"
-            )
-
-            # Evaluate context state
-            metrics = evaluator.evaluate_context_before_llm_call(
-                messages, model_name, f"{operation_name} - {context}"
-            )
-
-            # Apply optimization if needed
-            if metrics.compression_needed or metrics.evaluation_result.value in [
-                "needs_compression",
-                "needs_truncation",
-                "critical_overflow",
-                "requires_chunking",
-            ]:
-                logger.info(
-                    f"Context optimization needed: {metrics.evaluation_result.value}, "
-                    f"applying {metrics.recommended_strategy.value}"
-                )
-
-                optimized_messages, optimization_info = (
-                    evaluator.optimize_context_for_llm_call(
-                        messages,
-                        model_name,
-                        metrics.recommended_strategy,
-                        f"{operation_name} - {context}",
-                    )
-                )
-
-                # Update the arguments with optimized messages
-                new_args = list(args)
-                new_kwargs = kwargs.copy()
-
-                # Update messages in the appropriate location
-                if (
-                    "input" in kwargs
-                    and isinstance(kwargs["input"], dict)
-                    and "messages" in kwargs["input"]
-                ):
-                    new_input = kwargs["input"].copy()
-                    new_input["messages"] = optimized_messages
-                    new_kwargs["input"] = new_input
-                elif "messages" in kwargs:
-                    new_kwargs["messages"] = optimized_messages
-                else:
-                    # Update in args
-                    for i, arg in enumerate(new_args):
-                        if arg is messages:
-                            new_args[i] = optimized_messages
-                            break
-
-                logger.info(
-                    f"Context optimized: {optimization_info['original_tokens']} -> "
-                    f"{optimization_info['optimized_tokens']} tokens "
-                    f"({optimization_info['tokens_saved']} saved)"
-                )
-
-                # Final token validation before returning
-                try:
-                    from src.utils.content_processor import ContentProcessor
-                    from src.config import config_loader
-                    
-                    # Create processor with proper configuration
-                    config = config_loader.create_configuration()
-                    processor = ContentProcessor(config.model_token_limits)
-
-                    # Calculate total tokens in optimized messages
-                    total_content = ""
-                    for msg in optimized_messages:
-                        if hasattr(msg, "content"):
-                            total_content += str(msg.content) + " "
-
-                    estimated_tokens = processor.estimate_tokens(
-                        total_content, model_name
-                    )
-                    model_limits = processor.get_model_limits(model_name)
-                    model_limit = model_limits.safe_input_limit  # Use configured limit
-
-                    if (
-                        estimated_tokens > model_limit * ErrorHandlerConfig.OPTIMIZATION_THRESHOLD
-                    ):  # 90% threshold for final check
-                        logger.warning(
-                            f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})"
-                        )
-                        # Emergency truncation
-                        max_chars = int(
-                            model_limit * ErrorHandlerConfig.SAFETY_MARGIN * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER
-                        )  # Conservative character limit
-                        if len(total_content) > max_chars:
-                            truncated_content = (
-                                total_content[:max_chars] + ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            )
-                            # Update the last message with truncated content
-                            if optimized_messages and hasattr(
-                                optimized_messages[-1], "content"
-                            ):
-                                optimized_messages[-1].content = truncated_content
-
-                                # Update the arguments again with emergency truncation
-                                if (
-                                    "input" in new_kwargs
-                                    and isinstance(new_kwargs["input"], dict)
-                                    and "messages" in new_kwargs["input"]
-                                ):
-                                    new_kwargs["input"]["messages"] = optimized_messages
-                                elif "messages" in new_kwargs:
-                                    new_kwargs["messages"] = optimized_messages
-                                else:
-                                    for i, arg in enumerate(new_args):
-                                        if (
-                                            isinstance(arg, list)
-                                            and arg
-                                            and hasattr(arg[0], "content")
-                                        ):
-                                            new_args[i] = optimized_messages
-                                            break
-
-                except Exception as e:
-                    logger.warning(f"Final token validation failed: {e}")
-
-                return tuple(new_args), new_kwargs
-            else:
-                logger.debug(
-                    f"Context is optimal: {metrics.current_tokens}/{metrics.max_tokens} tokens "
-                    f"({metrics.utilization_ratio:.1%})"
-                )
-
-        # Return original arguments if no optimization needed
-        return args, kwargs
-
-    except Exception as e:
-        logger.warning(
-            f"Context evaluation failed: {e}, proceeding with original arguments"
-        )
-        return args, kwargs
-
-
-def _evaluate_and_optimize_context_before_call_sync(
-    llm_func: Callable, args: tuple, kwargs: dict, operation_name: str, context: str
-) -> tuple:
-    """Synchronous version of context evaluation and optimization
-
-    Args:
-        llm_func: LLM function to be called
-        args: Function arguments
-        kwargs: Function keyword arguments
-        operation_name: Name of the operation
-        context: Context information
-
-    Returns:
-        Tuple of (optimized_args, optimized_kwargs)
-    """
-    from src.utils.context_evaluator import get_global_context_evaluator
-
-    try:
-        # Get context evaluator
-        evaluator = get_global_context_evaluator()
-
-        # Extract messages and model information (same logic as async version)
-        messages = None
-        model_name = "deepseek-chat"  # Default fallback instead of 'unknown'
-
-        # Look for messages in kwargs
-        if (
-            "input" in kwargs
-            and isinstance(kwargs["input"], dict)
-            and "messages" in kwargs["input"]
-        ):
-            messages = kwargs["input"]["messages"]
-        elif "messages" in kwargs:
-            messages = kwargs["messages"]
-
-        # Look for messages in args
-        if messages is None:
-            for arg in args:
-                if isinstance(arg, list) and arg and hasattr(arg[0], "content"):
-                    messages = arg
-                    break
-                elif hasattr(arg, "__iter__") and not isinstance(arg, str):
-                    try:
-                        if all(hasattr(item, "content") for item in arg):
-                            messages = list(arg)
-                            break
-                    except Exception:
-                        continue
-
-        # Try to extract model name
-        if hasattr(llm_func, "__self__"):
-            llm_instance = llm_func.__self__
-            if hasattr(llm_instance, "model_name"):
-                model_name = llm_instance.model_name
-            elif hasattr(llm_instance, "model"):
-                model_name = llm_instance.model
-
-        if model_name == "deepseek-chat":  # Check if still using default
-            if "model" in kwargs:
-                model_name = kwargs["model"]
-            elif (
-                "config" in kwargs
-                and isinstance(kwargs["config"], dict)
-                and "model" in kwargs["config"]
-            ):
-                model_name = kwargs["config"]["model"]
-
-        # If we found messages, evaluate and optimize
-        if messages and isinstance(messages, list) and messages:
-            logger.debug(
-                f"Evaluating context for {operation_name}: {len(messages)} messages, model: {model_name}"
-            )
-
-            # Evaluate context state
-            metrics = evaluator.evaluate_context_before_llm_call(
-                messages, model_name, f"{operation_name} - {context}"
-            )
-
-            # Apply optimization if needed
-            if metrics.compression_needed or metrics.evaluation_result.value in [
-                "needs_compression",
-                "needs_truncation",
-                "critical_overflow",
-                "requires_chunking",
-            ]:
-                logger.info(
-                    f"Context optimization needed: {metrics.evaluation_result.value}, "
-                    f"applying {metrics.recommended_strategy.value}"
-                )
-
-                optimized_messages, optimization_info = (
-                    evaluator.optimize_context_for_llm_call(
-                        messages,
-                        model_name,
-                        metrics.recommended_strategy,
-                        f"{operation_name} - {context}",
-                    )
-                )
-
-                # Update the arguments with optimized messages
-                new_args = list(args)
-                new_kwargs = kwargs.copy()
-
-                # Update messages in the appropriate location
-                if (
-                    "input" in kwargs
-                    and isinstance(kwargs["input"], dict)
-                    and "messages" in kwargs["input"]
-                ):
-                    new_input = kwargs["input"].copy()
-                    new_input["messages"] = optimized_messages
-                    new_kwargs["input"] = new_input
-                elif "messages" in kwargs:
-                    new_kwargs["messages"] = optimized_messages
-                else:
-                    # Update in args
-                    for i, arg in enumerate(new_args):
-                        if arg is messages:
-                            new_args[i] = optimized_messages
-                            break
-
-                logger.info(
-                    f"Context optimized: {optimization_info['original_tokens']} -> "
-                    f"{optimization_info['optimized_tokens']} tokens "
-                    f"({optimization_info['tokens_saved']} saved)"
-                )
-
-                # Final token validation before returning
-                try:
-                    from src.utils.content_processor import ContentProcessor
-                    from src.config import config_loader
-                    
-                    # Create processor with proper configuration
-                    config = config_loader.create_configuration()
-                    processor = ContentProcessor(config.model_token_limits)
-
-                    # Calculate total tokens in optimized messages
-                    total_content = ""
-                    for msg in optimized_messages:
-                        if hasattr(msg, "content"):
-                            total_content += str(msg.content) + " "
-
-                    estimated_tokens = processor.estimate_tokens(
-                        total_content, model_name
-                    )
-                    model_limits = processor.get_model_limits(model_name)
-                    model_limit = model_limits.safe_input_limit  # Use configured limit
-
-                    if (
-                        estimated_tokens > model_limit * ErrorHandlerConfig.OPTIMIZATION_THRESHOLD
-                    ):  # 90% threshold for final check
-                        logger.warning(
-                            f"Final token check: {estimated_tokens} tokens exceeds 90% of limit ({model_limit})"
-                        )
-                        # Emergency truncation
-                        max_chars = int(
-                            model_limit * ErrorHandlerConfig.SAFETY_MARGIN * ErrorHandlerConfig.TOKEN_AGGRESSIVE_MULTIPLIER
-                        )  # Conservative character limit
-                        if len(total_content) > max_chars:
-                            truncated_content = (
-                                total_content[:max_chars] + ErrorHandlerConfig.TRUNCATION_SUFFIX
-                            )
-                            # Update the last message with truncated content
-                            if optimized_messages and hasattr(
-                                optimized_messages[-1], "content"
-                            ):
-                                optimized_messages[-1].content = truncated_content
-
-                                # Update the arguments again with emergency truncation
-                                if (
-                                    "input" in new_kwargs
-                                    and isinstance(new_kwargs["input"], dict)
-                                    and "messages" in new_kwargs["input"]
-                                ):
-                                    new_kwargs["input"]["messages"] = optimized_messages
-                                elif "messages" in new_kwargs:
-                                    new_kwargs["messages"] = optimized_messages
-                                else:
-                                    for i, arg in enumerate(new_args):
-                                        if (
-                                            isinstance(arg, list)
-                                            and arg
-                                            and hasattr(arg[0], "content")
-                                        ):
-                                            new_args[i] = optimized_messages
-                                            break
-
-                except Exception as e:
-                    logger.warning(f"Final token validation failed: {e}")
-
-                return tuple(new_args), new_kwargs
-            else:
-                logger.debug(
-                    f"Context is optimal: {metrics.current_tokens}/{metrics.max_tokens} tokens "
-                    f"({metrics.utilization_ratio:.1%})"
-                )
-
-        # Return original arguments if no optimization needed
-        return args, kwargs
-
-    except Exception as e:
-        logger.warning(
-            f"Context evaluation failed: {e}, proceeding with original arguments"
-        )
-        return args, kwargs
-
-
-def handle_llm_errors(operation_name: str = "LLM Operation", context: str = ""):
+def handle_llm_errors(operation_name: str = "LLM Operation", context: str = "", error_handler_instance: Optional[BaseLLMErrorHandler] = None):
     """LLM error handling decorator
 
     Args:
         operation_name: Operation name for logging
         context: Error context information
+        error_handler_instance: Optional, an instance of BaseLLMErrorHandler. If None, a default LLMErrorHandler will be used.
     """
+    if error_handler_instance is None:
+        error_handler_instance = LLMErrorHandler()
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -1349,7 +330,7 @@ def handle_llm_errors(operation_name: str = "LLM Operation", context: str = ""):
                 return func(*args, **kwargs)
             except Exception as e:
                 should_skip, fallback_response, needs_smart_processing = (
-                    error_handler.handle_error(e, context, operation_name)
+                    error_handler_instance.handle_error(e, context, operation_name)
                 )
                 if should_skip and fallback_response:
                     return fallback_response
@@ -1364,7 +345,7 @@ def handle_llm_errors(operation_name: str = "LLM Operation", context: str = ""):
                 return await func(*args, **kwargs)
             except Exception as e:
                 should_skip, fallback_response, needs_smart_processing = (
-                    error_handler.handle_error(e, context, operation_name)
+                    error_handler_instance.handle_error(e, context, operation_name)
                 )
                 if should_skip and fallback_response:
                     return fallback_response
@@ -1383,35 +364,21 @@ def handle_llm_errors(operation_name: str = "LLM Operation", context: str = ""):
     return decorator
 
 
-def safe_llm_call(
+def _execute_safe_llm_call_sync(
     llm_func: Callable,
-    *args,
-    operation_name: str = "LLM Call",
-    context: str = "",
-    max_retries: int = 3,
-    enable_smart_processing: bool = True,
-    **kwargs,
+    args: tuple,
+    kwargs: dict,
+    operation_name: str,
+    context: str,
+    max_retries: int,
+    enable_smart_processing: bool,
+    error_handler_instance: BaseLLMErrorHandler,
+    context_optimizer_instance: LLMContextOptimizer
 ) -> Any:
-    """Safe LLM call function with retry mechanism and smart content processing
-
-    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
-
-    Args:
-        llm_func: LLM call function
-        *args: Positional arguments
-        operation_name: Operation name
-        context: Context information
-        max_retries: Maximum retry attempts
-        enable_smart_processing: Whether to enable smart content processing
-        **kwargs: Keyword arguments
-
-    Returns:
-        LLM call result or fallback response
-    """
-
+    """Synchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
     try:
-        args, kwargs = _evaluate_and_optimize_context_before_call_sync(
+        args, kwargs = context_optimizer_instance.evaluate_and_optimize_context_before_call_sync(
             llm_func, args, kwargs, operation_name, context
         )
     except Exception as e:
@@ -1424,7 +391,7 @@ def safe_llm_call(
             return llm_func(*args, **kwargs)
         except Exception as e:
             should_skip, fallback_response, needs_smart_processing = (
-                error_handler.handle_error(e, context, operation_name)
+                error_handler_instance.handle_error(e, context, operation_name)
             )
 
             if should_skip and fallback_response:
@@ -1434,7 +401,7 @@ def safe_llm_call(
             if needs_smart_processing and enable_smart_processing:
                 logger.info("Attempting smart content processing for token limit error")
                 try:
-                    return _handle_content_too_long_error(llm_func, e, *args, **kwargs)
+                    return context_optimizer_instance._handle_content_too_long_error(llm_func, e, *args, **kwargs)
                 except Exception as smart_error:
                     logger.error(f"Smart content processing failed: {smart_error}")
                     # Create a new exception with more context information
@@ -1444,9 +411,9 @@ def safe_llm_call(
                     # Store the enhanced error for potential debugging
                     logger.debug(f"Enhanced error details: {enhanced_error}")
 
-            error_type = error_handler.classify_error(str(e))
+            error_type = error_handler_instance.classify_error(str(e))
 
-            if error_handler.should_retry_error(error_type) and attempt < max_retries:
+            if error_handler_instance.should_retry_error(error_type) and attempt < max_retries:
                 wait_time = 2**attempt  # Exponential backoff
                 logger.info(
                     f"Retry {attempt + 1} failed, retrying in {wait_time} seconds..."
@@ -1458,35 +425,21 @@ def safe_llm_call(
             raise
 
 
-async def safe_llm_call_async(
+async def _execute_safe_llm_call_async(
     llm_func: Callable,
-    *args,
-    operation_name: str = "Async LLM Call",
-    context: str = "",
-    max_retries: int = 3,
-    enable_smart_processing: bool = True,
-    **kwargs,
+    args: tuple,
+    kwargs: dict,
+    operation_name: str,
+    context: str,
+    max_retries: int,
+    enable_smart_processing: bool,
+    error_handler_instance: BaseLLMErrorHandler,
+    context_optimizer_instance: LLMContextOptimizer
 ) -> Any:
-    """Safe async LLM call function with retry mechanism and smart content processing
-
-    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
-
-    Args:
-        llm_func: Async LLM call function
-        *args: Positional arguments
-        operation_name: Operation name
-        context: Context information
-        max_retries: Maximum retry attempts
-        enable_smart_processing: Whether to enable smart content processing
-        **kwargs: Keyword arguments
-
-    Returns:
-        LLM call result or fallback response
-    """
-
+    """Asynchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
     try:
-        args, kwargs = await _evaluate_and_optimize_context_before_call(
+        args, kwargs = await context_optimizer_instance.evaluate_and_optimize_context_before_call(
             llm_func, args, kwargs, operation_name, context
         )
     except Exception as e:
@@ -1502,7 +455,7 @@ async def safe_llm_call_async(
                 return llm_func(*args, **kwargs)
         except Exception as e:
             should_skip, fallback_response, needs_smart_processing = (
-                error_handler.handle_error(e, context, operation_name)
+                error_handler_instance.handle_error(e, context, operation_name)
             )
 
             if should_skip and fallback_response:
@@ -1513,15 +466,11 @@ async def safe_llm_call_async(
                 logger.info("Attempting smart content processing for token limit error")
                 try:
                     if asyncio.iscoroutinefunction(llm_func):
-                        return await _handle_content_too_long_error_async(
-                            llm_func, e, *args, **kwargs
-                        )
+                        return await context_optimizer_instance._handle_content_too_long_error_async(llm_func, e, *args, **kwargs)
                     else:
-                        return _handle_content_too_long_error(
-                            llm_func, e, *args, **kwargs
-                        )
+                        return context_optimizer_instance._handle_content_too_long_error(llm_func, e, *args, **kwargs)
                 except Exception as smart_error:
-                    logger.error(f"Smart content processing failed: {smart_error}")
+                    logger.error(f"Async smart content processing failed: {smart_error}")
                     # Create a new exception with more context information
                     enhanced_error = Exception(f"Async smart processing failed: {smart_error}. Original error: {e}")
                     enhanced_error.__cause__ = smart_error
@@ -1529,9 +478,9 @@ async def safe_llm_call_async(
                     # Store the enhanced error for potential debugging
                     logger.debug(f"Enhanced error details: {enhanced_error}")
 
-            error_type = error_handler.classify_error(str(e))
+            error_type = error_handler_instance.classify_error(str(e))
 
-            if error_handler.should_retry_error(error_type) and attempt < max_retries:
+            if error_handler_instance.should_retry_error(error_type) and attempt < max_retries:
                 wait_time = 2**attempt  # Exponential backoff
                 logger.info(
                     f"Retry {attempt + 1} failed, retrying in {wait_time} seconds..."
@@ -1541,3 +490,101 @@ async def safe_llm_call_async(
 
             # If not a retryable error or max retries reached, re-raise exception
             raise
+
+
+def safe_llm_call(
+    llm_func: Callable,
+    *args,
+    operation_name: str = "LLM Call",
+    context: str = "",
+    max_retries: int = 3,
+    enable_smart_processing: bool = True,
+    error_handler_instance: Optional[BaseLLMErrorHandler] = None,
+    context_optimizer_instance: Optional[LLMContextOptimizer] = None,
+    **kwargs,
+) -> Any:
+    """Safe LLM call function with retry mechanism and smart content processing
+
+    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
+
+    Args:
+        llm_func: LLM call function
+        *args: Positional arguments
+        operation_name: Operation name
+        context: Context information
+        max_retries: Maximum retry attempts
+        enable_smart_processing: Whether to enable smart content processing
+        error_handler_instance: Optional, an instance of BaseLLMErrorHandler. If None, a default LLMErrorHandler will be used.
+        context_optimizer_instance: Optional, an instance of LLMContextOptimizer. If None, a default LLMContextOptimizer will be used.
+        **kwargs: Keyword arguments
+
+    Returns:
+        LLM call result or fallback response
+    """
+    if error_handler_instance is None:
+        error_handler_instance = LLMErrorHandler()
+    if context_optimizer_instance is None:
+        context_optimizer_instance = LLMContextOptimizer()
+
+    return _execute_safe_llm_call_sync(
+        llm_func,
+        args,
+        kwargs,
+        operation_name,
+        context,
+        max_retries,
+        enable_smart_processing,
+        error_handler_instance,
+        context_optimizer_instance
+    )
+
+
+async def safe_llm_call_async(
+    llm_func: Callable,
+    *args,
+    operation_name: str = "Async LLM Call",
+    context: str = "",
+    max_retries: int = 3,
+    enable_smart_processing: bool = True,
+    error_handler_instance: Optional[BaseLLMErrorHandler] = None,
+    context_optimizer_instance: Optional[LLMContextOptimizer] = None,
+    **kwargs,
+) -> Any:
+    """Safe async LLM call function with retry mechanism and smart content processing
+
+    Context evaluation is automatically enabled for all calls to ensure token limits are respected.
+
+    Args:
+        llm_func: Async LLM call function
+        *args: Positional arguments
+        operation_name: Operation name
+        context: Context information
+        max_retries: Maximum retry attempts
+        enable_smart_processing: Whether to enable smart content processing
+        error_handler_instance: Optional, an instance of BaseLLMErrorHandler. If None, a default LLMErrorHandler will be used.
+        context_optimizer_instance: Optional, an instance of LLMContextOptimizer. If None, a default LLMContextOptimizer will be used.
+        **kwargs: Keyword arguments
+
+    Returns:
+        LLM call result or fallback response
+    """
+    if error_handler_instance is None:
+        error_handler_instance = LLMErrorHandler()
+    if context_optimizer_instance is None:
+        context_optimizer_instance = LLMContextOptimizer()
+
+    return await _execute_safe_llm_call_async(
+        llm_func,
+        args,
+        kwargs,
+        operation_name,
+        context,
+        max_retries,
+        enable_smart_processing,
+        error_handler_instance,
+        context_optimizer_instance
+    )
+
+
+# Create a global instance for easy importing
+error_handler = LLMErrorHandler()

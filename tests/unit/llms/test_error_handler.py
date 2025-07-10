@@ -4,8 +4,7 @@ This module contains comprehensive test cases to verify the correctness of the L
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.llms.error_handler import (
@@ -434,7 +433,7 @@ class TestLogicIssues:
                 
                 try:
                     _handle_content_too_long_error(mock_llm_func, error, messages)
-                except:
+                except Exception:
                     pass
                 
                 # Check if ContentProcessor was instantiated multiple times

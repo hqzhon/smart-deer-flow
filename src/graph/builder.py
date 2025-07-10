@@ -31,12 +31,6 @@ try:
         TaskRequirement,
         TaskType,
     )
-    from src.collaboration.human_loop import HumanLoopController
-    from src.collaboration.consensus_system import (
-        ConflictResolutionSystem,
-        ConflictingClaim,
-    )
-    from src.report_quality.template_engine import ReportBuilder, ReportDomain
     from src.report_quality.critical_thinking import CriticalThinkingEngine
     from src.report_quality.interactive_report import ReportEnhancer
 

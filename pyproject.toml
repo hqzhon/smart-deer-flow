@@ -71,3 +71,8 @@ extend-exclude = '''
 # in the root of the project.
 ^/build/
 '''
+
+[dependency-groups]
+test = [
+    "pytest-cov>=6.0.0",
+]

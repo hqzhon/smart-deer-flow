@@ -61,8 +61,9 @@ logger = logging.getLogger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
-# Global variables for advanced optimization with thread safety
 import threading
+
+# Global variables for advanced optimization with thread safety
 
 # Thread-safe global state management
 _global_state_lock = threading.RLock()

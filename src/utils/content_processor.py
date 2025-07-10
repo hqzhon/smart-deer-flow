@@ -803,17 +803,18 @@ Abstract:"""
         model_name: str,
         max_results: Optional[int] = None,
         query: Optional[str] = None,
-        enable_smart_filtering: bool = True,
     ) -> str:
-        """Process search results with intelligent filtering, chunking, summarization and security validation
+        """Process search results with chunking, summarization and security validation
+
+        Note: Smart filtering is now handled exclusively at the SmartSearchTool level.
+        This method focuses on traditional content processing.
 
         Args:
             search_results: List of search results
             llm: Language model
             model_name: Model name
             max_results: Maximum number of results
-            query: Original user query for relevance filtering
-            enable_smart_filtering: Whether to use LLM-based filtering
+            query: Original user query (for logging purposes)
 
         Returns:
             Processed search results text
@@ -851,16 +852,6 @@ Content: {content}
 
         combined_results = "\n\n".join(formatted_results)
 
-        # Use SearchResultFilter to determine if smart filtering should be enabled
-        should_use_smart_filtering = False
-        if enable_smart_filtering and query:
-            from src.utils.search_result_filter import SearchResultFilter
-
-            filter_instance = SearchResultFilter(self)
-            should_use_smart_filtering = filter_instance.should_enable_smart_filtering(
-                search_results, model_name
-            )
-
         # Get model limits for token checking
         limits = self.get_model_limits(model_name)
 
@@ -869,68 +860,12 @@ Content: {content}
             combined_results, model_name, limits.safe_input_limit, limits.safety_margin
         )
 
-        # Use smart filtering if enabled, query is provided, and threshold is met
-        if enable_smart_filtering and query and should_use_smart_filtering:
-            try:
-                # Get threshold info for logging
-                from src.utils.search_result_filter import SearchResultFilter
-
-                filter_instance = SearchResultFilter(self)
-                smart_filtering_threshold = (
-                    filter_instance.get_smart_filtering_threshold(model_name)
-                )
-                logger.info(
-                    f"Using smart filtering for search results "
-                    f"(tokens: {results_token_result.total_tokens}, threshold: {smart_filtering_threshold})"
-                )
-
-                filtered_data = filter_instance.filter_search_results(
-                    query=query,
-                    search_results=search_results,
-                    llm=llm,
-                    model_name=model_name,
-                    max_results=max_results,
-                )
-
-                # Format filtered results
-                filtered_formatted_results = filter_instance.format_filtered_results(
-                    filtered_data
-                )
-
-                # Check if the filtered results are within token limits
-                filtered_within_limit, filtered_token_result = (
-                    self.check_content_token_limit(
-                        filtered_formatted_results,
-                        model_name,
-                        limits.safe_input_limit,
-                        limits.safety_margin,
-                    )
-                )
-
-                if filtered_within_limit:
-                    logger.info(
-                        f"Smart filtering successful: {filtered_data.get('total_filtered', 0)}/"
-                        f"{filtered_data.get('total_original', 0)} results "
-                        f"({filtered_token_result.total_tokens} tokens)"
-                    )
-                    return filtered_formatted_results
-                else:
-                    logger.info(
-                        f"Filtered results still too long ({filtered_token_result.total_tokens} tokens), "
-                        "applying additional summarization"
-                    )
-                    return self.summarize_content(
-                        filtered_formatted_results, llm, model_name, "key_points"
-                    )
-
-            except Exception as e:
-                logger.warning(
-                    f"Smart filtering failed: {e}, falling back to traditional processing"
-                )
-                # Fall back to traditional processing with the already formatted results
-
-        # Traditional processing (fallback or when smart filtering is disabled)
-        # Use the already formatted results from above
+        # Note: Smart filtering is now handled exclusively at the SmartSearchTool level
+        # This method focuses on traditional content processing (chunking/summarization)
+        logger.info(
+            f"Processing search results with traditional methods "
+            f"(tokens: {results_token_result.total_tokens}, limit: {limits.safe_input_limit})"
+        )
 
         # Check if summarization is needed
         if not results_within_limit:
