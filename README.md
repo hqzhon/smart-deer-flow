@@ -404,7 +404,7 @@ A: Fork → Make changes → Submit PR. Check contribution guidelines.
 
 ## 📄 License
 
-Apache License 2.0 - see [LICENSE](LICENSE) file for details.
+This project is open source and available under the [MIT License](./LICENSE).
 
 ## 🙏 Acknowledgments
 
