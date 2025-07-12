@@ -92,19 +92,17 @@ CONTENT_PROCESSING:
 
 ```python
 from src.utils.search_result_filter import SearchResultFilter
-from src.llms.llm import get_llm_by_type
+from src.utils.content_processor import ContentProcessor
 
-# 创建筛选器实例
-filter_instance = SearchResultFilter()
+# 创建内容处理器和筛选器实例
+processor = ContentProcessor()
+filter_instance = SearchResultFilter(processor)
 
-# 获取LLM实例
-llm = get_llm_by_type("basic")
-
-# 执行筛选
+# 执行筛选（不再需要 LLM 参数）
 filtered_results = filter_instance.filter_search_results(
-    search_results=search_results,
     query="Python机器学习教程",
-    llm=llm,
+    search_results=search_results,
+    model_name="deepseek-chat",
     max_results=3
 )
 ```
@@ -113,18 +111,18 @@ filtered_results = filter_instance.filter_search_results(
 
 ```python
 from src.utils.content_processor import ContentProcessor
+from src.utils.search_result_filter import SearchResultFilter
 
-# 创建处理器实例
-processor = ContentProcessor(model_limits)
+# 创建处理器和筛选器实例
+processor = ContentProcessor()
+filter_instance = SearchResultFilter(processor)
 
-# 处理搜索结果（启用智能筛选）
-processed_results = processor.process_search_results(
-    search_results=search_results,
-    llm=llm,
-    model_name="doubao-1-5-pro-32k",
-    max_results=5,
+# 处理搜索结果（使用新的轻量级筛选）
+filtered_results = filter_instance.filter_search_results(
     query="深度学习框架对比",
-    enable_smart_filtering=True
+    search_results=search_results,
+    model_name="deepseek-chat",
+    max_results=5
 )
 ```
 

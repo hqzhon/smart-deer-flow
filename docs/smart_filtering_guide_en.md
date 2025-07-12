@@ -92,19 +92,17 @@ The enhanced `process_search_results()` method now supports:
 
 ```python
 from src.utils.search_result_filter import SearchResultFilter
-from src.llms.llm import get_llm_by_type
+from src.utils.content_processor import ContentProcessor
 
-# Create filter instance
-filter_instance = SearchResultFilter()
+# Create content processor and filter instances
+processor = ContentProcessor()
+filter_instance = SearchResultFilter(processor)
 
-# Get LLM instance
-llm = get_llm_by_type("basic")
-
-# Execute filtering
+# Execute filtering (no longer requires LLM parameter)
 filtered_results = filter_instance.filter_search_results(
-    search_results=search_results,
     query="Python machine learning tutorial",
-    llm=llm,
+    search_results=search_results,
+    model_name="deepseek-chat",
     max_results=3
 )
 ```
@@ -113,18 +111,18 @@ filtered_results = filter_instance.filter_search_results(
 
 ```python
 from src.utils.content_processor import ContentProcessor
+from src.utils.search_result_filter import SearchResultFilter
 
-# Create processor instance
-processor = ContentProcessor(model_limits)
+# Create processor and filter instances
+processor = ContentProcessor()
+filter_instance = SearchResultFilter(processor)
 
-# Process search results (enable smart filtering)
-processed_results = processor.process_search_results(
-    search_results=search_results,
-    llm=llm,
-    model_name="doubao-1-5-pro-32k",
-    max_results=5,
+# Process search results (using new lightweight filtering)
+filtered_results = filter_instance.filter_search_results(
     query="Deep learning framework comparison",
-    enable_smart_filtering=True
+    search_results=search_results,
+    model_name="deepseek-chat",
+    max_results=5
 )
 ```
 
