@@ -10,6 +10,7 @@
 [![GitHub forks](https://img.shields.io/github/forks/hqzhon/smart-deer-flow?style=social)](https://github.com/hqzhon/smart-deer-flow/network/members)
 [![GitHub issues](https://img.shields.io/github/issues/hqzhon/smart-deer-flow)](https://github.com/hqzhon/smart-deer-flow/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/hqzhon/smart-deer-flow)](https://github.com/hqzhon/smart-deer-flow/commits/main)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hqzhon/smart-deer-flow)
 
 [English](./README.md) | [简体中文](./README_zh.md)
 
