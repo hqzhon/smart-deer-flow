@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage
 
 from src.utils.structured_logging import get_logger
 from src.llms.base_error_handler import BaseLLMErrorHandler
-from src.llms.llm_context_optimizer import LLMContextOptimizer
+
 
 logger = get_logger(__name__)
 
@@ -373,7 +373,7 @@ def _execute_safe_llm_call_sync(
     max_retries: int,
     enable_smart_processing: bool,
     error_handler_instance: BaseLLMErrorHandler,
-    context_optimizer_instance: LLMContextOptimizer
+    context_optimizer_instance
 ) -> Any:
     """Synchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
@@ -434,7 +434,7 @@ async def _execute_safe_llm_call_async(
     max_retries: int,
     enable_smart_processing: bool,
     error_handler_instance: BaseLLMErrorHandler,
-    context_optimizer_instance: LLMContextOptimizer
+    context_optimizer_instance
 ) -> Any:
     """Asynchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
@@ -500,7 +500,7 @@ def safe_llm_call(
     max_retries: int = 3,
     enable_smart_processing: bool = True,
     error_handler_instance: Optional[BaseLLMErrorHandler] = None,
-    context_optimizer_instance: Optional[LLMContextOptimizer] = None,
+    context_optimizer_instance = None,
     **kwargs,
 ) -> Any:
     """Safe LLM call function with retry mechanism and smart content processing
@@ -515,7 +515,7 @@ def safe_llm_call(
         max_retries: Maximum retry attempts
         enable_smart_processing: Whether to enable smart content processing
         error_handler_instance: Optional, an instance of BaseLLMErrorHandler. If None, a default LLMErrorHandler will be used.
-        context_optimizer_instance: Optional, an instance of LLMContextOptimizer. If None, a default LLMContextOptimizer will be used.
+        context_optimizer_instance: Optional, an instance of ExecutionContextManager. If None, a default ExecutionContextManager will be used.
         **kwargs: Keyword arguments
 
     Returns:
@@ -524,7 +524,8 @@ def safe_llm_call(
     if error_handler_instance is None:
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
-        context_optimizer_instance = LLMContextOptimizer()
+        from src.utils.execution_context_manager import ExecutionContextManager
+        context_optimizer_instance = ExecutionContextManager()
 
     return _execute_safe_llm_call_sync(
         llm_func,
@@ -547,7 +548,7 @@ async def safe_llm_call_async(
     max_retries: int = 3,
     enable_smart_processing: bool = True,
     error_handler_instance: Optional[BaseLLMErrorHandler] = None,
-    context_optimizer_instance: Optional[LLMContextOptimizer] = None,
+    context_optimizer_instance = None,
     **kwargs,
 ) -> Any:
     """Safe async LLM call function with retry mechanism and smart content processing
@@ -562,7 +563,7 @@ async def safe_llm_call_async(
         max_retries: Maximum retry attempts
         enable_smart_processing: Whether to enable smart content processing
         error_handler_instance: Optional, an instance of BaseLLMErrorHandler. If None, a default LLMErrorHandler will be used.
-        context_optimizer_instance: Optional, an instance of LLMContextOptimizer. If None, a default LLMContextOptimizer will be used.
+        context_optimizer_instance: Optional, an instance of ExecutionContextManager. If None, a default ExecutionContextManager will be used.
         **kwargs: Keyword arguments
 
     Returns:
@@ -571,7 +572,8 @@ async def safe_llm_call_async(
     if error_handler_instance is None:
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
-        context_optimizer_instance = LLMContextOptimizer()
+        from src.utils.execution_context_manager import ExecutionContextManager
+        context_optimizer_instance = ExecutionContextManager()
 
     return await _execute_safe_llm_call_async(
         llm_func,

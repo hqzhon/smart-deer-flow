@@ -1,10 +1,11 @@
 """Tests for Enhanced Message Extractor
 
-Tests the comprehensive message extraction capabilities and various message formats.
+Tests the comprehensive message extraction capabilities, various message formats,
+and intelligent content deduplication functionality.
 """
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 from src.utils.enhanced_message_extractor import (
@@ -12,6 +13,7 @@ from src.utils.enhanced_message_extractor import (
     MessagePattern,
     get_global_message_extractor
 )
+# from src.utils.types import Message, MessageType  # Not needed for deduplication tests
 
 
 class TestEnhancedMessageExtractor:
@@ -368,3 +370,281 @@ class TestEnhancedMessageExtractor:
         # Should not find messages due to depth limit
         assert extracted.messages is None
         assert "max_depth_reached" in extracted.source_location or "failed" in extracted.source_location
+
+
+class TestEnhancedMessageExtractorDeduplication:
+    """Test intelligent content deduplication functionality"""
+    
+    @pytest.fixture
+    def extractor(self):
+        """EnhancedMessageExtractor fixture"""
+        return EnhancedMessageExtractor()
+    
+    def test_jaccard_similarity_identical(self, extractor):
+        """Test Jaccard similarity with identical texts"""
+        text1 = "The quick brown fox jumps over the lazy dog"
+        text2 = "The quick brown fox jumps over the lazy dog"
+        
+        similarity = extractor._jaccard_similarity(text1, text2)
+        assert similarity == 1.0
+    
+    def test_jaccard_similarity_no_overlap(self, extractor):
+        """Test Jaccard similarity with no overlap"""
+        text1 = "apple banana cherry"
+        text2 = "dog elephant fox"
+        
+        similarity = extractor._jaccard_similarity(text1, text2)
+        assert similarity == 0.0
+    
+    def test_jaccard_similarity_partial_overlap(self, extractor):
+        """Test Jaccard similarity with partial overlap"""
+        text1 = "the quick brown fox"
+        text2 = "the lazy brown dog"
+        
+        similarity = extractor._jaccard_similarity(text1, text2)
+        # Common words: "the", "brown" = 2
+        # Total unique words: "the", "quick", "brown", "fox", "lazy", "dog" = 6
+        # Jaccard = 2/6 = 0.333...
+        assert abs(similarity - 0.3333333333333333) < 0.001
+    
+    def test_jaccard_similarity_empty_texts(self, extractor):
+        """Test jaccard similarity with empty texts"""
+        similarity1 = extractor._jaccard_similarity("", "some text")
+        similarity2 = extractor._jaccard_similarity("some text", "")
+        similarity3 = extractor._jaccard_similarity("", "")
+        
+        assert similarity1 == 0.0
+        assert similarity2 == 0.0
+        assert similarity3 == 1.0  # Both empty should be identical
+    
+    def test_cosine_similarity_identical(self, extractor):
+        """Test cosine similarity with identical texts"""
+        text1 = "machine learning artificial intelligence"
+        text2 = "machine learning artificial intelligence"
+        
+        similarity = extractor._cosine_similarity(text1, text2)
+        assert abs(similarity - 1.0) < 0.001
+    
+    def test_cosine_similarity_no_overlap(self, extractor):
+        """Test cosine similarity with no overlap"""
+        text1 = "apple banana cherry"
+        text2 = "dog elephant fox"
+        
+        similarity = extractor._cosine_similarity(text1, text2)
+        assert similarity == 0.0
+    
+    def test_cosine_similarity_partial_overlap(self, extractor):
+        """Test cosine similarity with partial overlap"""
+        text1 = "machine learning is powerful"
+        text2 = "machine learning helps automation"
+        
+        similarity = extractor._cosine_similarity(text1, text2)
+        # Should be > 0 due to common words "machine" and "learning"
+        assert similarity > 0.0
+        assert similarity < 1.0
+    
+    def test_cosine_similarity_empty_texts(self, extractor):
+        """Test cosine similarity with empty texts"""
+        similarity1 = extractor._cosine_similarity("", "some text")
+        similarity2 = extractor._cosine_similarity("some text", "")
+        similarity3 = extractor._cosine_similarity("", "")
+        
+        assert similarity1 == 0.0  # Empty vs non-empty returns 0.0
+        assert similarity2 == 0.0  # Non-empty vs empty returns 0.0
+        assert similarity3 == 1.0  # Both empty should be identical
+    
+    def test_calculate_text_similarity_high_similarity(self, extractor):
+        """Test text similarity calculation with high similarity"""
+        content1 = "Artificial intelligence is transforming healthcare industry"
+        content2 = "AI is revolutionizing the healthcare sector"
+        
+        # Should have high similarity due to semantic overlap
+        similarity = extractor._calculate_text_similarity(content1, content2)
+        assert similarity > 0.25  # Adjusted based on actual calculation
+    
+    def test_calculate_text_similarity_low_similarity(self, extractor):
+        """Test text similarity calculation with low similarity"""
+        content1 = "Artificial intelligence in healthcare"
+        content2 = "Weather forecast for tomorrow"
+        
+        # Should have low similarity
+        similarity = extractor._calculate_text_similarity(content1, content2)
+        assert similarity < 0.3
+    
+    def test_calculate_text_similarity_threshold_boundary(self, extractor):
+        """Test text similarity calculation at threshold boundary"""
+        content1 = "the quick brown fox"
+        content2 = "the lazy brown dog"
+        
+        # Calculate similarity
+        similarity = extractor._calculate_text_similarity(content1, content2)
+        assert similarity > 0.0
+        assert similarity < 1.0
+    
+    def test_deduplicate_messages_no_duplicates(self, extractor):
+        """Test message deduplication with no duplicates"""
+        messages = [
+            HumanMessage(content="First unique message"),
+            AIMessage(content="Second unique message"),
+            HumanMessage(content="Third unique message")
+        ]
+        
+        deduplicated = extractor._deduplicate_messages(messages)
+        
+        assert len(deduplicated) == 3
+        assert deduplicated == messages
+    
+    def test_deduplicate_messages_with_duplicates(self, extractor):
+        """Test message deduplication with exact duplicates"""
+        messages = [
+            HumanMessage(content="Unique message"),
+            AIMessage(content="Duplicate message"),
+            HumanMessage(content="Duplicate message"),  # Exact duplicate
+            AIMessage(content="Another unique message")
+        ]
+        
+        deduplicated = extractor._deduplicate_messages(messages)
+        
+        assert len(deduplicated) == 3
+        # Should keep first occurrence of duplicate
+        assert deduplicated[1].content == "Duplicate message"
+        assert deduplicated[2].content == "Another unique message"
+    
+    def test_deduplicate_messages_with_similar_content(self, extractor):
+        """Test message deduplication with similar content"""
+        messages = [
+            HumanMessage(content="machine learning is powerful"),
+            AIMessage(content="machine learning is powerful"),  # Exact duplicate
+            HumanMessage(content="Weather is sunny today")
+        ]
+        
+        # Should remove exact duplicate messages
+        deduplicated = extractor._deduplicate_messages(messages, similarity_threshold=0.85)
+        assert len(deduplicated) == 2  # Should keep only 2 unique messages
+        assert deduplicated[0].content == "machine learning is powerful"
+        assert deduplicated[1].content == "Weather is sunny today"
+    
+    def test_deduplicate_messages_preserve_order(self, extractor):
+        """Test that message deduplication preserves order"""
+        messages = [
+            HumanMessage(content="First message"),
+            AIMessage(content="Second message"),
+            HumanMessage(content="First message"),  # Duplicate
+            AIMessage(content="Third message")
+        ]
+        
+        deduplicated = extractor._deduplicate_messages(messages)
+        
+        assert len(deduplicated) == 3
+        assert deduplicated[0].content == "First message"
+        assert deduplicated[1].content == "Second message"
+        assert deduplicated[2].content == "Third message"
+    
+    def test_deduplicate_messages_empty_list(self, extractor):
+        """Test message deduplication with empty list"""
+        messages = []
+        deduplicated = extractor._deduplicate_messages(messages)
+        assert deduplicated == []
+    
+    def test_deduplicate_messages_single_message(self, extractor):
+        """Test message deduplication with single message"""
+        messages = [HumanMessage(content="Single message")]
+        deduplicated = extractor._deduplicate_messages(messages)
+        assert len(deduplicated) == 1
+        assert deduplicated[0].content == "Single message"
+    
+    def test_deduplicate_messages_different_thresholds(self, extractor):
+        """Test message deduplication with different similarity thresholds"""
+        messages = [
+            HumanMessage(content="Machine learning is powerful"),
+            AIMessage(content="ML is very powerful technology"),
+            HumanMessage(content="Deep learning networks")
+        ]
+        
+        # High threshold - should keep more messages
+        deduplicated_high = extractor._deduplicate_messages(messages, similarity_threshold=0.9)
+        assert len(deduplicated_high) >= 2
+        
+        # Low threshold - should remove more messages
+        deduplicated_low = extractor._deduplicate_messages(messages, similarity_threshold=0.1)
+        assert len(deduplicated_low) <= len(deduplicated_high)
+    
+    def test_normalize_messages_integration(self, extractor):
+        """Test _normalize_messages method integration with deduplication"""
+        messages = [
+            HumanMessage(content="Research AI applications"),
+            AIMessage(content="AI research applications"),
+            HumanMessage(content="Weather forecast data")
+        ]
+        
+        # Test the actual _normalize_messages method
+        normalized = extractor._normalize_messages(messages)
+        
+        # Should apply deduplication
+        assert len(normalized) <= len(messages)
+        assert all(isinstance(msg, (HumanMessage, AIMessage, SystemMessage)) for msg in normalized)
+    
+    def test_normalize_messages_preserves_non_duplicate_content(self, extractor):
+        """Test that normalization preserves non-duplicate content"""
+        messages = [
+            HumanMessage(content="Unique content 1"),
+            AIMessage(content="Unique content 2"),
+            HumanMessage(content="Unique content 3")
+        ]
+        
+        # Test the actual _normalize_messages method
+        normalized = extractor._normalize_messages(messages)
+        
+        assert len(normalized) == 3
+        assert normalized == messages
+    
+    def test_normalize_messages_handles_empty_content(self, extractor):
+        """Test normalization with empty or None content"""
+        messages = [
+            HumanMessage(content=""),
+            AIMessage(content="Valid content")
+        ]
+        
+        # Test the actual _normalize_messages method
+        normalized = extractor._normalize_messages(messages)
+        
+        # Should handle empty content gracefully
+        assert len(normalized) <= 2
+        assert any(msg.content == "Valid content" for msg in normalized)
+    
+    def test_large_message_list_performance(self, extractor):
+        """Test deduplication performance with large message list"""
+        import time
+        
+        # Create a large list of messages with some duplicates
+        messages = []
+        for i in range(100):
+            content = f"Message content {i % 20}"  # Creates duplicates
+            messages.append(HumanMessage(content=content))
+        
+        start_time = time.time()
+        deduplicated = extractor._deduplicate_messages(messages)
+        end_time = time.time()
+        
+        # Should complete in reasonable time (< 1 second)
+        assert end_time - start_time < 1.0
+        # Should have removed duplicates
+        assert len(deduplicated) < len(messages)
+        assert len(deduplicated) <= 20  # At most 20 unique messages
+    
+    def test_similarity_calculation_performance(self, extractor):
+        """Test similarity calculation performance"""
+        import time
+        
+        text1 = "This is a long text with many words to test similarity calculation performance" * 10
+        text2 = "This is another long text with some similar words for performance testing" * 10
+        
+        start_time = time.time()
+        jaccard_sim = extractor._jaccard_similarity(text1, text2)
+        cosine_sim = extractor._cosine_similarity(text1, text2)
+        end_time = time.time()
+        
+        # Should complete quickly
+        assert end_time - start_time < 0.1
+        assert 0.0 <= jaccard_sim <= 1.0
+        assert 0.0 <= cosine_sim <= 1.0

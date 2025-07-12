@@ -29,3 +29,4 @@ coverage/
 
 # reports directory
 reports/
+.claude/settings.local.json

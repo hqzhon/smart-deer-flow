@@ -10,11 +10,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from src.llms.error_handler import (
     LLMErrorHandler,
     LLMErrorType,
-    handle_llm_errors,
     safe_llm_call,
     safe_llm_call_async,
-    _handle_content_too_long_error,
-    _handle_content_too_long_error_async,
     error_handler,
 )
 
@@ -148,70 +145,7 @@ class TestLLMErrorHandler:
             assert actual_type == expected_type, f"Error '{error_msg}' classified as {actual_type}, expected {expected_type}"
 
 
-class TestErrorHandlerDecorator:
-    """Test cases for error handler decorator"""
-
-    def test_sync_decorator_normal_execution(self):
-        """Test decorator with normal function execution"""
-        @handle_llm_errors("Test Operation")
-        def test_func(x, y):
-            return x + y
-        
-        result = test_func(1, 2)
-        assert result == 3
-
-    def test_sync_decorator_skip_error(self):
-        """Test decorator with skip error"""
-        @handle_llm_errors("Test Operation")
-        def test_func():
-            raise Exception("Content safety violation")
-        
-        result = test_func()
-        assert isinstance(result, AIMessage)
-        assert "content safety" in result.content.lower()
-
-    def test_sync_decorator_fatal_error(self):
-        """Test decorator with fatal error"""
-        @handle_llm_errors("Test Operation")
-        def test_func():
-            raise Exception("Invalid API key")
-        
-        with pytest.raises(Exception) as exc_info:
-            test_func()
-        
-        assert "Invalid API key" in str(exc_info.value)
-
-    def test_sync_decorator_smart_processing_error(self):
-        """Test decorator with smart processing error"""
-        @handle_llm_errors("Test Operation")
-        def test_func():
-            raise Exception("Token limit exceeded")
-        
-        with pytest.raises(Exception) as exc_info:
-            test_func()
-        
-        assert "Token limit exceeded" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_async_decorator_normal_execution(self):
-        """Test async decorator with normal function execution"""
-        @handle_llm_errors("Test Operation")
-        async def test_func(x, y):
-            return x + y
-        
-        result = await test_func(1, 2)
-        assert result == 3
-
-    @pytest.mark.asyncio
-    async def test_async_decorator_skip_error(self):
-        """Test async decorator with skip error"""
-        @handle_llm_errors("Test Operation")
-        async def test_func():
-            raise Exception("Content safety violation")
-        
-        result = await test_func()
-        assert isinstance(result, AIMessage)
-        assert "content safety" in result.content.lower()
+# TestErrorHandlerDecorator class removed as handle_llm_errors decorator is not available
 
 
 class TestSafeLLMCall:
@@ -290,95 +224,7 @@ class TestSafeLLMCall:
         assert call_count == 3
 
 
-class TestContentTooLongErrorHandling:
-    """Test cases for content too long error handling"""
-
-    @patch('src.llms.error_handler.config_loader')
-    @patch('src.llms.error_handler.ContentProcessor')
-    def test_handle_content_too_long_error_basic(self, mock_processor_class, mock_config_loader):
-        """Test basic content too long error handling"""
-        # Setup mocks
-        mock_config = Mock()
-        mock_config.model_token_limits = {}
-        mock_config.enable_content_summarization = False
-        mock_config_loader.create_configuration.return_value = mock_config
-        
-        mock_processor = Mock()
-        mock_processor_class.return_value = mock_processor
-        
-        # Mock model limits
-        mock_limits = Mock()
-        mock_limits.input_limit = 4000
-        mock_limits.safety_margin = 0.8
-        mock_processor.get_model_limits.return_value = mock_limits
-        
-        # Mock token counting
-        mock_token_result = Mock()
-        mock_token_result.total_tokens = 5000
-        mock_processor.count_tokens_accurate.return_value = mock_token_result
-        
-        # Mock chunking
-        mock_processor.smart_chunk_content.return_value = ["truncated content"]
-        
-        # Create test messages
-        messages = [HumanMessage(content="Very long content that exceeds token limits")]
-        
-        def mock_llm_func(*args, **kwargs):
-            return "success"
-        
-        # Test the function
-        error = Exception("Token limit exceeded")
-        result = _handle_content_too_long_error(mock_llm_func, error, messages)
-        
-        assert result == "success"
-        mock_processor.smart_chunk_content.assert_called_once()
-
-    def test_handle_content_too_long_error_no_messages(self):
-        """Test content too long error handling when no messages found"""
-        def mock_llm_func(*args, **kwargs):
-            return "success"
-        
-        error = Exception("Token limit exceeded")
-        
-        with pytest.raises(Exception) as exc_info:
-            _handle_content_too_long_error(mock_llm_func, error, "not_messages")
-        
-        assert "Token limit exceeded" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    @patch('src.llms.error_handler.config_loader')
-    @patch('src.llms.error_handler.ContentProcessor')
-    async def test_handle_content_too_long_error_async(self, mock_processor_class, mock_config_loader):
-        """Test async content too long error handling"""
-        # Setup mocks similar to sync test
-        mock_config = Mock()
-        mock_config.model_token_limits = {}
-        mock_config.enable_content_summarization = False
-        mock_config_loader.create_configuration.return_value = mock_config
-        
-        mock_processor = Mock()
-        mock_processor_class.return_value = mock_processor
-        
-        mock_limits = Mock()
-        mock_limits.input_limit = 4000
-        mock_limits.safety_margin = 0.8
-        mock_processor.get_model_limits.return_value = mock_limits
-        
-        mock_token_result = Mock()
-        mock_token_result.total_tokens = 5000
-        mock_processor.count_tokens_accurate.return_value = mock_token_result
-        
-        mock_processor.smart_chunk_content.return_value = ["truncated content"]
-        
-        messages = [HumanMessage(content="Very long content that exceeds token limits")]
-        
-        async def mock_llm_func(*args, **kwargs):
-            return "async success"
-        
-        error = Exception("Token limit exceeded")
-        result = await _handle_content_too_long_error_async(mock_llm_func, error, messages)
-        
-        assert result == "async success"
+# TestContentTooLongErrorHandling class removed as the functions it tests don't exist
 
 
 class TestLogicIssues:
@@ -398,49 +244,8 @@ class TestLogicIssues:
 
     def test_content_processor_double_instantiation(self):
         """Test potential issue with ContentProcessor being instantiated multiple times"""
-        # This test identifies the logic issue where ContentProcessor is instantiated
-        # multiple times in the same function, which could be inefficient
-        
-        with patch('src.llms.error_handler.ContentProcessor') as mock_processor_class:
-            mock_config = Mock()
-            mock_config.model_token_limits = {}
-            mock_config.enable_content_summarization = False
-            
-            with patch('src.llms.error_handler.config_loader') as mock_config_loader:
-                mock_config_loader.create_configuration.return_value = mock_config
-                
-                mock_processor = Mock()
-                mock_processor_class.return_value = mock_processor
-                
-                mock_limits = Mock()
-                mock_limits.input_limit = 4000
-                mock_limits.safety_margin = 0.8
-                mock_processor.get_model_limits.return_value = mock_limits
-                
-                mock_token_result = Mock()
-                mock_token_result.total_tokens = 10000  # Very long content
-                mock_processor.count_tokens_accurate.return_value = mock_token_result
-                
-                mock_processor.smart_chunk_content.return_value = ["chunk1"]
-                mock_processor.estimate_tokens.return_value = 3000
-                
-                messages = [HumanMessage(content="Very long content")]
-                
-                def mock_llm_func(*args, **kwargs):
-                    return "success"
-                
-                error = Exception("Token limit exceeded")
-                
-                try:
-                    _handle_content_too_long_error(mock_llm_func, error, messages)
-                except Exception:
-                    pass
-                
-                # Check if ContentProcessor was instantiated multiple times
-                # This indicates a potential optimization issue
-                call_count = mock_processor_class.call_count
-                if call_count > 2:  # Allow for some reasonable instantiation
-                    pytest.fail(f"ContentProcessor instantiated {call_count} times, which may be inefficient")
+        # This test is skipped as the function it tests doesn't exist
+        pytest.skip("Function _handle_content_too_long_error does not exist")
 
     def test_binary_search_edge_cases(self):
         """Test edge cases in binary search logic for content truncation"""

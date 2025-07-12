@@ -8,6 +8,9 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
+from collections import Counter
+import math
+import re
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 
 from src.utils.structured_logging import get_logger
@@ -619,7 +622,7 @@ class EnhancedMessageExtractor:
             return False
     
     def _normalize_messages(self, messages: List[Any]) -> List[BaseMessage]:
-        """Normalize messages to BaseMessage format"""
+        """Normalize messages to BaseMessage format with intelligent deduplication"""
         normalized = []
         
         for msg in messages:
@@ -658,7 +661,8 @@ class EnhancedMessageExtractor:
                 logger.warning(f"Failed to normalize message: {e}")
                 continue
         
-        return normalized
+        # Apply intelligent deduplication
+        return self._deduplicate_messages(normalized)
     
     def _generate_cache_key(self, args: tuple, kwargs: dict) -> str:
         """Generate cache key for extraction results"""
@@ -695,6 +699,110 @@ class EnhancedMessageExtractor:
         if self._cache:
             self._cache.clear()
             logger.debug("Message extraction cache cleared")
+    
+    def _deduplicate_messages(self, messages: List[BaseMessage], similarity_threshold: float = 0.85) -> List[BaseMessage]:
+        """Remove duplicate messages using text similarity detection"""
+        if not messages:
+            return messages
+        
+        deduplicated = []
+        seen_contents = []
+        
+        for msg in messages:
+            content = msg.content.strip()
+            if not content:
+                continue
+            
+            # Check for exact duplicates first (fast path)
+            if content in seen_contents:
+                logger.debug(f"Skipping exact duplicate message: {content[:50]}...")
+                continue
+            
+            # Check for similar content using text similarity
+            is_similar = False
+            for existing_content in seen_contents:
+                similarity = self._calculate_text_similarity(content, existing_content)
+                if similarity >= similarity_threshold:
+                    logger.debug(f"Skipping similar message (similarity: {similarity:.2f}): {content[:50]}...")
+                    is_similar = True
+                    break
+            
+            if not is_similar:
+                deduplicated.append(msg)
+                seen_contents.append(content)
+        
+        if len(deduplicated) < len(messages):
+            logger.info(f"Deduplicated {len(messages) - len(deduplicated)} messages, kept {len(deduplicated)}")
+        
+        return deduplicated
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate text similarity using multiple methods"""
+        # Normalize texts
+        text1_norm = self._normalize_text(text1)
+        text2_norm = self._normalize_text(text2)
+        
+        # If either text is too short, use exact match
+        if len(text1_norm) < 10 or len(text2_norm) < 10:
+            return 1.0 if text1_norm == text2_norm else 0.0
+        
+        # Calculate multiple similarity metrics
+        jaccard_sim = self._jaccard_similarity(text1_norm, text2_norm)
+        cosine_sim = self._cosine_similarity(text1_norm, text2_norm)
+        
+        # Weighted combination of similarities
+        combined_similarity = (jaccard_sim * 0.4) + (cosine_sim * 0.6)
+        
+        return combined_similarity
+    
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for similarity comparison"""
+        # Convert to lowercase
+        text = text.lower()
+        
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Remove common punctuation that doesn't affect meaning
+        text = re.sub(r'[.,!?;:"\'\'\"\`]', '', text)
+        
+        return text
+    
+    def _jaccard_similarity(self, text1: str, text2: str) -> float:
+        """Calculate Jaccard similarity based on word sets"""
+        words1 = set(text1.split())
+        words2 = set(text2.split())
+        
+        if not words1 and not words2:
+            return 1.0
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        return len(intersection) / len(union) if union else 0.0
+    
+    def _cosine_similarity(self, text1: str, text2: str) -> float:
+        """Calculate cosine similarity based on word frequency vectors"""
+        words1 = text1.split()
+        words2 = text2.split()
+        
+        if not words1 or not words2:
+            return 1.0 if not words1 and not words2 else 0.0
+        
+        # Create word frequency vectors
+        all_words = set(words1 + words2)
+        vector1 = [words1.count(word) for word in all_words]
+        vector2 = [words2.count(word) for word in all_words]
+        
+        # Calculate cosine similarity
+        dot_product = sum(a * b for a, b in zip(vector1, vector2))
+        magnitude1 = math.sqrt(sum(a * a for a in vector1))
+        magnitude2 = math.sqrt(sum(b * b for b in vector2))
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+        
+        return dot_product / (magnitude1 * magnitude2)
 
 
 # Global instance for reuse

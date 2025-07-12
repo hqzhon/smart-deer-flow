@@ -8,8 +8,9 @@ Provides intelligent parallel task execution with rate limiting, error handling 
 import asyncio
 import time
 import logging
-from typing import List, Callable, Any, Optional, Dict
-from dataclasses import dataclass
+import hashlib
+from typing import List, Callable, Any, Optional, Dict, Set
+from dataclasses import dataclass, field
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 
@@ -55,6 +56,60 @@ class TaskResult:
 
 
 @dataclass
+class SharedTaskContext:
+    """Shared context for parallel tasks to prevent content duplication"""
+    
+    search_results_cache: Dict[str, Any] = field(default_factory=dict)
+    content_hashes: Set[str] = field(default_factory=set)
+    task_outputs: Dict[str, str] = field(default_factory=dict)
+    max_cache_size: int = 100
+    
+    def add_search_result(self, query_hash: str, result: Any) -> None:
+        """Add search result to shared cache"""
+        if len(self.search_results_cache) >= self.max_cache_size:
+            # Remove oldest entries
+            oldest_key = next(iter(self.search_results_cache))
+            del self.search_results_cache[oldest_key]
+        
+        self.search_results_cache[query_hash] = result
+        logger.debug(f"Added search result to cache: {query_hash[:16]}...")
+    
+    def get_search_result(self, query_hash: str) -> Optional[Any]:
+        """Get cached search result"""
+        return self.search_results_cache.get(query_hash)
+    
+    def is_content_duplicate(self, content: str, similarity_threshold: float = 0.8) -> bool:
+        """Check if content is duplicate based on hash and similarity"""
+        content_hash = hashlib.md5(content.encode()).hexdigest()
+        
+        if content_hash in self.content_hashes:
+            return True
+        
+        # Check for similar content (simplified similarity check)
+        content_words = set(content.lower().split())
+        for existing_content in self.task_outputs.values():
+            existing_words = set(existing_content.lower().split())
+            if content_words and existing_words:
+                intersection = content_words.intersection(existing_words)
+                union = content_words.union(existing_words)
+                similarity = len(intersection) / len(union) if union else 0
+                if similarity >= similarity_threshold:
+                    logger.debug(f"Found similar content (similarity: {similarity:.2f})")
+                    return True
+        
+        self.content_hashes.add(content_hash)
+        return False
+    
+    def add_task_output(self, task_id: str, content: str) -> None:
+        """Add task output to shared context"""
+        if not self.is_content_duplicate(content):
+            self.task_outputs[task_id] = content
+            logger.debug(f"Added unique task output: {task_id}")
+        else:
+            logger.info(f"Skipped duplicate task output: {task_id}")
+
+
+@dataclass
 class ParallelTask:
     """Parallel task definition"""
 
@@ -83,12 +138,14 @@ class ParallelExecutor:
         rate_limiter: Optional[RateLimiter] = None,
         enable_adaptive_scheduling: bool = True,
         task_timeout: float = 300.0,
+        shared_context: Optional[SharedTaskContext] = None,
     ):
 
         self.max_concurrent_tasks = max_concurrent_tasks
         self.rate_limiter = rate_limiter or get_global_rate_limiter()
         self.enable_adaptive_scheduling = enable_adaptive_scheduling
         self.task_timeout = task_timeout
+        self.shared_context = shared_context or SharedTaskContext()
 
         # Task management
         self.pending_tasks: List[ParallelTask] = []
@@ -215,6 +272,21 @@ class ParallelExecutor:
 
         start_time = time.time()
 
+        # Check for cached results if this is a search task
+        if hasattr(task, 'kwargs') and 'query' in task.kwargs:
+            query = task.kwargs['query']
+            query_hash = hashlib.md5(str(query).encode()).hexdigest()
+            cached_result = self.shared_context.get_search_result(query_hash)
+            if cached_result is not None:
+                logger.info(f"Using cached result for task {task.task_id}")
+                result.status = TaskStatus.COMPLETED
+                result.result = cached_result
+                result.execution_time = 0.001
+                self.completed_tasks[task.task_id] = result
+                if task.task_id in self.running_tasks:
+                    del self.running_tasks[task.task_id]
+                return result
+
         for attempt in range(task.max_retries + 1):
             try:
                 # Rate limiting
@@ -233,6 +305,16 @@ class ParallelExecutor:
                     )
                 else:
                     task_result = await self._call_task_function(task)
+
+                # Cache search results and check for content duplication
+                if hasattr(task, 'kwargs') and 'query' in task.kwargs:
+                    query = task.kwargs['query']
+                    query_hash = hashlib.md5(str(query).encode()).hexdigest()
+                    self.shared_context.add_search_result(query_hash, task_result)
+                
+                # Add task output to shared context for deduplication
+                if isinstance(task_result, str) and len(task_result) > 100:  # Only check substantial content
+                    self.shared_context.add_task_output(task.task_id, task_result)
 
                 # Task successful
                 result.status = TaskStatus.COMPLETED
@@ -451,8 +533,9 @@ def create_parallel_executor(
     max_concurrent_tasks: Optional[int] = None,
     enable_rate_limiting: bool = True,
     enable_adaptive_scheduling: bool = True,
+    shared_context: Optional[SharedTaskContext] = None,
 ) -> ParallelExecutor:
-    """Create parallel executor"""
+    """Create parallel executor with optional shared context for deduplication"""
     # Load default values from config
     from src.config.config_loader import config_loader
 
@@ -482,9 +565,14 @@ def create_parallel_executor(
             max_concurrent_tasks = 3
 
     rate_limiter = get_global_rate_limiter() if enable_rate_limiting else None
+    
+    # Create shared context if not provided
+    if shared_context is None:
+        shared_context = SharedTaskContext()
 
     return ParallelExecutor(
         max_concurrent_tasks=max_concurrent_tasks,
         rate_limiter=rate_limiter,
         enable_adaptive_scheduling=enable_adaptive_scheduling,
+        shared_context=shared_context,
     )

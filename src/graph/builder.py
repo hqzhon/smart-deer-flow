@@ -22,6 +22,8 @@ from .nodes import (
     coder_node,
     human_feedback_node,
     background_investigation_node,
+    context_optimizer_node,
+    planning_context_optimizer_node,
 )
 
 # Import enhanced collaboration modules
@@ -45,9 +47,16 @@ logger = logging.getLogger(__name__)
 def continue_to_running_research_team(state: State):
     current_plan = state.get("current_plan")
     if not current_plan or not current_plan.steps:
+        # 检查是否需要规划上下文优化
+        messages = state.get("messages", [])
+        plan_iterations = state.get("plan_iterations", 0)
+        
+        # 如果消息过多且有多次规划迭代，先进行上下文优化
+        if len(messages) > 10 and plan_iterations > 1:
+            return "planning_context_optimizer"
         return "planner"
     if all(step.execution_res for step in current_plan.steps):
-        return "planner"
+        return "context_optimizer"
     for step in current_plan.steps:
         if not step.execution_res:
             break
@@ -87,12 +96,16 @@ def _build_base_graph():
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
+    builder.add_node("context_optimizer", context_optimizer_node)
+    builder.add_node("planning_context_optimizer", planning_context_optimizer_node)
     builder.add_edge("background_investigator", "planner")
+    builder.add_edge("planning_context_optimizer", "planner")
     builder.add_conditional_edges(
         "research_team",
         continue_to_running_research_team,
-        ["planner", "researcher", "coder"],
+        ["planner", "researcher", "coder", "context_optimizer", "planning_context_optimizer"],
     )
+    builder.add_edge("context_optimizer", "reporter")
     builder.add_edge("reporter", END)
     return builder
 
@@ -585,12 +598,16 @@ def _build_enhanced_graph():
     builder.add_node("researcher", researcher_node)
     builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
+    builder.add_node("context_optimizer", context_optimizer_node)
+    builder.add_node("planning_context_optimizer", planning_context_optimizer_node)
     builder.add_edge("background_investigator", "planner")
+    builder.add_edge("planning_context_optimizer", "planner")
     builder.add_conditional_edges(
         "research_team",
         continue_to_running_research_team,
-        ["planner", "researcher", "coder"],
+        ["planner", "researcher", "coder", "context_optimizer", "planning_context_optimizer"],
     )
+    builder.add_edge("context_optimizer", "reporter")
     builder.add_edge("reporter", END)
     return builder
 

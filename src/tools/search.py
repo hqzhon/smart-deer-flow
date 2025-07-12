@@ -143,8 +143,8 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
             name="web_search_base",
             max_results=max_search_results,
             include_raw_content=False,
-            include_images=True,
-            include_image_descriptions=True,
+            include_images=False,
+            include_image_descriptions=False,
         )
     elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
         base_tool = LoggedDuckDuckGoSearch(
@@ -193,8 +193,8 @@ def get_raw_web_search_tool(max_search_results: int):
             name="web_search",
             max_results=max_search_results,
             include_raw_content=False,
-            include_images=True,
-            include_image_descriptions=True,
+            include_images=False,
+            include_image_descriptions=False,
         )
     elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
         return LoggedDuckDuckGoSearch(
