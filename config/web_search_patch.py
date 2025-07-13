@@ -35,8 +35,8 @@ def get_optimized_web_search_tool():
 
 def get_optimized_search_filter():
     """获取优化的搜索过滤器"""
-    from src.utils.content_processor import ContentProcessor
-    from src.utils.search_result_filter import SearchResultFilter
+    from src.utils.tokens.content_processor import ContentProcessor
+    from src.utils.common.search_result_filter import SearchResultFilter
     
     processor = ContentProcessor()
     cleaning_config = WEB_SEARCH_OPTIMIZATION_CONFIG.get('cleaning_config', {})

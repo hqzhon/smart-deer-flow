@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 
-from src.utils.rate_limiter import get_global_rate_limiter, RateLimiter
-from src.utils.decorators import safe_background_task
+from ..system.rate_limiter import get_global_rate_limiter, RateLimiter
+from ..common.decorators import safe_background_task
 from src.llms.error_handler import error_handler, LLMErrorType
 
 logger = logging.getLogger(__name__)

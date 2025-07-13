@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 
-from .token_counter import count_tokens
+from ..tokens.token_counter import count_tokens
 from typing import NamedTuple
 import time
 import hashlib

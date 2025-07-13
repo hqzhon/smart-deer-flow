@@ -15,12 +15,20 @@ from pathlib import Path
 from enum import Enum
 import threading
 import time
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+
+# Optional watchdog import for file monitoring
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    Observer = None
+    FileSystemEventHandler = None
+    WATCHDOG_AVAILABLE = False
 from pydantic import BaseModel
 from functools import wraps
 
-from .structured_logging import get_logger, EventType
+from ..common.structured_logging import get_logger, EventType
 
 logger = get_logger(__name__)
 
@@ -149,12 +157,15 @@ class EnvConfigLoader(ConfigLoader):
         return format == ConfigFormat.ENV
 
 
-class ConfigWatcher(FileSystemEventHandler):
+class ConfigWatcher:
     """Configuration file watcher"""
 
     def __init__(
         self, config_manager: "ConfigManager", watched_files: Dict[str, ConfigSource]
     ):
+        if WATCHDOG_AVAILABLE and FileSystemEventHandler:
+            # Initialize as FileSystemEventHandler if watchdog is available
+            FileSystemEventHandler.__init__(self)
         self.config_manager = config_manager
         self.watched_files = watched_files
         self._last_modified = {}
@@ -396,6 +407,13 @@ class ConfigManager:
 
     def _setup_file_watching(self):
         """Setup file watching"""
+        if not WATCHDOG_AVAILABLE:
+            logger.warning(
+                "Watchdog not available, file watching disabled",
+                event_type=EventType.SYSTEM,
+            )
+            return
+            
         # Collect files that need to be watched
         watch_files = {}
         for source in self.sources:
@@ -480,7 +498,7 @@ class ConfigManager:
 
     def stop_watching(self):
         """Stop file watching"""
-        if self._observer:
+        if WATCHDOG_AVAILABLE and self._observer:
             self._observer.stop()
             self._observer.join()
             self._observer = None

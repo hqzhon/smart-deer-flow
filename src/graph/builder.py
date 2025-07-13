@@ -10,7 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
 from src.prompts.planner_model import StepType
-from src.utils.memory_manager import cached
+from src.utils.performance.memory_manager import cached
 
 from .types import State
 from .nodes import (

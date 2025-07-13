@@ -4,7 +4,7 @@ from typing import Optional
 from dataclasses import dataclass
 
 from .content_processor import ContentProcessor
-from .structured_logging import get_logger
+from ..common.structured_logging import get_logger
 
 logger = get_logger(__name__)
 

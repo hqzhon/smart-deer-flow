@@ -14,6 +14,9 @@ static/browser_history/*.gif
 .venv
 venv/
 
+# UV cache
+.uv_cache/
+
 # Environment variables
 .env
 
@@ -29,4 +32,15 @@ coverage/
 
 # reports directory
 reports/
+
+temp_project/
+
+# Test generated files
+phase2_*.json
+phase2_*.md
+*_analysis.json
+*_validation_report.json
+*_performance_report.md
+
 .claude/settings.local.json
+CLAUDE.md

@@ -25,10 +25,10 @@ from src.workflow import (
     run_optimized_research_workflow,
     run_parallel_report_generation,
 )
-from src.utils.workflow_optimizer import (
+from src.utils.performance.workflow_optimizer import (
     WorkflowOptimizationLevel,
 )
-from src.utils.performance_optimizer import (
+from src.utils.performance.performance_optimizer import (
     get_global_advanced_executor,
     shutdown_global_executor,
 )

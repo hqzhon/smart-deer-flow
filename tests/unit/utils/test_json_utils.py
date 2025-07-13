@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import json
-from src.utils.json_utils import repair_json_output
+from src.utils.common.json_utils import repair_json_output
 
 
 class TestRepairJsonOutput:

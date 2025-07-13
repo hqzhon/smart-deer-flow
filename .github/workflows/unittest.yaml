@@ -22,9 +22,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv venv --python 3.12
-        uv pip install -e ".[dev]"
-        uv pip install -e ".[test]"
+        uv sync --extra dev --extra test
 
     - name: Run test cases with coverage
       run: |

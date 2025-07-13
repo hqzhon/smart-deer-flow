@@ -1,0 +1,27 @@
+{
+  "isolation": {
+    "enable_isolation": true,
+    "max_local_context_size": 8000,
+    "token_budget": 16000,
+    "compression_threshold": 0.7,
+    "max_concurrent_sessions": 8,
+    "session_timeout": 1800
+  },
+  "performance": {
+    "memory_cleanup_interval": 300,
+    "performance_threshold": 0.3,
+    "success_rate_threshold": 0.8,
+    "complexity_threshold": 0.6
+  },
+  "monitoring": {
+    "monitoring_interval": 60,
+    "alert_sensitivity": "medium",
+    "metrics_retention_days": 7,
+    "enable_predictive_analytics": true
+  },
+  "optimization": {
+    "auto_tuning_enabled": false,
+    "optimization_level": "balanced",
+    "min_data_points_for_tuning": 50
+  }
+}

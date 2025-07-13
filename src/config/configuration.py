@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 
 from src.rag.retriever import Resource
 from src.config.report_style import ReportStyle
-from src.utils.content_processor import ModelTokenLimits
+from src.utils.tokens.content_processor import ModelTokenLimits
 
 
 @dataclass
@@ -75,6 +75,15 @@ class Configuration:
     advanced_context_config: AdvancedContextConfig = field(
         default_factory=AdvancedContextConfig
     )  # Advanced context management settings
+
+    # Researcher context isolation configuration (Phase 3)
+    enable_researcher_isolation: bool = False  # Whether to enable researcher context isolation
+    researcher_isolation_level: str = "moderate"  # Isolation level: minimal, moderate, aggressive
+    researcher_max_local_context: int = 5000  # Maximum local context size for researcher
+    researcher_isolation_threshold: int = 3  # Enable isolation when steps exceed this value
+    researcher_auto_isolation: bool = True  # Enable automatic isolation based on complexity
+    researcher_isolation_metrics: bool = True  # Enable isolation metrics collection
+    max_context_steps_researcher: int = 2  # Maximum context steps for researcher isolation
 
     _current_instance: Optional["Configuration"] = None
 

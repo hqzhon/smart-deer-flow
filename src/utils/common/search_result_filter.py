@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from src.utils.content_processor import ContentProcessor
+from ..tokens.content_processor import ContentProcessor
 
 logger = logging.getLogger(__name__)
 

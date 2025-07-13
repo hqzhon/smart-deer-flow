@@ -29,8 +29,8 @@ from src.config.configuration import Configuration
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call, safe_llm_call_async
 from src.prompts.template import apply_prompt_template
-from src.utils.json_utils import repair_json_output
-from src.utils.token_manager import TokenManager
+from src.utils.common.json_utils import repair_json_output
+from src.utils.tokens.token_manager import TokenManager
 
 from .types import State
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
@@ -90,7 +90,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
     # Smart content processing is always enabled (smart chunking, summarization, and smart filtering)
     if True:  # Always process content with smart features
         try:
-            from src.utils.content_processor import ContentProcessor
+            from src.utils.tokens.content_processor import ContentProcessor
             from src.llms.llm import get_llm_by_type
 
             processor = ContentProcessor(configurable.model_token_limits)
@@ -211,7 +211,7 @@ def planner_node(
 
         # Check if adding background results would exceed token limits
         try:
-            from src.utils.content_processor import ContentProcessor
+            from src.utils.tokens.content_processor import ContentProcessor
 
             processor = ContentProcessor(configurable.model_token_limits)
 
@@ -683,7 +683,7 @@ async def _execute_steps_parallel(
         f"Starting parallel execution with max {max_parallel_tasks} concurrent tasks"
     )
 
-    from src.utils.parallel_executor import (
+    from src.utils.performance.parallel_executor import (
         create_parallel_executor,
         ParallelTask,
         TaskPriority,
@@ -700,7 +700,7 @@ async def _execute_steps_parallel(
     all_messages = []
 
     # Create parallel executor with rate limiting and shared context
-    from src.utils.parallel_executor import SharedTaskContext
+    from src.utils.performance.parallel_executor import SharedTaskContext
     shared_context = SharedTaskContext()
     executor = create_parallel_executor(
         max_concurrent_tasks=max_parallel_tasks,
@@ -846,7 +846,7 @@ async def _execute_single_step_parallel(
     Now uses ExecutionContextManager for consistent context handling across
     serial and parallel execution modes.
     """
-    from src.utils.execution_context_manager import ExecutionContextManager, ContextConfig
+    from src.utils.context.execution_context_manager import ExecutionContextManager, ContextConfig
     
     logger.info(f"Executing step in parallel: {step.title} with {agent_type}")
 
@@ -1044,7 +1044,7 @@ async def _execute_agent_step(
     
     Now uses unified ExecutionContextManager for consistent context handling.
     """
-    from src.utils.execution_context_manager import ExecutionContextManager, ContextConfig
+    from src.utils.context.execution_context_manager import ExecutionContextManager, ContextConfig
     
     current_plan = state.get("current_plan")
     observations = state.get("observations", [])
@@ -1281,23 +1281,119 @@ async def _setup_and_execute_agent_step(
         return await _execute_agent_step(state, config, agent, agent_type)
 
 
-async def researcher_node(
+async def researcher_node_with_isolation(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
-    """Researcher node that do research"""
-    logger.info("Researcher node is researching.")
+    """Researcher node with context isolation - Phase 3 Implementation.
+    
+    This function implements the enhanced researcher node with context isolation
+    capabilities including progressive enablement and monitoring.
+    """
+    from src.utils.researcher.researcher_context_extension import ResearcherContextExtension, ResearcherContextConfig
+    from src.agents.agent_factory import create_agent
+    from src.tools.mcp_client import MultiServerMCPClient
+    
+    logger.info("Executing researcher node with context isolation (Phase 3)")
     configurable = Configuration.from_runnable_config(config)
+    
+    # Configure isolation level based on configuration
+    isolation_level = getattr(configurable, "researcher_isolation_level", "moderate")
+    isolation_config = ResearcherContextConfig(
+        max_context_steps=getattr(configurable, "max_context_steps_researcher", 2),
+        max_step_content_length=1500,
+        max_observations_length=8000,
+        isolation_level=isolation_level
+    )
+    
+    # Phase 3: Prepare configuration for progressive enablement and metrics
+    phase3_config = {
+        'researcher_isolation_metrics': getattr(configurable, 'researcher_isolation_metrics', False),
+        'researcher_auto_isolation': getattr(configurable, 'researcher_auto_isolation', False),
+        'researcher_isolation_threshold': getattr(configurable, 'researcher_isolation_threshold', 0.7),
+        'researcher_max_local_context': getattr(configurable, 'researcher_max_local_context', 3000)
+    }
+    
+    # Initialize context extension with Phase 3 features
+    context_extension = ResearcherContextExtension(
+        isolation_config=isolation_config,
+        config=phase3_config
+    )
+    
+    # Setup tools
     tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)
-    logger.info(f"Researcher tools: {tools}")
-    return await _setup_and_execute_agent_step(
-        state,
-        config,
-        "researcher",
-        tools,
-    )
+    
+    # Setup MCP servers if configured
+    mcp_servers = {}
+    enabled_tools = {}
+    
+    if configurable.mcp_settings:
+        for server_name, server_config in configurable.mcp_settings["servers"].items():
+            if (
+                server_config["enabled_tools"]
+                and "researcher" in server_config["add_to_agents"]
+            ):
+                mcp_servers[server_name] = {
+                    k: v
+                    for k, v in server_config.items()
+                    if k in ("transport", "command", "args", "url", "env")
+                }
+                for tool_name in server_config["enabled_tools"]:
+                    enabled_tools[tool_name] = server_name
+    
+    # Create and execute agent with isolation
+    if mcp_servers:
+        async with MultiServerMCPClient(mcp_servers) as client:
+            loaded_tools = tools[:]
+            for tool in client.get_tools():
+                if tool.name in enabled_tools:
+                    tool.description = (
+                        f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
+                    )
+                    loaded_tools.append(tool)
+            agent = create_agent("researcher", "researcher", loaded_tools, "researcher")
+            return await context_extension.execute_researcher_step_with_isolation(
+                state, agent, "researcher"
+            )
+    else:
+        agent = create_agent("researcher", "researcher", tools, "researcher")
+        return await context_extension.execute_researcher_step_with_isolation(
+            state, agent, "researcher"
+        )
+
+
+async def researcher_node(
+    state: State, config: RunnableConfig
+) -> Command[Literal["research_team"]]:
+    """Researcher node that do research with context isolation capabilities.
+    
+    Phase 1 Implementation: Enhanced with ResearcherContextExtension for
+    context isolation to prevent context accumulation in parallel execution.
+    """
+    logger.info("Researcher node is researching.")
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Check if context isolation is enabled
+    enable_researcher_isolation = getattr(configurable, "enable_researcher_isolation", True)
+    
+    if enable_researcher_isolation:
+        logger.info("Using researcher node with context isolation")
+        return await researcher_node_with_isolation(state, config)
+    else:
+        logger.info("Using standard researcher node")
+        tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
+        retriever_tool = get_retriever_tool(state.get("resources", []))
+        if retriever_tool:
+            tools.insert(0, retriever_tool)
+        logger.info(f"Researcher tools: {tools}")
+        return await _setup_and_execute_agent_step(
+            state,
+            config,
+            "researcher",
+            tools,
+        )
 
 
 async def coder_node(
@@ -1333,7 +1429,7 @@ async def context_optimizer_node(
     logger.info(f"Optimizing {len(observations)} observations for context compression.")
     
     try:
-        from src.utils.execution_context_manager import ExecutionContextManager, ContextConfig
+        from src.utils.context.execution_context_manager import ExecutionContextManager, ContextConfig
         
         # Initialize unified context manager with reporter-specific configuration
         context_config = ContextConfig(
@@ -1393,7 +1489,7 @@ async def planning_context_optimizer_node(
     logger.info("Planning context optimizer started")
     
     try:
-        from src.utils.execution_context_manager import ExecutionContextManager, ContextConfig
+        from src.utils.context.execution_context_manager import ExecutionContextManager, ContextConfig
         
         messages = state.get("messages", [])
         observations = state.get("observations", [])
@@ -1470,7 +1566,7 @@ async def planning_context_optimizer_node(
         logger.error(f"Planning context optimization failed: {e}")
         # Fallback to unified message optimization
         try:
-            from src.utils.execution_context_manager import ExecutionContextManager, ContextConfig
+            from src.utils.context.execution_context_manager import ExecutionContextManager, ContextConfig
             
             fallback_config = ContextConfig(
                 max_context_steps=5,

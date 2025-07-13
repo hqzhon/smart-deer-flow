@@ -48,7 +48,7 @@ def apply_prompt_template(
     Returns:
         List of messages with the system prompt as the first message
     """
-    from src.utils.context_evaluator import (
+    from src.utils.context.context_evaluator import (
         get_global_context_evaluator,
     )
     from src.config.config_loader import config_loader

@@ -9,7 +9,7 @@ import yaml
 import logging
 from typing import Dict, Any, Optional
 
-from src.utils.content_processor import ModelTokenLimits
+from src.utils.tokens.content_processor import ModelTokenLimits
 from src.config.configuration import Configuration, AdvancedContextConfig
 
 logger = logging.getLogger(__name__)

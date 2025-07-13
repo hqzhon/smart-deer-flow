@@ -21,13 +21,13 @@ from src.utils.decorators import safe_background_task
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
-from src.utils.performance_optimizer import (
+from src.utils.performance.performance_optimizer import (
     AdvancedParallelExecutor,
     AdaptiveRateLimiter,
     SmartErrorRecovery,
     TaskPriority,
 )
-from src.utils.memory_manager import HierarchicalMemoryManager
+from src.utils.performance.memory_manager import HierarchicalMemoryManager
 from src.config.performance_config import (
     get_performance_config,
     update_performance_config,
@@ -231,8 +231,8 @@ async def _process_enhanced_batch(batch: List[Dict[str, Any]]):
             if error_recovery:
                 tasks = []
                 for request_data in uncached_batch:
-                    task = error_recovery.execute_with_retry(
-                        _process_single_request, request_data
+                    task = error_recovery.execute_with_recovery(
+                        _process_single_request, request_data, operation_id=f"batch_request_{request_data.get('id', 'unknown')}"
                     )
                     tasks.append(task)
 

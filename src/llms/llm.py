@@ -12,7 +12,7 @@ from typing import get_args
 
 from src.config import load_yaml_config
 from src.config.agents import LLMType
-from src.utils.content_processor import ModelTokenLimits
+from src.utils.tokens.content_processor import ModelTokenLimits
 
 # Cache for LLM instances
 _llm_cache: dict[LLMType, ChatOpenAI] = {}

@@ -14,7 +14,7 @@ import hashlib
 import pickle
 import threading
 
-from src.utils.decorators import safe_background_task
+from ..common.decorators import safe_background_task
 
 logger = logging.getLogger(__name__)
 

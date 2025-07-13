@@ -146,7 +146,7 @@ def test_context_management_integration():
     try:
         # Test 1: Context evaluator availability
         print("\n1. Testing context evaluator...")
-        from src.utils.context_evaluator import get_global_context_evaluator
+        from src.utils.context.context_evaluator import get_global_context_evaluator
 
         evaluator = get_global_context_evaluator()
         if evaluator:

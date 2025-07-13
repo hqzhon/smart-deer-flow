@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Callable, Any, Union
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-from .structured_logging import get_logger, EventType
+from ..common.structured_logging import get_logger, EventType
 
 logger = get_logger(__name__)
 

@@ -10,14 +10,16 @@ from dataclasses import dataclass
 from enum import Enum
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
-from src.utils.advanced_context_manager import (
+from .advanced_context_manager import (
     AdvancedContextManager,
-    CompressionStrategy,
     ContextPriority,
+    CompressionStrategy,
 )
-from src.utils.content_processor import ContentProcessor
-from src.config.configuration import Configuration
-from src.utils.structured_logging import get_logger
+from ..tokens.content_processor import ContentProcessor
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from src.config.configuration import Configuration
+from ..common.structured_logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -59,7 +61,7 @@ class ContextStateEvaluator:
 
     def __init__(
         self,
-        config: Configuration,
+        config: "Configuration",
         content_processor: Optional[ContentProcessor] = None,
         context_manager: Optional[AdvancedContextManager] = None,
     ):
@@ -844,7 +846,7 @@ _global_context_evaluator: Optional[ContextStateEvaluator] = None
 
 
 def get_global_context_evaluator(
-    config: Optional[Configuration] = None,
+    config: Optional["Configuration"] = None,
 ) -> ContextStateEvaluator:
     """Get or create global context evaluator instance"""
     global _global_context_evaluator

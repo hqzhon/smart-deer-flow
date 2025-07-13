@@ -11,8 +11,8 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
-from src.utils.search_result_filter import SearchResultCleaner, SearchResultFilter
-from src.utils.content_processor import ContentProcessor
+from src.utils.common.search_result_filter import SearchResultCleaner, SearchResultFilter
+from src.utils.tokens.content_processor import ContentProcessor
 
 
 class TestSearchResultCleaner(unittest.TestCase):

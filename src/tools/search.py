@@ -78,8 +78,8 @@ class SmartSearchTool(BaseTool):
     ) -> str:
         """Apply SearchResultFilter to search results."""
         try:
-            from src.utils.content_processor import ContentProcessor
-            from src.utils.search_result_filter import SearchResultFilter
+            from src.utils.tokens.content_processor import ContentProcessor
+            from src.utils.common.search_result_filter import SearchResultFilter
 
             # Initialize content processor and filter
             processor = ContentProcessor()

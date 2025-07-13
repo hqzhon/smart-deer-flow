@@ -8,7 +8,7 @@ import pytest
 from unittest.mock import Mock, patch
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-from src.utils.enhanced_message_extractor import (
+from src.utils.tokens.enhanced_message_extractor import (
     EnhancedMessageExtractor,
     MessagePattern,
     get_global_message_extractor

@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional
 from functools import wraps
 from langchain_core.messages import AIMessage
 
-from src.utils.structured_logging import get_logger
+from src.utils.common.structured_logging import get_logger
 from src.llms.base_error_handler import BaseLLMErrorHandler
 
 
@@ -524,7 +524,7 @@ def safe_llm_call(
     if error_handler_instance is None:
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
-        from src.utils.execution_context_manager import ExecutionContextManager
+        from src.utils.context.execution_context_manager import ExecutionContextManager
         context_optimizer_instance = ExecutionContextManager()
 
     return _execute_safe_llm_call_sync(
@@ -572,7 +572,7 @@ async def safe_llm_call_async(
     if error_handler_instance is None:
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
-        from src.utils.execution_context_manager import ExecutionContextManager
+        from src.utils.context.execution_context_manager import ExecutionContextManager
         context_optimizer_instance = ExecutionContextManager()
 
     return await _execute_safe_llm_call_async(

@@ -8,17 +8,17 @@ from src.graph.builder import build_graph
 from src.collaboration.role_bidding import RoleBiddingSystem
 from src.collaboration.human_loop import HumanLoopController
 from src.collaboration.consensus_system import ConflictResolutionSystem
-from src.utils.performance_optimizer import (
+from src.utils.performance.performance_optimizer import (
     AdvancedParallelExecutor,
     AdaptiveRateLimiter,
     SmartErrorRecovery,
 )
-from src.utils.workflow_optimizer import (
+from src.utils.performance.workflow_optimizer import (
     WorkflowOptimizer,
     WorkflowOptimizationLevel,
     create_optimized_workflow,
 )
-from src.utils.memory_manager import HierarchicalMemoryManager, cached
+from src.utils.performance.memory_manager import HierarchicalMemoryManager, cached
 from src.config.config_loader import config_loader
 
 # Import collaboration modules
@@ -439,7 +439,7 @@ async def run_agent_workflow_async(
                 _execute_workflow, operation_id=f"workflow_{thread_id or 'default'}"
             )
         else:
-            final_state = await error_recovery.execute_with_retry(_execute_workflow)
+            final_state = await error_recovery.execute_with_recovery(_execute_workflow, operation_id=f"workflow_{thread_id or 'default'}_fallback")
 
         # Cache the result if caching is enabled
         if enable_caching and cache_key and final_state:

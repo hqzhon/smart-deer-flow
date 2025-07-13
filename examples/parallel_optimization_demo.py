@@ -21,10 +21,10 @@ try:
         run_parallel_report_generation,
         run_agent_workflow_async,
     )
-    from src.utils.workflow_optimizer import (
+    from src.utils.performance.workflow_optimizer import (
         WorkflowOptimizationLevel,
     )
-    from src.utils.performance_optimizer import optimize_report_generation_workflow
+    from src.utils.performance.performance_optimizer import optimize_report_generation_workflow
 except ImportError as e:
     logger.error(f"Failed to import DeerFlow modules: {e}")
     logger.info(

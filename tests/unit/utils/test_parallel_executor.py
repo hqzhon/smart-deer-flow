@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import hashlib
 from unittest.mock import Mock, AsyncMock, patch
-from src.utils.parallel_executor import (
+from src.utils.performance.parallel_executor import (
     ParallelExecutor,
     SharedTaskContext,
     ParallelTask,

@@ -13,7 +13,7 @@ import math
 import re
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 
-from src.utils.structured_logging import get_logger
+from ..common.structured_logging import get_logger
 
 logger = get_logger(__name__)
 

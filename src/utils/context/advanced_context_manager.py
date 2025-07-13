@@ -14,9 +14,12 @@ from dataclasses import dataclass
 from enum import Enum
 import re
 
-from src.utils.content_processor import ContentProcessor
-from src.utils.token_manager import TokenManager
-from src.config.configuration import Configuration
+from ..tokens.content_processor import ContentProcessor
+from ..tokens.token_manager import TokenManager
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from src.config.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +74,7 @@ class AdvancedContextManager:
 
     def __init__(
         self,
-        config: Configuration,
+        config: "Configuration",
         content_processor: Optional[ContentProcessor] = None,
     ):
         self.config = config
