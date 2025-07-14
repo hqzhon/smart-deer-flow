@@ -48,15 +48,26 @@ class ScenarioContext:
 class ResearcherProgressiveEnabler:
     """Progressive enablement system for researcher context isolation"""
     
-    def __init__(self):
+    def __init__(self, config: Optional[Any] = None):
         self.scenario_history: List[Tuple[ScenarioContext, bool, float]] = []  # (context, enabled, performance)
         self.user_feedback: Dict[str, float] = {}  # scenario_id -> satisfaction_score
         self.performance_baseline: Optional[float] = None
+        self.config = config
         
         # Learning parameters
         self.min_samples_for_learning = 5
         self.performance_threshold = 0.1  # 10% performance degradation threshold
         self.token_savings_threshold = 1000  # Minimum token savings to consider worthwhile
+        
+        # Phase 2 - GFLQ Integration: Initialize reflection agent if enabled
+        self.reflection_agent = None
+        if config and getattr(config, 'enable_enhanced_reflection', True):
+            try:
+                from .enhanced_reflection import EnhancedReflectionAgent
+                self.reflection_agent = EnhancedReflectionAgent(config)
+                logger.info("Enhanced reflection agent initialized for progressive enablement")
+            except ImportError as e:
+                logger.warning(f"Failed to initialize reflection agent: {e}")
         
         logger.info("Initialized ResearcherProgressiveEnabler")
     
@@ -218,6 +229,39 @@ class ResearcherProgressiveEnabler:
                            config: Optional[Any], metrics: Any, 
                            decision_factors: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """Adaptive enablement based on historical performance and learning"""
+        # Phase 2 - GFLQ Integration: Add reflection-driven decision making
+        if self.reflection_agent:
+            try:
+                # Create reflection context for analysis
+                from .enhanced_reflection import ReflectionContext
+                import asyncio
+                
+                reflection_context = ReflectionContext(
+                    research_topic=scenario.task_description,
+                    completed_steps=[],
+                    execution_results=[],
+                    total_steps=scenario.step_count,
+                    current_step_index=0
+                )
+                
+                # Use analyze_knowledge_gaps for full reflection analysis
+                reflection_result = asyncio.run(self.reflection_agent.analyze_knowledge_gaps(reflection_context))
+                decision_factors['reflection_insights'] = {
+                    'is_sufficient': reflection_result.is_sufficient,
+                    'knowledge_gaps_count': len(reflection_result.knowledge_gaps),
+                    'follow_up_queries_count': len(reflection_result.follow_up_queries),
+                    'confidence_score': reflection_result.confidence_score or 0.0
+                }
+                
+                # If reflection indicates insufficient information, enable deep research
+                if not reflection_result.is_sufficient:
+                    decision_factors['trigger'] = 'reflection_insufficient_knowledge'
+                    decision_factors['suggested_queries'] = reflection_result.follow_up_queries[:3]  # Limit to top 3
+                    return True, "Reflection analysis indicates knowledge gaps requiring deep research", decision_factors
+                    
+            except Exception as e:
+                logger.warning(f"Reflection analysis failed: {e}")
+        
         # Get historical performance for similar scenarios
         similar_scenarios = self._find_similar_scenarios(scenario)
         

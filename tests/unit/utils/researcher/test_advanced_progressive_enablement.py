@@ -9,14 +9,14 @@ from unittest.mock import Mock, patch, MagicMock
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../src'))
 
-from utils.researcher_progressive_enablement_phase4 import (
+from src.utils.researcher.researcher_progressive_enablement_phase4 import (
     AdvancedResearcherProgressiveEnabler,
     AdvancedScenarioFeatures,
     DecisionConfidence,
     DynamicThreshold,
     PerformancePredictor
 )
-from utils.researcher_progressive_enablement import ScenarioContext
+from src.utils.researcher.researcher_progressive_enablement import ScenarioContext
 
 
 class TestAdvancedResearcherProgressiveEnabler:

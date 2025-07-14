@@ -5,7 +5,7 @@ from enum import Enum
 from typing import List, Optional
 import re
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class StepType(str, Enum):
@@ -24,7 +24,8 @@ class Step(BaseModel):
         default=None, description="The Step execution result", max_length=50000
     )
 
-    @validator("title")
+    @field_validator("title")
+    @classmethod
     def validate_title(cls, v):
         if not v.strip():
             raise ValueError("Title cannot be empty")
@@ -39,7 +40,8 @@ class Step(BaseModel):
                 raise ValueError("Potentially unsafe content in title")
         return v
 
-    @validator("description")
+    @field_validator("description")
+    @classmethod
     def validate_description(cls, v):
         if not v.strip():
             raise ValueError("Description cannot be empty")
@@ -54,7 +56,8 @@ class Step(BaseModel):
                 raise ValueError("Potentially unsafe content in description")
         return v
 
-    @validator("execution_res")
+    @field_validator("execution_res")
+    @classmethod
     def validate_execution_res(cls, v):
         if v is not None:
             # Check for suspicious patterns
@@ -84,7 +87,8 @@ class Plan(BaseModel):
         description="Research & Processing steps to get more context",
     )
 
-    @validator("thought")
+    @field_validator("thought")
+    @classmethod
     def validate_thought(cls, v):
         if not v.strip():
             raise ValueError("Thought cannot be empty")
@@ -99,7 +103,8 @@ class Plan(BaseModel):
                 raise ValueError("Potentially unsafe content in thought")
         return v
 
-    @validator("title")
+    @field_validator("title")
+    @classmethod
     def validate_title(cls, v):
         if not v.strip():
             raise ValueError("Title cannot be empty")
@@ -114,14 +119,15 @@ class Plan(BaseModel):
                 raise ValueError("Potentially unsafe content in title")
         return v
 
-    @validator("steps")
+    @field_validator("steps")
+    @classmethod
     def validate_steps(cls, v):
         if len(v) > 50:  # Limit number of steps
             raise ValueError("Too many steps in plan")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "has_enough_context": False,
@@ -142,3 +148,4 @@ class Plan(BaseModel):
                 }
             ]
         }
+    )

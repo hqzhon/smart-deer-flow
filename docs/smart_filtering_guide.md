@@ -91,8 +91,8 @@ CONTENT_PROCESSING:
 ### 1. 基本使用
 
 ```python
-from src.utils.search_result_filter import SearchResultFilter
-from src.utils.content_processor import ContentProcessor
+from src.utils.common.search_result_filter import SearchResultFilter
+from src.utils.tokens.content_processor import ContentProcessor
 
 # 创建内容处理器和筛选器实例
 processor = ContentProcessor()
@@ -110,8 +110,8 @@ filtered_results = filter_instance.filter_search_results(
 ### 2. 集成到内容处理器
 
 ```python
-from src.utils.content_processor import ContentProcessor
-from src.utils.search_result_filter import SearchResultFilter
+from src.utils.tokens.content_processor import ContentProcessor
+from src.utils.common.search_result_filter import SearchResultFilter
 
 # 创建处理器和筛选器实例
 processor = ContentProcessor()

@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, MagicMock
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../src'))
 
-from utils.researcher_config_optimizer_phase4 import (
+from src.utils.researcher.researcher_config_optimizer_phase4 import (
     ConfigurationOptimizer,
     ConfigRecommendation,
     ConfigParameter,

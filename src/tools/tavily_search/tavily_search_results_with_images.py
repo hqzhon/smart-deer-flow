@@ -36,9 +36,9 @@ class TavilySearchResultsWithImages(TavilySearchResults):  # type: ignore[overri
             tool = TavilySearchResults(
                 max_results=5,
                 include_answer=True,
-                include_raw_content=True,
-                include_images=True,
-                include_image_descriptions=True,
+                include_raw_content=False,
+                include_images=False,
+                include_image_descriptions=False,
                 # search_depth="advanced",
                 # include_domains = []
                 # exclude_domains = []

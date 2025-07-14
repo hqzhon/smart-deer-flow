@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../src'))
 
-from utils.researcher_isolation_metrics_phase4 import (
+from src.utils.researcher.researcher_isolation_metrics_phase4 import (
     AdvancedResearcherIsolationMetrics,
     PredictiveAnalyzer,
     AlertManager,

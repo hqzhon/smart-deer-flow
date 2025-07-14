@@ -44,3 +44,4 @@ phase2_*.md
 
 .claude/settings.local.json
 CLAUDE.md
+pytest.ini

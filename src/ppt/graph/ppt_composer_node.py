@@ -10,7 +10,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
-from src.prompts.template import get_prompt_template
+from src.utils.template import get_prompt_template
 
 from .state import PPTState
 

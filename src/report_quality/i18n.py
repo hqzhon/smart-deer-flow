@@ -86,6 +86,9 @@ class I18nManager:
                     "improve_methodology": "改进研究方法",
                     "use_validated_methods": "使用经过验证的方法",
                     "explain_method_limits": "说明方法局限性",
+                    "multiple_methods": "采用多种研究方法进行交叉验证",
+                    "explain_methodology_limits": "详细说明所采用方法的局限性和适用范围",
+                    "sensitivity_analysis": "进行敏感性分析以测试结论的稳健性",
                 },
                 # Bias types and descriptions
                 "bias_types": {
@@ -228,6 +231,9 @@ class I18nManager:
                     "improve_methodology": "Improve research methodology",
                     "use_validated_methods": "Use validated methods",
                     "explain_method_limits": "Explain methodological limitations",
+                    "multiple_methods": "Employ multiple research methods for cross-validation",
+                    "explain_methodology_limits": "Provide detailed explanation of methodological limitations and scope",
+                    "sensitivity_analysis": "Conduct sensitivity analysis to test robustness of conclusions",
                 },
                 "confidence_reasoning": {
                     "very_high": "Based on {count} high-quality evidence items, conclusion has very high confidence",

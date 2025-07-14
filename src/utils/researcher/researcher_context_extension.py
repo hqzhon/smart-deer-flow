@@ -56,6 +56,16 @@ class ResearcherContextExtension:
             
         if self.config.get('researcher_auto_isolation', False):
             self.progressive_enabler = ResearcherProgressiveEnabler()
+        
+        # Phase 2 - GFLQ Integration: Initialize reflection agent
+        self.reflection_agent = None
+        if self.config.get('enable_enhanced_reflection', True):
+            try:
+                from .enhanced_reflection import EnhancedReflectionAgent
+                self.reflection_agent = EnhancedReflectionAgent(config=self.config)
+                logger.info("Enhanced reflection agent initialized for context extension")
+            except ImportError as e:
+                logger.warning(f"Failed to initialize reflection agent: {e}")
             
         logger.info("ResearcherContextExtension initialized with base_manager integration")
     
@@ -186,7 +196,7 @@ class ResearcherContextExtension:
         }
 
         # Add researcher-specific guidance and resource information
-        agent_input = self._add_researcher_guidance(agent_input, state)
+        agent_input = await self._add_researcher_guidance(agent_input, state)
 
         # Execute the agent with proper error handling
         try:
@@ -273,7 +283,7 @@ class ResearcherContextExtension:
             goto="research_team",
         )
     
-    def _add_researcher_guidance(self, agent_input: Dict[str, Any], state: State) -> Dict[str, Any]:
+    async def _add_researcher_guidance(self, agent_input: Dict[str, Any], state: State) -> Dict[str, Any]:
         """Add researcher-specific guidance and resource information.
         
         Args:
@@ -283,6 +293,64 @@ class ResearcherContextExtension:
         Returns:
             Enhanced agent input with researcher guidance
         """
+        # Phase 2 - GFLQ Integration: Add reflection-enhanced guidance
+        if self.reflection_agent:
+            try:
+                # Analyze current research context
+                current_plan = state.get("current_plan")
+                observations = state.get("observations", [])
+                
+                # Create proper ReflectionContext object
+                from src.utils.reflection.enhanced_reflection import ReflectionContext
+                
+                completed_steps = []
+                if current_plan and hasattr(current_plan, 'steps'):
+                    for step in current_plan.steps:
+                        if step.execution_res:
+                            completed_steps.append({
+                                'step': step.title,
+                                'description': step.description,
+                                'execution_res': step.execution_res
+                            })
+                
+                execution_results = []
+                if current_plan and hasattr(current_plan, 'steps'):
+                    execution_results = [step.execution_res for step in current_plan.steps if step.execution_res]
+                
+                context = ReflectionContext(
+                    research_topic=getattr(current_plan, 'description', '') if current_plan else '',
+                    completed_steps=completed_steps,
+                    execution_results=execution_results,
+                    observations=observations,
+                    total_steps=len(current_plan.steps) if current_plan else 0,
+                    current_step_index=len(completed_steps)
+                )
+                
+                # Get reflection insights - need to await the coroutine
+                reflection_result = await self.reflection_agent.assess_research_sufficiency(context)
+                
+                if not reflection_result.is_sufficient and reflection_result.follow_up_queries:
+                    guidance_content = "**Research Enhancement Suggestions:**\n\n"
+                    guidance_content += "Based on analysis, consider exploring these areas:\n\n"
+                    
+                    for i, query in enumerate(reflection_result.follow_up_queries[:3], 1):
+                        guidance_content += f"{i}. {query}\n"
+                    
+                    if reflection_result.knowledge_gaps:
+                        guidance_content += "\n**Identified Knowledge Gaps:**\n\n"
+                        for gap in reflection_result.knowledge_gaps[:3]:
+                            guidance_content += f"- {gap}\n"
+                    
+                    agent_input["messages"].append(
+                        HumanMessage(
+                            content=guidance_content,
+                            name="reflection_guidance"
+                        )
+                    )
+                    
+            except Exception as e:
+                logger.warning(f"Reflection guidance failed: {e}")
+        
         # Add resource information if available
         if state.get("resources"):
             resources_info = "**The user mentioned the following resource files:**\n\n"

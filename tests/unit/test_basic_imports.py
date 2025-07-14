@@ -95,7 +95,11 @@ class TestBasicImports:
         optimizer = WorkflowOptimizer()
         memory_manager = HierarchicalMemoryManager()
         processor = ContentProcessor()
-        evaluator = ContextStateEvaluator()
+        # Create a mock config for ContextStateEvaluator
+        from unittest.mock import Mock
+        mock_config = Mock()
+        mock_config.model_token_limits = {}
+        evaluator = ContextStateEvaluator(mock_config)
         context_manager = ExecutionContextManager()
         error_handler = LLMErrorHandler()
         

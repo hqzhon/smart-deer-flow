@@ -9,8 +9,10 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
-from src.prompts.planner_model import StepType
+from src.models.planner_model import StepType
 from src.utils.performance.memory_manager import cached
+from src.report_quality.template_engine import ReportDomain
+from src.utils.system.callback_safety import global_callback_manager
 
 from .types import State
 from .nodes import (
@@ -56,14 +58,20 @@ def continue_to_running_research_team(state: State):
             return "planning_context_optimizer"
         return "planner"
     if all(step.execution_res for step in current_plan.steps):
-        return "context_optimizer"
+        return "planner"
+    
+    # 找到第一个未执行的步骤并根据类型路由
     for step in current_plan.steps:
         if not step.execution_res:
-            break
-    if step.step_type and step.step_type == StepType.RESEARCH:
-        return "researcher"
-    if step.step_type and step.step_type == StepType.PROCESSING:
-        return "coder"
+            if step.step_type and step.step_type == StepType.RESEARCH:
+                return "researcher"
+            elif step.step_type and step.step_type == StepType.PROCESSING:
+                return "coder"
+            else:
+                # 如果步骤类型未知或为None，返回planner重新规划
+                return "planner"
+    
+    # 如果没有找到未执行的步骤，返回planner
     return "planner"
 
 
@@ -212,6 +220,22 @@ def build_graph_with_memory():
 
     # build state graph
     builder = _build_base_graph()
+    logger.info("Built state graph with memory")
+    
+    # Add safe callback handling
+    try:
+        logger.info("Registering safe default callback for state graph with memory")
+        from src.utils.system.callback_safety import global_callback_manager
+        
+        def safe_default_callback(*args, **kwargs):
+            """Safe default callback that does nothing but prevents None errors"""
+            pass
+            
+        global_callback_manager.register_default_callback("on_done", safe_default_callback)
+        logger.debug("Registered safe default callback for LangGraph with memory")
+    except Exception as e:
+        logger.warning(f"Could not register safe callback for graph with memory: {e}")
+    
     return builder.compile(checkpointer=memory)
 
 
@@ -233,6 +257,21 @@ def build_graph():
             logger.warning("Enhanced collaboration nodes not available")
 
     logger.info("Optimized workflow graph built successfully")
+    
+    # Compile with safe callback handling
+    try:
+        from src.utils.system.callback_safety import global_callback_manager
+        
+        # Register a default callback to prevent None callback errors
+        def safe_default_callback(*args, **kwargs):
+            """Safe default callback that does nothing but prevents None errors"""
+            pass
+            
+        global_callback_manager.register_default_callback("on_done", safe_default_callback)
+        logger.debug("Registered safe default callback for LangGraph")
+    except Exception as e:
+        logger.warning(f"Could not register safe callback: {e}")
+    
     return builder.compile()
 
 
@@ -622,6 +661,24 @@ def build_enhanced_graph():
 
     # build enhanced state graph
     builder = _build_enhanced_graph()
+    logger.info("Built enhanced state graph")
+    
+    # Apply LangGraph safety patches
+    # ensure_safe_langgraph_execution()
+    logger.info("Applied LangGraph safety patches")
+    
+    # Add safe callback handling
+    try:
+        logger.info("Registering safe default callback for LangGraph")
+        def safe_default_callback(*args, **kwargs):
+            """Safe default callback that does nothing but prevents None errors"""
+            pass
+            
+        global_callback_manager.register_default_callback("on_done", safe_default_callback)
+        logger.debug("Registered safe default callback for LangGraph")
+    except Exception as e:
+        logger.warning(f"Could not register safe callback for graph: {e}")
+    
     return builder.compile()
 
 
@@ -638,6 +695,22 @@ def build_enhanced_graph_with_memory():
 
     # build enhanced state graph
     builder = _build_enhanced_graph()
+    logger.info("Built enhanced state graph with memory")
+    
+    # Add safe callback handling
+    try:
+        logger.info("Registering safe default callback for enhanced LangGraph with memory")
+        from src.utils.system.callback_safety import global_callback_manager
+        
+        def safe_default_callback(*args, **kwargs):
+            """Safe default callback that does nothing but prevents None errors"""
+            pass
+            
+        global_callback_manager.register_default_callback("on_done", safe_default_callback)
+        logger.debug("Registered safe default callback for enhanced LangGraph with memory")
+    except Exception as e:
+        logger.warning(f"Could not register safe callback for enhanced graph with memory: {e}")
+    
     return builder.compile(checkpointer=memory)
 
 

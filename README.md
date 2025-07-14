@@ -38,6 +38,7 @@
 - [🌟 Features](#-features)
 - [⚡ Performance](#-performance)
 - [🏗️ Architecture](#-architecture)
+- [🔄 GFLQ Reflection Integration](#-gflq-reflection-integration)
 - [📚 Examples](#-examples)
 - [🐳 Docker](#-docker)
 - [🛠️ Development](#-development)
@@ -113,24 +114,16 @@ To configure your preferred search engine, set the `SEARCH_API` variable in your
 SEARCH_API=tavily
 ```
 
-## ⚡ Performance
+## 🤖 Multi-Agent System
 
-### Optimization Levels
-| Level | Workers | Features |
-|-------|---------|----------|
-| **Basic** | 4 | Parallel processing |
-| **Standard** | 8 | Rate limiting, caching |
-| **Advanced** | 12 | Intelligent scheduling |
-| **Maximum** | 16 | ML-driven optimization |
-
-### Quick Setup
-```bash
-# Enable performance mode
-cp .env.performance.example .env.performance
-export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
-```
-
-📖 **Detailed Guides:** [Performance](./README_PERFORMANCE.md) | [Parallel Optimization](./README_PARALLEL_OPTIMIZATION.md)
+### Agent Architecture
+| Agent | Role | Capabilities |
+|-------|------|-------------|
+| **Coordinator** | Workflow Manager | Task orchestration, user interface |
+| **Planner** | Strategic Planning | Research decomposition, execution planning |
+| **Researcher** | Information Gathering | Multi-source search, content analysis |
+| **Coder** | Technical Analysis | Code execution, data processing |
+| **Reporter** | Content Generation | Report synthesis, output formatting |
 
 ## 🌟 Features
 
@@ -145,17 +138,23 @@ export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
 - **RAG Integration** - Private knowledge base support via [RAGFlow](https://github.com/infiniflow/ragflow)
 - **MCP Extensions** - Expandable tool ecosystem
 
-### ⚡ Performance & Optimization
-- **Parallel Processing** - 4-16 worker configurations with intelligent scheduling
-- **Hierarchical Caching** - Multi-level cache system (L1/L2/L3)
-- **Adaptive Rate Limiting** - Dynamic request management
-- **Smart Error Recovery** - Automatic retry with exponential backoff
+### 🤖 Multi-Agent Collaboration
+- **Intelligent Coordination** - Dynamic task distribution and agent orchestration
+- **Reflection Mechanism** - Self-evaluation and iterative improvement
+- **Knowledge Gap Detection** - Automatic identification of missing information
+- **Adaptive Planning** - Dynamic research strategy adjustment
+- **Cross-Agent Communication** - Seamless information sharing between agents
+- **Role-Based Specialization** - Each agent optimized for specific tasks
+- **Consensus Building** - Multi-agent decision making and validation
 
 ### 📊 Content Generation
 - **Research Reports** - Comprehensive analysis and documentation
-- **Podcast Scripts** - AI-powered audio content generation
-- **Presentations** - Automated PowerPoint creation
+- **Podcast Scripts** - AI-powered audio content generation with TTS
+- **Presentations** - Automated PowerPoint creation via Marp
 - **Interactive Editing** - Notion-style block editing with AI assistance
+- **Multi-Format Output** - JSON, Markdown, HTML, PDF support
+- **Voice Synthesis** - Volcengine TTS integration for audio reports
+- **Chart Generation** - Automated data visualization via MCP Chart Server
 
 ### 🤝 Human Collaboration
 - **Human-in-the-Loop** - Interactive plan review and modification
@@ -163,13 +162,29 @@ export DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true
 - **Consensus Systems** - Multi-agent decision making
 - **Role-based Access** - Dynamic permission management
 
-## Architecture
+### 🔗 MCP (Model Context Protocol) Integration
+- **Extensible Tool Ecosystem** - Support for MCP servers and custom tools
+- **Chart Generation** - Built-in MCP Chart Server for data visualization
+- **GitHub Integration** - MCP GitHub Trending for repository analysis
+- **Search Extensions** - Tavily MCP for enhanced search capabilities
+- **Custom MCP Servers** - Easy integration of third-party MCP services
+- **Dynamic Tool Loading** - Runtime tool discovery and configuration
+- **API-First Design** - RESTful endpoints for MCP server management
+
+### 🧠 Advanced AI Features
+- **GFLQ Reflection Mechanism** - Self-improving research quality
+- **Knowledge Gap Detection** - Automatic identification of missing information
+- **Iterative Research Enhancement** - Continuous improvement of research strategies
+- **Context-Aware Processing** - Intelligent understanding of research objectives
+- **Multi-Model Orchestration** - Seamless integration across different LLM providers
+
+## 🏗️ Architecture
 
 DeerFlow implements a modular multi-agent system architecture designed for automated research and code analysis. The system is built on LangGraph, enabling a flexible state-based workflow where components communicate through a well-defined message passing system.
 
-![Architecture Diagram](./assets/architecture.png)
+### Multi-Agent Collaboration Flow
 
-> See it live at [deerflow.tech](https://deerflow.tech/#multi-agent-architecture)
+![DeerFlow Multi-Agent Architecture with Reflection](https://mdn.alipayobjects.com/one_clip/afts/img/TCFoT53erbwAAAAAR6AAAAgAoEACAQFr/original)
 
 The system employs a streamlined workflow with the following components:
 
@@ -185,37 +200,91 @@ The system employs a streamlined workflow with the following components:
    - Determines if enough context is available or if more research is needed
    - Manages the research flow and decides when to generate the final report
 
-3. **Research Team**: A collection of specialized agents that execute the plan:
+3. **Research Node**: An intelligent research component with reflection capabilities:
 
-   - **Researcher**: Conducts web searches and information gathering using tools like web search engines, crawling and even MCP services.
-   - **Coder**: Handles code analysis, execution, and technical tasks using Python REPL tool.
-     Each agent has access to specific tools optimized for their role and operates within the LangGraph framework
+   - **Independent State Management**: Maintains its own research context and progress
+   - **Reflection Analysis**: Self-evaluates research quality and completeness
+   - **Knowledge Gap Detection**: Identifies missing information automatically
+   - **Adaptive Research**: Generates follow-up queries based on reflection results
+   - **Multi-Tool Integration**: Uses web search, crawling, and MCP services
+
+4. **Specialized Agents**: Supporting agents for specific tasks:
+   - **Coder**: Handles code analysis, execution, and technical tasks using Python REPL tool
+   - Each agent operates within the LangGraph framework with optimized tool access
 
 4. **Reporter**: Final stage processor for research outputs
    - Aggregates findings from the research team
    - Processes and structures the collected information
    - Generates comprehensive research reports
 
-## Text-to-Speech Integration
+## 🔄 GFLQ Reflection Integration
 
-DeerFlow now includes a Text-to-Speech (TTS) feature that allows you to convert research reports to speech. This feature uses the volcengine TTS API to generate high-quality audio from text. Features like speed, volume, and pitch are also customizable.
+**SmartDeerFlow** is implementing an advanced reflection mechanism based on GFLQ (Goal-Focused Learning Query) to enhance research quality and system intelligence.
 
-### Using the TTS API
+### Overview
 
-You can access the TTS functionality through the `/api/tts` endpoint:
+The GFLQ reflection integration introduces a self-improvement capability that allows the system to:
+- **Analyze research gaps** and identify missing information
+- **Generate follow-up queries** to fill knowledge gaps
+- **Evaluate research completeness** and suggest improvements
+- **Learn from past research patterns** to optimize future queries
+
+### Key Features
+
+- 🎯 **Goal-Focused Analysis** - Evaluates research against specific objectives
+- 🔍 **Gap Detection** - Identifies missing information and knowledge gaps
+- 🔄 **Iterative Improvement** - Continuously refines research strategies
+- 📊 **Quality Assessment** - Measures research completeness and relevance
+- ⚡ **Fast Integration** - Experimental MVP approach for rapid deployment
+
+
+### Benefits
+
+- **Improved Research Quality** - More comprehensive and complete research results
+- **Intelligent Adaptation** - System learns and improves research strategies
+- **Reduced Manual Intervention** - Automatic gap detection and follow-up
+- **Enhanced User Experience** - More relevant and thorough research outputs
+
+> **Details**: [GFLQ Reflection Integration](./docs/GFLQ_REFLECTION_en.md)
+
+
+## 🛠️ Integrated Tools & Services
+
+### Text-to-Speech Integration
+
+DeerFlow includes advanced TTS capabilities for converting research reports to high-quality audio:
 
 ```bash
-# Example API call using curl
+# TTS API with customizable parameters
 curl --location 'http://localhost:8000/api/tts' \
 --header 'Content-Type: application/json' \
 --data '{
-    "text": "This is a test of the text-to-speech functionality.",
+    "text": "Research report content...",
     "speed_ratio": 1.0,
     "volume_ratio": 1.0,
     "pitch_ratio": 1.0
 }' \
---output speech.mp3
+--output research_audio.mp3
 ```
+
+### Built-in Tool Suite
+
+| Tool | Purpose | Configuration |
+|------|---------|---------------|
+| **SmartSearchTool** | Multi-source web search | Tavily, DuckDuckGo, Brave, ArXiv |
+| **WebCrawler** | Content extraction | Jina API integration |
+| **PythonREPL** | Code execution | Sandboxed Python environment |
+| **VolcengineTTS** | Voice synthesis | Customizable voice parameters |
+| **RAGRetriever** | Knowledge base | RAGFlow integration |
+| **MCPChart** | Data visualization | Flow diagrams, charts, maps |
+
+### Agent Coordination Tools
+
+- **State Manager** - Cross-agent state synchronization
+- **Message Router** - Inter-agent communication
+- **Task Scheduler** - Intelligent task distribution
+- **Reflection Engine** - Self-evaluation and improvement
+- **Knowledge Graph** - Contextual information management
 
 ## 🛠️ Development
 
@@ -341,12 +410,13 @@ uv run main.py
 
 ### Sample Reports
 - [OpenAI Sora Analysis](examples/openai_sora_report.md)
-- [Agent to Agent Protocol](examples/what_is_agent_to_agent_protocol.md)
-- [Bitcoin Price Analysis](examples/bitcoin_price_fluctuation.md)
 - [AI in Healthcare](examples/AI_adoption_in_healthcare.md)
 - [Quantum Cryptography](examples/Quantum_Computing_Impact_on_Cryptography.md)
+> All of the above examples are generated by SmartDeerFlow using the latest features and enhancements. It's api powered by deepseek v3.
 
-## 🔧 Command Line Options
+## 🔧 Configuration & Usage
+
+### Command Line Options
 
 ```bash
 # Basic options
@@ -354,9 +424,9 @@ uv run main.py "Your research question"
 uv run main.py --interactive
 uv run main.py --enable-human-in-loop "Your question"
 
-# Performance tuning
-uv run main.py --performance-mode advanced --workers 12
-uv run main.py --enable-caching --max_plan_iterations 5
+# Agent configuration
+uv run main.py --enable-reflection --max-reflection-loops 3
+uv run main.py --agent-mode advanced --max_plan_iterations 5
 
 # Output formats
 uv run main.py --output-format report "Your question"
@@ -394,14 +464,71 @@ A: Copy `.env.example` to `.env` and add your keys. See [Configuration Guide](do
 **Q: Can I use local models?**  
 A: Yes, supports Ollama and other local providers via `.env` configuration.
 
-**Q: How to enable performance optimization?**  
-A: Set `DEER_FLOW_ENABLE_ADVANCED_OPTIMIZATION=true` and use `--performance-mode advanced`.
+**Q: How to enable reflection mechanism?**  
+A: Set `DEER_FLOW_ENABLE_REFLECTION=true` and use `--enable-reflection` flag.
 
 **Q: What search engines are supported?**  
 A: Tavily, Brave, DuckDuckGo, ArXiv, and more via MCP integrations.
 
 **Q: How to contribute?**  
 A: Fork → Make changes → Submit PR. Check contribution guidelines.
+
+## 🌐 API Reference
+
+### Core Endpoints
+
+```bash
+# Research Generation
+POST /api/chat/stream
+Content-Type: application/json
+{
+  "message": "Research question",
+  "enable_human_feedback": true,
+  "mcp_settings": {
+    "servers": {
+      "mcp-chart": {
+        "transport": "stdio",
+        "enabled_tools": ["generate_flow_diagram"]
+      }
+    }
+  }
+}
+
+# Text-to-Speech
+POST /api/tts
+Content-Type: application/json
+{
+  "text": "Content to synthesize",
+  "speed_ratio": 1.0,
+  "volume_ratio": 1.0,
+  "pitch_ratio": 1.0
+}
+
+# MCP Server Management
+POST /api/mcp/server/metadata
+Content-Type: application/json
+{
+  "transport": "stdio",
+  "command": "uvx",
+  "args": ["mcp-github-trending"],
+  "env": {"API_KEY": "value"}
+}
+
+# Agent Status
+GET /api/agents/status
+GET /api/agents/reflection/state
+```
+
+### WebSocket Streaming
+
+```javascript
+// Real-time research updates
+const ws = new WebSocket('ws://localhost:8000/ws/research');
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Research update:', data);
+};
+```
 
 ## 📄 License
 
@@ -411,4 +538,5 @@ This project is open source and available under the [MIT License](./LICENSE).
 
 **Built with:** [LangChain](https://langchain.com/) • [LangGraph](https://langchain-ai.github.io/langgraph/) • [FastAPI](https://fastapi.tiangolo.com/)  
 **Forked from:** [DeerFlow](https://github.com/bytedance/deer-flow) by ByteDance  
+**Thanks to:** [gemini-fullstack-langgraph-quickstart](https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart)
 **Thanks to:** All contributors and the open-source community

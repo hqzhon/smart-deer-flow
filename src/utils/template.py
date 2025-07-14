@@ -6,11 +6,14 @@ import dataclasses
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langgraph.prebuilt.chat_agent_executor import AgentState
-from src.config.configuration import Configuration
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.config.configuration import Configuration
 
 # Initialize Jinja2 environment
 env = Environment(
-    loader=FileSystemLoader(os.path.dirname(__file__)),
+    loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), '..', 'prompts')),
     autoescape=select_autoescape(),
     trim_blocks=True,
     lstrip_blocks=True,
@@ -35,7 +38,7 @@ def get_prompt_template(prompt_name: str) -> str:
 
 
 def apply_prompt_template(
-    prompt_name: str, state: AgentState, configurable: Configuration = None
+    prompt_name: str, state: AgentState, configurable: "Configuration" = None
 ) -> list:
     """
     Apply template variables to a prompt template and return formatted messages.

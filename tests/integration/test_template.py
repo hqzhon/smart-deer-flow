@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import pytest
-from src.prompts.template import get_prompt_template, apply_prompt_template
+from src.utils.template import get_prompt_template, apply_prompt_template
 
 
 def test_get_prompt_template_success():

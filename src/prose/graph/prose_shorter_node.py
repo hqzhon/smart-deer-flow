@@ -7,7 +7,7 @@ from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
 from src.prose.graph.state import ProseState
-from src.prompts.template import get_prompt_template
+from src.utils.template import get_prompt_template
 
 logger = logging.getLogger(__name__)
 

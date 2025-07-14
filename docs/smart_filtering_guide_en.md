@@ -91,8 +91,8 @@ The enhanced `process_search_results()` method now supports:
 ### 1. Basic Usage
 
 ```python
-from src.utils.search_result_filter import SearchResultFilter
-from src.utils.content_processor import ContentProcessor
+from src.utils.common.search_result_filter import SearchResultFilter
+from src.utils.tokens.content_processor import ContentProcessor
 
 # Create content processor and filter instances
 processor = ContentProcessor()
@@ -110,8 +110,8 @@ filtered_results = filter_instance.filter_search_results(
 ### 2. Integration with Content Processor
 
 ```python
-from src.utils.content_processor import ContentProcessor
-from src.utils.search_result_filter import SearchResultFilter
+from src.utils.tokens.content_processor import ContentProcessor
+from src.utils.common.search_result_filter import SearchResultFilter
 
 # Create processor and filter instances
 processor = ContentProcessor()

@@ -9,15 +9,15 @@ from unittest.mock import Mock, patch, MagicMock
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../../src'))
 
-from utils.researcher_phase4_system import (
+from src.utils.researcher.researcher_phase4_integration import (
     ResearcherPhase4System,
     Phase4State,
     Phase4Mode,
     Phase4Report
 )
-from utils.researcher_progressive_enabler_phase4 import AdvancedResearcherProgressiveEnabler
-from utils.researcher_isolation_metrics_phase4 import AdvancedResearcherIsolationMetrics
-from utils.researcher_config_optimizer_phase4 import ConfigurationOptimizer
+from src.utils.researcher.researcher_progressive_enablement_phase4 import AdvancedResearcherProgressiveEnabler
+from src.utils.researcher.researcher_isolation_metrics_phase4 import AdvancedResearcherIsolationMetrics
+from src.utils.researcher.researcher_config_optimizer_phase4 import ConfigurationOptimizer
 
 
 class TestPhase4Integration:
