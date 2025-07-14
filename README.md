@@ -21,12 +21,13 @@
 **SmartDeerFlow** is a community-driven AI research framework that combines **Large Language Models**, **Multi-Agent Systems**, and **Advanced Tools** for automated research, content generation, and data analysis.
 
 **Key Highlights:**
-- 🤖 **Multi-Agent Collaboration** - Intelligent task distribution and coordination
-- ⚡ **Performance Optimized** - Advanced parallel processing and caching
-- 🔍 **Multi-Source Search** - Tavily, Brave, DuckDuckGo, ArXiv integration
-- 📊 **Rich Output Formats** - Reports, Podcasts, Presentations
-- 🌐 **Web & Console UI** - Flexible interaction modes
-- 🔗 **Extensible Architecture** - MCP and RAG integrations
+- 🤖 **Multi-Agent Collaboration** - Intelligent task distribution with role-based specialization and cross-agent communication
+- 🧠 **GFLQ Reflection System** - Self-improving research quality with knowledge gap detection and iterative enhancement
+- 🔄 **Adaptive Research Flow** - Dynamic strategy adjustment and consensus building across multiple agents
+- 🔍 **Multi-Source Intelligence** - Tavily, Brave, DuckDuckGo, ArXiv integration with smart content analysis
+- 📊 **Rich Output Formats** - Reports, Podcasts, Presentations with AI-powered generation
+- 🌐 **Flexible Interfaces** - Web & Console UI with human-in-the-loop collaboration
+- 🔗 **Extensible Architecture** - MCP protocol integration and RAG knowledge base support
 
 > Forked from [DeerFlow](https://github.com/bytedance/deer-flow) with enhanced features and community-driven improvements.
 
