@@ -16,7 +16,7 @@ from src.utils.reflection.reflection_tools import (
     ReflectionSession, ReflectionAnalyzer, ReflectionMetrics, 
     parse_reflection_result, calculate_research_complexity
 )
-from src.config.configuration import Configuration
+# from src.config.configuration import Configuration  # Removed - using new config system
 from src.graph.types import State
 
 
@@ -60,7 +60,7 @@ class TestEnhancedReflectionAgent:
     @pytest.fixture
     def mock_config(self):
         """Create mock configuration."""
-        config = Mock(spec=Configuration)
+        config = Mock()  # Removed spec=Configuration
         config.reflection_temperature = 0.7
         config.reflection_confidence_threshold = 0.7
         config.max_reflection_loops = 3
@@ -179,7 +179,7 @@ class TestReflectionIntegrator:
     @pytest.fixture
     def mock_config(self):
         """Create mock configuration."""
-        config = Mock(spec=Configuration)
+        config = Mock()  # Removed spec=Configuration
         config.enable_reflection_integration = True
         config.reflection_trigger_threshold = 2
         config.max_reflection_loops = 3

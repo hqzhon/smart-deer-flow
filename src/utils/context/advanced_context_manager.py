@@ -17,9 +17,7 @@ import re
 from ..tokens.content_processor import ContentProcessor
 from ..tokens.token_manager import TokenManager
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from src.config.configuration import Configuration
+# Remove TYPE_CHECKING import for Configuration as it's no longer needed
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +72,19 @@ class AdvancedContextManager:
 
     def __init__(
         self,
-        config: "Configuration",
+        config: Optional[Dict[str, Any]] = None,
         content_processor: Optional[ContentProcessor] = None,
     ):
-        self.config = config
+        self.config = config or {}
+        # Get model token limits from config or use defaults
+        model_token_limits = {}
+        if config and hasattr(config, 'model_token_limits'):
+            model_token_limits = config.model_token_limits
+        elif isinstance(config, dict):
+            model_token_limits = config.get('model_token_limits', {})
+        
         self.content_processor = content_processor or ContentProcessor(
-            config.model_token_limits
+            model_token_limits
         )
         self.token_manager = TokenManager(self.content_processor)
 

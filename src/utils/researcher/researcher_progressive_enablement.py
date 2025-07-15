@@ -134,10 +134,10 @@ class ResearcherProgressiveEnabler:
         """Determine if isolation should be enabled for the given scenario"""
         from .researcher_isolation_metrics import get_isolation_metrics
         
-        # Import Configuration dynamically to avoid circular import
+        # Get configuration from settings
         try:
-            from src.config.configuration import Configuration
-            config = Configuration.get_current()
+            from src.config import get_settings
+            config = get_settings()
         except ImportError:
             config = None
         metrics = get_isolation_metrics()

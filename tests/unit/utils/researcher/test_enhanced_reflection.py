@@ -22,7 +22,7 @@ from src.utils.reflection.enhanced_reflection import (
     ReflectionResult,
     ReflectionContext
 )
-from src.config.configuration import Configuration
+# from src.config.configuration import Configuration  # Removed - using new config system
 
 
 class TestEnhancedReflectionAgent:
@@ -31,7 +31,7 @@ class TestEnhancedReflectionAgent:
     @pytest.fixture
     def config(self):
         """Create test configuration."""
-        config = Configuration()
+        config = Mock()
         config.enable_enhanced_reflection = True
         config.max_reflection_loops = 3
         config.reflection_temperature = 0.7
@@ -96,7 +96,7 @@ class TestEnhancedReflectionAgent:
             mock_model.return_value.with_structured_output.return_value = mock_structured_model
             
             # Mock the safe_llm_call_async function
-            with patch('src.utils.researcher.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
+            with patch('src.utils.reflection.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
                 mock_result = ReflectionResult(
                     is_sufficient=False,
                     knowledge_gaps=["Missing data science applications", "Missing web development details"],
@@ -204,7 +204,7 @@ class TestEnhancedReflectionAgent:
         
         # Mock safe_llm_call_async to return a reflection result
         with patch.object(reflection_agent, '_get_reflection_model') as mock_get_model, \
-             patch('src.utils.researcher.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
+             patch('src.utils.reflection.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
             
             mock_get_model.return_value = mock_model
             mock_safe_call.return_value = ReflectionResult(
@@ -336,7 +336,7 @@ class TestEnhancedReflectionAgent:
         mock_model.with_structured_output.return_value = mock_structured_model
         
         with patch.object(reflection_agent, '_get_reflection_model') as mock_get_model, \
-             patch('src.utils.researcher.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
+             patch('src.utils.reflection.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
             
             mock_get_model.return_value = mock_model
             mock_safe_call.side_effect = Exception("LLM API error")
@@ -377,7 +377,7 @@ class TestEnhancedReflectionAgent:
         mock_model.with_structured_output.return_value = mock_structured_model
         
         with patch.object(reflection_agent, '_get_reflection_model') as mock_get_model, \
-             patch('src.utils.researcher.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
+             patch('src.utils.reflection.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
             
             mock_get_model.return_value = mock_model
             mock_safe_call.return_value = ReflectionResult(
@@ -417,7 +417,7 @@ class TestEnhancedReflectionAgent:
         mock_model.with_structured_output.return_value = mock_structured_model
         
         with patch.object(reflection_agent, '_get_reflection_model') as mock_get_model, \
-             patch('src.utils.researcher.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
+             patch('src.utils.reflection.enhanced_reflection.safe_llm_call_async', new_callable=AsyncMock) as mock_safe_call:
             
             mock_get_model.return_value = mock_model
             mock_safe_call.return_value = ReflectionResult(

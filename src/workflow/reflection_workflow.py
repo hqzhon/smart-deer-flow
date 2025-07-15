@@ -13,7 +13,7 @@ from datetime import datetime
 from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent, ReflectionContext
 from src.utils.researcher.researcher_progressive_enablement import ResearcherProgressiveEnabler
 from src.utils.researcher.researcher_isolation_metrics import ResearcherIsolationMetrics
-from src.config.config_manager import config_manager
+from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class ReflectionWorkflow:
     """Enhanced research workflow with integrated reflection capabilities."""
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or config_manager.get_reflection_config()
+        self.config = config or get_settings().model_dump()
         self.reflection_agent = EnhancedReflectionAgent(self.config)
         self.progressive_enabler = ResearcherProgressiveEnabler(self.config)
         self.isolation_metrics = ResearcherIsolationMetrics(self.config)

@@ -25,10 +25,6 @@ from src.tools import (
 )
 
 from src.config.agents import AGENT_LLM_MAP
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.config.configuration import Configuration
 # ExecutionContextManager will be imported dynamically to avoid circular imports
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call, safe_llm_call_async
@@ -47,9 +43,20 @@ logger = logging.getLogger(__name__)
 
 
 def get_configuration_from_config(config):
-    """Helper function to dynamically import Configuration and create instance."""
-    from src.config.configuration import Configuration
-    return Configuration.from_runnable_config(config)
+    """Helper function to get configuration from settings."""
+    from src.config import get_settings
+    try:
+        return get_settings()
+    except Exception as e:
+        logger.warning(f"Failed to get settings: {e}")
+        # Return a minimal config object with default values
+        class DefaultConfig:
+            max_search_results = 5
+            enable_smart_filtering = True
+            model_token_limits = {}
+            enable_content_summarization = True
+            summary_type = "comprehensive"
+        return DefaultConfig()
 
 
 @tool
@@ -127,9 +134,9 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 )
                 logger.warning(f"Full traceback: {traceback.format_exc()}")
                 try:
-                    from src.config.config_loader import config_loader
+                    from src.config import get_settings
 
-                    config_data = config_loader.load_config()
+                    config_data = get_settings().load_config()
                     agent_model = AGENT_LLM_MAP.get("planner", "basic")
 
                     if agent_model == "basic":

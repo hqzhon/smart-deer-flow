@@ -275,9 +275,9 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
         if config is None:
             # Try to load from config
             try:
-                from src.config.config_loader import config_loader
+                from src.config import get_settings
 
-                config_data = config_loader.load_config()
+                config_data = get_settings().load_config()
 
                 # Extract rate limiting parameters from config
                 rate_limit_config = config_data.get("rate_limiting", {})
@@ -299,9 +299,9 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
 
         # Choose rate limiter type based on configuration
         try:
-            from src.config.config_loader import config_loader
+            from src.config import get_settings
 
-            config_data = config_loader.load_config()
+            config_data = get_settings().load_config()
             rate_limit_config = config_data.get("rate_limiting", {})
             if rate_limit_config.get("adaptive", True):
                 _global_rate_limiter = AdaptiveRateLimiter(config)
@@ -312,9 +312,9 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
     elif config is not None:
         # If new configuration is provided, recreate instance
         try:
-            from src.config.config_loader import config_loader
+            from src.config import get_settings
 
-            config_data = config_loader.load_config()
+            config_data = get_settings().load_config()
             rate_limit_config = config_data.get("rate_limiting", {})
             if rate_limit_config.get("adaptive", True):
                 _global_rate_limiter = AdaptiveRateLimiter(config)

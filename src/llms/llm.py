@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from langchain_deepseek import ChatDeepSeek
 from typing import get_args
 
-from src.config import load_yaml_config
+from src.config import get_settings
 from src.config.agents import LLMType
 from src.utils.tokens.content_processor import ModelTokenLimits
 
@@ -133,7 +133,7 @@ def get_llm_by_type(
     if llm_type in _llm_cache:
         return _llm_cache[llm_type]
 
-    conf = load_yaml_config(_get_config_file_path())
+    conf = get_settings().llm
     llm = _create_llm_use_conf(llm_type, conf)
     _llm_cache[llm_type] = llm
     return llm
@@ -147,7 +147,7 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         Dictionary mapping LLM type to list of configured model names.
     """
     try:
-        conf = load_yaml_config(_get_config_file_path())
+        conf = get_settings().llm
         llm_type_config_keys = _get_llm_type_config_keys()
 
         configured_models: dict[str, list[str]] = {}

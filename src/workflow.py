@@ -19,7 +19,7 @@ from src.utils.performance.workflow_optimizer import (
     create_optimized_workflow,
 )
 from src.utils.performance.memory_manager import HierarchicalMemoryManager, cached
-from src.config.config_loader import config_loader
+from src.config import get_settings
 
 # Import collaboration modules
 try:
@@ -376,9 +376,9 @@ async def run_agent_workflow_async(
     }
     # Load model token limits from configuration
     try:
-        configuration = config_loader.create_configuration()
-        model_token_limits = configuration.model_token_limits
-        logger.debug(f"Loaded model_token_limits: {list(model_token_limits.keys())}")
+        settings = get_settings()
+        model_token_limits = getattr(settings, 'model_token_limits', {})
+        logger.debug(f"Loaded model_token_limits: {list(model_token_limits.keys()) if model_token_limits else 'None'}")
     except Exception as e:
         logger.warning(f"Failed to load model_token_limits from config: {e}")
         model_token_limits = {}

@@ -6,10 +6,7 @@ import dataclasses
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langgraph.prebuilt.chat_agent_executor import AgentState
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.config.configuration import Configuration
+# Remove TYPE_CHECKING import for Configuration as it's no longer needed
 
 # Initialize Jinja2 environment
 env = Environment(
@@ -38,7 +35,7 @@ def get_prompt_template(prompt_name: str) -> str:
 
 
 def apply_prompt_template(
-    prompt_name: str, state: AgentState, configurable: "Configuration" = None
+    prompt_name: str, state: AgentState, configurable = None
 ) -> list:
     """
     Apply template variables to a prompt template and return formatted messages.
@@ -54,14 +51,14 @@ def apply_prompt_template(
     from src.utils.context.context_evaluator import (
         get_global_context_evaluator,
     )
-    from src.config.config_loader import config_loader
+    from src.config import get_settings
     import logging
 
     logger = logging.getLogger(__name__)
 
     # CRITICAL: Apply context evaluation before template rendering
     try:
-        config = config_loader.create_configuration()
+        config = get_settings()
         evaluator = get_global_context_evaluator(config)
 
         # Get messages from state, with aggressive limitation

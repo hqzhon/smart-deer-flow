@@ -1,282 +1,285 @@
 # SPDX-License-Identifier: MIT
 """
-Configuration Loader
-Load configuration from YAML files, including model token limits
+Unified Configuration Loader - New Pydantic-based system.
+Replaces both old and intermediate configuration systems.
 """
 
 import os
 import yaml
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+from pathlib import Path
 
-from src.utils.tokens.content_processor import ModelTokenLimits
-from src.config.configuration import Configuration, AdvancedContextConfig
+from .models import AppSettings
+from .validators import validate_configuration
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigLoader:
-    """Configuration Loader"""
-
-    def __init__(self, config_path: Optional[str] = None):
-        # Use relative path, relative to project root directory
-        self.config_path = config_path or "conf.yaml"
-        # Simplified default model limits, only provide a general default value
-        self.default_model_limits = ModelTokenLimits(
-            input_limit=32000,
-            output_limit=4096,
-            context_window=32000,
-            safety_margin=0.8,
-        )
-
-    def load_config(self) -> Dict[str, Any]:
-        """Load configuration file"""
-        if not os.path.exists(self.config_path):
-            logger.warning(
-                f"Configuration file {self.config_path} does not exist, using default configuration"
-            )
+    """Unified configuration loader using Pydantic models."""
+    
+    def __init__(self, config_dir: Optional[str] = None):
+        """Initialize the configuration loader.
+        
+        Args:
+            config_dir: Directory containing configuration files. Defaults to project root.
+        """
+        self.config_dir = Path(config_dir) if config_dir else Path.cwd()
+        self._settings: Optional[AppSettings] = None
+    
+    def load_from_yaml(self, yaml_path: str) -> Dict[str, Any]:
+        """Load configuration from YAML file.
+        
+        Args:
+            yaml_path: Path to YAML configuration file.
+            
+        Returns:
+            Dictionary containing configuration data.
+            
+        Raises:
+            FileNotFoundError: If YAML file doesn't exist.
+            yaml.YamLError: If YAML is invalid.
+        """
+        yaml_file = self.config_dir / yaml_path
+        if not yaml_file.exists():
+            logger.warning(f"Configuration file not found: {yaml_file}")
             return {}
-
+        
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f) or {}
-            logger.info(f"Successfully loaded configuration file: {self.config_path}")
+            logger.info(f"Successfully loaded configuration file: {yaml_file}")
             return config
-        except Exception as e:
-            logger.error(f"Failed to load configuration file: {e}")
+        except yaml.YAMLError as e:
+            logger.error(f"Failed to parse YAML file {yaml_file}: {e}")
             return {}
-
-    def parse_model_limits(self, config: Dict[str, Any]) -> Dict[str, ModelTokenLimits]:
-        """Parse model token limit configuration"""
-        model_limits = {}
-
-        # Read token limits from BASIC_MODEL configuration
-        basic_model = config.get("BASIC_MODEL", {})
-        basic_model_name = basic_model.get("model", "")
-        basic_token_limits = basic_model.get("token_limits", {})
-
-        # Read token limits from REASONING_MODEL configuration (if exists)
-        reasoning_model = config.get("REASONING_MODEL", {})
-        reasoning_model_name = reasoning_model.get("model", "")
-        reasoning_token_limits = reasoning_model.get("token_limits", {})
-
-        # If BASIC_MODEL has token_limits configured, use user configuration
-        if basic_model_name and basic_token_limits:
-            try:
-                model_limits[basic_model_name] = ModelTokenLimits(
-                    input_limit=basic_token_limits.get("input_limit", 32000),
-                    output_limit=basic_token_limits.get("output_limit", 4096),
-                    context_window=basic_token_limits.get("context_window", 32000),
-                    safety_margin=basic_token_limits.get("safety_margin", 0.8),
-                )
-                logger.info(f"Loading BASIC_MODEL token limits: {basic_model_name}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to parse BASIC_MODEL {basic_model_name} token limit configuration: {e}"
-                )
-
-        # If REASONING_MODEL has token_limits configured, use user configuration
-        if reasoning_model_name and reasoning_token_limits:
-            try:
-                model_limits[reasoning_model_name] = ModelTokenLimits(
-                    input_limit=reasoning_token_limits.get("input_limit", 32000),
-                    output_limit=reasoning_token_limits.get("output_limit", 4096),
-                    context_window=reasoning_token_limits.get("context_window", 32000),
-                    safety_margin=reasoning_token_limits.get("safety_margin", 0.8),
-                )
-                logger.info(
-                    f"Loading REASONING_MODEL token limits: {reasoning_model_name}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to parse REASONING_MODEL {reasoning_model_name} token limit configuration: {e}"
-                )
-
-        # Compatible with legacy MODEL_TOKEN_LIMITS configuration (if exists)
-        custom_limits = config.get("MODEL_TOKEN_LIMITS", {})
-
-        for model_name, limits_config in custom_limits.items():
-            try:
-                if isinstance(limits_config, dict):
-                    model_limits[model_name] = ModelTokenLimits(
-                        input_limit=limits_config.get("input_limit", 4000),
-                        output_limit=limits_config.get("output_limit", 1000),
-                        context_window=limits_config.get("context_window", 8000),
-                        safety_margin=limits_config.get("safety_margin", 0.8),
-                    )
-                    logger.info(f"Loading custom model limits: {model_name}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to parse model {model_name} token limit configuration: {e}"
-                )
-
-        # If no model limits found, add default deepseek configurations
-        if not model_limits:
-            logger.warning(
-                "No model token limits found in configuration, using defaults"
-            )
-            default_models = {
-                "deepseek-chat": ModelTokenLimits(
-                    input_limit=65536,
-                    output_limit=8192,
-                    context_window=131072,
-                    safety_margin=0.2,
-                ),
-                "deepseek-reasoner": ModelTokenLimits(
-                    input_limit=65536,
-                    output_limit=8192,
-                    context_window=131072,
-                    safety_margin=0.2,
-                ),
-            }
-            model_limits.update(default_models)
-            logger.info(
-                f"Added default configurations for models: {list(default_models.keys())}"
-            )
-
-        return model_limits
-
-    def parse_advanced_context_config(
-        self, config: Dict[str, Any]
-    ) -> AdvancedContextConfig:
-        """Parse advanced context management configuration"""
-        advanced_config = config.get("ADVANCED_CONTEXT_MANAGEMENT", {})
-
-        try:
-            return AdvancedContextConfig(
-                max_context_ratio=advanced_config.get("max_context_ratio", 0.6),
-                sliding_window_size=advanced_config.get("sliding_window_size", 5),
-                overlap_ratio=advanced_config.get("overlap_ratio", 0.2),
-                compression_threshold=advanced_config.get("compression_threshold", 0.8),
-                default_strategy=advanced_config.get("default_strategy", "adaptive"),
-                priority_weights=advanced_config.get(
-                    "priority_weights",
-                    {"critical": 1.0, "high": 0.7, "medium": 0.4, "low": 0.1},
-                ),
-                enable_caching=advanced_config.get("enable_caching", True),
-                enable_analytics=advanced_config.get("enable_analytics", True),
-                debug_mode=advanced_config.get("debug_mode", False),
-            )
-        except Exception as e:
-            logger.error(
-                f"Failed to parse advanced context management configuration: {e}"
-            )
-            return AdvancedContextConfig()  # Return default configuration
-
-    def create_configuration(self) -> Configuration:
-        """Create configuration object"""
-        config_data = self.load_config()
-        model_limits = self.parse_model_limits(config_data)
-
-        # If no model limits are configured, use default values
-        if not model_limits:
-            model_limits = {"default": self.default_model_limits}
-
-        # Parse intelligent content processing configuration
-        content_config = config_data.get("CONTENT_PROCESSING", {})
-
-        # Parse parallel execution configuration
-        parallel_config = config_data.get("PARALLEL_EXECUTION", {})
-
-        # Parse advanced context management configuration
-        advanced_context_config = self.parse_advanced_context_config(config_data)
-
-        # Create model instances
-        basic_model = None
-        reasoning_model = None
-
-        try:
-            from src.llms.llm import get_llm_by_type
-
-            # Try to create basic model instance
-            if config_data.get("BASIC_MODEL"):
-                basic_model = get_llm_by_type("basic")
-            # Try to create reasoning model instance
-            if config_data.get("REASONING_MODEL"):
-                reasoning_model = get_llm_by_type("reasoning")
-        except Exception as e:
-            logger.warning(f"Failed to create model instances: {e}")
-
-        return Configuration(
-            # enable_smart_chunking removed - smart chunking is now always enabled
-            enable_content_summarization=content_config.get(
-                "enable_content_summarization", True
-            ),
-            enable_smart_filtering=content_config.get("enable_smart_filtering", True),
-            # chunk_strategy removed - smart chunking now uses 'auto' strategy by default
-            summary_type=content_config.get("summary_type", "comprehensive"),
-            model_token_limits=model_limits,
-            max_search_results=config_data.get("max_search_results", 3),
-            enable_parallel_execution=parallel_config.get(
-                "enable_parallel_execution", True
-            ),
-            max_parallel_tasks=parallel_config.get("max_parallel_tasks", 3),
-            max_context_steps_parallel=parallel_config.get(
-                "max_context_steps_parallel", 1
-            ),  # Reduced for token optimization
-            disable_context_parallel=parallel_config.get(
-                "disable_context_parallel", False
-            ),
-            basic_model=basic_model,
-            reasoning_model=reasoning_model,
-            advanced_context_config=advanced_context_config,
-        )
-
-    def save_example_config(self, output_path: Optional[str] = None):
-        """Save example configuration file"""
-        output_path = output_path or "conf.yaml.example"
-
-        example_config = {
-            "BASIC_MODEL": {
-                "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-                "model": "doubao-1-5-pro-32k-250115",
-                "api_key": "xxxx",
-                "token_limits": {
-                    "input_limit": 32000,
-                    "output_limit": 4096,
-                    "context_window": 32000,
-                    "safety_margin": 0.8,
-                },
-            },
-            "REASONING_MODEL": {
-                "base_url": "https://ark-cn-beijing.bytedance.net/api/v3",
-                "model": "doubao-1-5-thinking-pro-m-250428",
-                "api_key": "xxxx",
-                "token_limits": {
-                    "input_limit": 32000,
-                    "output_limit": 8192,
-                    "context_window": 32000,
-                    "safety_margin": 0.8,
-                },
-            },
-            "CONTENT_PROCESSING": {
-                # 'enable_smart_chunking': True,  # Removed - smart chunking is now always enabled
-                "enable_content_summarization": True,
-                "enable_smart_filtering": True,  # Enable LLM-based search result filtering
-                # 'chunk_strategy': 'auto',  # Removed - smart chunking now uses 'auto' strategy by default
-                "summary_type": "key_points",  # comprehensive, key_points, abstract
-            },
-            "PARALLEL_EXECUTION": {
-                "enable_parallel_execution": True,
-                "max_parallel_tasks": 2,  # Maximum number of parallel tasks
-                "max_context_steps_parallel": 3,  # Maximum context steps in parallel execution
-            },
-            "max_search_results": 3,
+    
+    def load_from_env(self) -> Dict[str, Any]:
+        """Load configuration from environment variables.
+        
+        Returns:
+            Dictionary containing environment-based configuration.
+        """
+        env_config = {}
+        
+        # Environment variable mappings
+        env_mappings = {
+            # Core settings
+            'DEER_REPORT_STYLE': 'report_style',
+            'DEER_RESOURCES': 'resources',
+            
+            # LLM settings
+            'DEER_LLM_TEMPERATURE': ['llm', 'temperature'],
+            'DEER_LLM_TIMEOUT': ['llm', 'timeout'],
+            'DEER_LLM_MAX_TOKENS': ['llm', 'max_tokens'],
+            
+            # Agent settings
+            'DEER_MAX_PLAN_ITERATIONS': ['agents', 'max_plan_iterations'],
+            'DEER_MAX_STEP_NUM': ['agents', 'max_step_num'],
+            'DEER_MAX_SEARCH_RESULTS': ['agents', 'max_search_results'],
+            'DEER_ENABLE_DEEP_THINKING': ['agents', 'enable_deep_thinking'],
+            'DEER_ENABLE_PARALLEL_EXECUTION': ['agents', 'enable_parallel_execution'],
+            'DEER_MAX_PARALLEL_TASKS': ['agents', 'max_parallel_tasks'],
+            'DEER_MAX_CONTEXT_STEPS_PARALLEL': ['agents', 'max_context_steps_parallel'],
+            'DEER_DISABLE_CONTEXT_PARALLEL': ['agents', 'disable_context_parallel'],
+            
+            # Research settings
+            'DEER_ENABLE_RESEARCHER_ISOLATION': ['research', 'enable_researcher_isolation'],
+            'DEER_RESEARCHER_ISOLATION_LEVEL': ['research', 'researcher_isolation_level'],
+            'DEER_RESEARCHER_MAX_LOCAL_CONTEXT': ['research', 'researcher_max_local_context'],
+            'DEER_RESEARCHER_ISOLATION_THRESHOLD': ['research', 'researcher_isolation_threshold'],
+            'DEER_RESEARCHER_AUTO_ISOLATION': ['research', 'researcher_auto_isolation'],
+            'DEER_RESEARCHER_ISOLATION_METRICS': ['research', 'researcher_isolation_metrics'],
+            'DEER_MAX_CONTEXT_STEPS_RESEARCHER': ['research', 'max_context_steps_researcher'],
+            
+            # Reflection settings
+            'DEER_ENABLE_ENHANCED_REFLECTION': ['reflection', 'enable_enhanced_reflection'],
+            'DEER_MAX_REFLECTION_LOOPS': ['reflection', 'max_reflection_loops'],
+            'DEER_REFLECTION_TEMPERATURE': ['reflection', 'reflection_temperature'],
+            'DEER_REFLECTION_TRIGGER_THRESHOLD': ['reflection', 'reflection_trigger_threshold'],
+            'DEER_REFLECTION_CONFIDENCE_THRESHOLD': ['reflection', 'reflection_confidence_threshold'],
+            'DEER_ENABLE_REFLECTION_INTEGRATION': ['reflection', 'enable_reflection_integration'],
+            'DEER_ENABLE_PROGRESSIVE_REFLECTION': ['reflection', 'enable_progressive_reflection'],
+            'DEER_ENABLE_REFLECTION_METRICS': ['reflection', 'enable_reflection_metrics'],
+            
+            # Iterative research settings
+            'DEER_MAX_FOLLOW_UP_ITERATIONS': ['iterative_research', 'max_follow_up_iterations'],
+            'DEER_SUFFICIENCY_THRESHOLD': ['iterative_research', 'sufficiency_threshold'],
+            'DEER_ENABLE_ITERATIVE_RESEARCH': ['iterative_research', 'enable_iterative_research'],
+            'DEER_MAX_QUERIES_PER_ITERATION': ['iterative_research', 'max_queries_per_iteration'],
+            'DEER_FOLLOW_UP_DELAY_SECONDS': ['iterative_research', 'follow_up_delay_seconds'],
+            
+            # Content settings
+            'DEER_ENABLE_CONTENT_SUMMARIZATION': ['content', 'enable_content_summarization'],
+            'DEER_ENABLE_SMART_FILTERING': ['content', 'enable_smart_filtering'],
+            'DEER_SUMMARY_TYPE': ['content', 'summary_type'],
+            
+            # Advanced context settings
+            'DEER_MAX_CONTEXT_RATIO': ['advanced_context', 'max_context_ratio'],
+            'DEER_SLIDING_WINDOW_SIZE': ['advanced_context', 'sliding_window_size'],
+            'DEER_OVERLAP_RATIO': ['advanced_context', 'overlap_ratio'],
+            'DEER_COMPRESSION_THRESHOLD': ['advanced_context', 'compression_threshold'],
+            'DEER_DEFAULT_STRATEGY': ['advanced_context', 'default_strategy'],
+            'DEER_ENABLE_CACHING': ['advanced_context', 'enable_caching'],
+            'DEER_ENABLE_ANALYTICS': ['advanced_context', 'enable_analytics'],
+            'DEER_DEBUG_MODE': ['advanced_context', 'debug_mode'],
+            
+            # MCP settings
+            'DEER_MCP_ENABLED': ['mcp', 'enabled'],
+            'DEER_MCP_TIMEOUT': ['mcp', 'timeout'],
         }
-
+        
+        for env_var, config_key in env_mappings.items():
+            value = os.getenv(env_var)
+            if value is not None:
+                # Convert string values to appropriate types
+                if value.lower() in ('true', '1', 'yes', 'on'):
+                    value = True
+                elif value.lower() in ('false', '0', 'no', 'off'):
+                    value = False
+                elif value.isdigit():
+                    value = int(value)
+                elif value.replace('.', '', 1).isdigit():
+                    value = float(value)
+                
+                # Handle nested keys
+                if isinstance(config_key, list):
+                    current = env_config
+                    for key in config_key[:-1]:
+                        if key not in current:
+                            current[key] = {}
+                        current = current[key]
+                    current[config_key[-1]] = value
+                else:
+                    env_config[config_key] = value
+        
+        return env_config
+    
+    def merge_configs(self, *configs: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge multiple configuration dictionaries with deep merging.
+        
+        Args:
+            *configs: Configuration dictionaries to merge.
+            
+        Returns:
+            Merged configuration dictionary.
+        """
+        def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+            """Deep merge two dictionaries."""
+            result = dict1.copy()
+            
+            for key, value in dict2.items():
+                if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                    result[key] = deep_merge(result[key], value)
+                else:
+                    result[key] = value
+            
+            return result
+        
+        merged = {}
+        for config in configs:
+            if config:
+                merged = deep_merge(merged, config)
+        
+        return merged
+    
+    def load_configuration(self, yaml_path: str = "conf.yaml", validate: bool = True) -> AppSettings:
+        """Load complete configuration from all sources.
+        
+        Args:
+            yaml_path: Path to YAML configuration file.
+            validate: Whether to validate configuration before creating AppSettings.
+            
+        Returns:
+            Complete application settings.
+            
+        Raises:
+            ValidationError: If configuration is invalid.
+        """
+        # Load from YAML file
+        yaml_config = self.load_from_yaml(yaml_path)
+        
+        # Load from environment variables
+        env_config = self.load_from_env()
+        
+        # Merge configurations (env vars override YAML)
+        merged_config = self.merge_configs(yaml_config, env_config)
+        
+        # Validate configuration if requested
+        if validate:
+            if not validate_configuration(merged_config):
+                logger.warning("Configuration validation failed, but continuing with current config")
+        
+        # Create and validate AppSettings
         try:
-            with open(output_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    example_config,
-                    f,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    indent=2,
-                )
-            logger.info(f"Example configuration file saved to: {output_path}")
+            self._settings = AppSettings(**merged_config)
+            logger.info("Successfully loaded and validated configuration")
+            return self._settings
         except Exception as e:
-            logger.error(f"Failed to save example configuration file: {e}")
+            logger.error(f"Configuration validation failed: {e}")
+            raise ValueError(f"Invalid configuration: {e}")
+    
+    def get_settings(self) -> AppSettings:
+        """Get the loaded settings.
+        
+        Returns:
+            Application settings.
+            
+        Raises:
+            RuntimeError: If settings haven't been loaded yet.
+        """
+        if self._settings is None:
+            return self.load_configuration()
+        return self._settings
+    
+    def reload_configuration(self, yaml_path: str = "conf.yaml") -> AppSettings:
+        """Reload configuration from all sources.
+        
+        Args:
+            yaml_path: Path to YAML configuration file.
+            
+        Returns:
+            Updated application settings.
+        """
+        self._settings = None
+        return self.load_configuration(yaml_path)
 
 
 # Global configuration loader instance
-config_loader = ConfigLoader()
+_config_loader: Optional[ConfigLoader] = None
+
+
+def get_config_loader() -> ConfigLoader:
+    """Get the global configuration loader instance.
+    
+    Returns:
+        Configuration loader instance.
+    """
+    global _config_loader
+    if _config_loader is None:
+        _config_loader = ConfigLoader()
+    return _config_loader
+
+
+def load_configuration(yaml_path: str = "conf.yaml") -> AppSettings:
+    """Convenience function to load configuration.
+    
+    Args:
+        yaml_path: Path to YAML configuration file.
+        
+    Returns:
+        Application settings.
+    """
+    loader = get_config_loader()
+    return loader.load_configuration(yaml_path)
+
+
+def get_settings() -> AppSettings:
+    """Convenience function to get loaded settings.
+    
+    Returns:
+        Application settings.
+    """
+    loader = get_config_loader()
+    return loader.get_settings()

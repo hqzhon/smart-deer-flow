@@ -294,19 +294,31 @@ class ResearcherIsolationMetrics:
                               step_count: int) -> bool:
         """Determine if isolation should be enabled based on current metrics and task characteristics"""
         # Get current configuration
-        from src.config.configuration import Configuration
-        config = Configuration.get_current()
-        
-        if not config or not config.researcher_auto_isolation:
-            return config.enable_researcher_isolation if config else False
-        
-        # Check threshold-based enablement
-        if step_count >= (config.researcher_isolation_threshold if config else 3):
-            return True
-        
-        # Check context size threshold
-        if context_size >= (config.researcher_max_local_context if config else 5000):
-            return True
+        from src.config import get_settings
+        try:
+            settings = get_settings()
+            researcher_config = settings.get_research_config()
+            
+            # Use default values if config is not available
+            auto_isolation = getattr(researcher_config, 'auto_isolation', False)
+            enable_isolation = getattr(researcher_config, 'enable_isolation', False)
+            isolation_threshold = getattr(researcher_config, 'isolation_threshold', 3)
+            max_local_context = getattr(researcher_config, 'max_local_context', 5000)
+            
+            if not auto_isolation:
+                return enable_isolation
+            
+            # Check threshold-based enablement
+            if step_count >= isolation_threshold:
+                return True
+            
+            # Check context size threshold
+            if context_size >= max_local_context:
+                return True
+        except Exception:
+            # Fallback to default behavior
+            if step_count >= 3 or context_size >= 5000:
+                return True
         
         # Check task complexity
         complexity_thresholds = {

@@ -37,7 +37,7 @@ class ReflectionConfig(BaseModel):
     sufficiency_threshold: float = Field(default=0.7, description="Threshold for sufficiency")
 from langchain_core.runnables import RunnableConfig
 from src.llms.error_handler import safe_llm_call_async
-from src.config.configuration import Configuration
+from src.config import get_settings
 from src.models.planner_model import Step
 
 logger = logging.getLogger(__name__)
@@ -156,13 +156,17 @@ class EnhancedReflectionAgent:
     - Dynamic research strategy adjustment
     """
     
-    def __init__(self, config: Optional[Configuration] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize the enhanced reflection agent.
         
         Args:
             config: Configuration instance for reflection settings
         """
-        self.config = config or Configuration.get_current()
+        try:
+            self.config = config or get_settings()
+        except Exception:
+            # Fallback to empty config if settings unavailable
+            self.config = {}
         self.reflection_history: List[Tuple[ReflectionContext, ReflectionResult]] = []
         
         # Initialize prompt manager for multilingual support
@@ -587,12 +591,7 @@ class EnhancedReflectionAgent:
         # Import here to avoid circular imports
         try:
             from src.llms.llm import get_llm_by_type
-            from src.config.configuration import Configuration
-            
-            # Get configurable from runnable_config if provided
-            configurable = None
-            if runnable_config:
-                configurable = Configuration.from_runnable_config(runnable_config)
+            # from src.config.configuration import Configuration  # Removed - using new config system
             
             # Check if we have reflection model configured directly
             if hasattr(self.config, 'reflection_model') and self.config.reflection_model:
@@ -601,7 +600,8 @@ class EnhancedReflectionAgent:
             # Use enable_deep_thinking to determine model type, similar to nodes.py
             model_type = "basic"  # Default fallback
             
-            if configurable and hasattr(configurable, 'enable_deep_thinking') and configurable.enable_deep_thinking:
+            # Try to get enable_deep_thinking from runnable_config or use basic model
+            if runnable_config and runnable_config.get('configurable', {}).get('enable_deep_thinking'):
                 model_type = "reasoning"
             else:
                 model_type = "basic"

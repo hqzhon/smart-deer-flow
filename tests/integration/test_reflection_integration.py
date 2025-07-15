@@ -26,7 +26,7 @@ from src.utils.reflection.enhanced_reflection import (
 from src.utils.reflection.enhanced_reflection import ReflectionConfig
 from src.graph.nodes import researcher_node_with_isolation
 from src.graph.nodes import planner_node
-from src.config.configuration import Configuration
+# from src.config.configuration import Configuration  # Removed - using new config system
 
 
 class TestReflectionIntegration:
@@ -35,7 +35,12 @@ class TestReflectionIntegration:
     @pytest.fixture
     def config(self):
         """Create test configuration."""
-        return Configuration()
+        config = Mock()
+        config.enable_enhanced_reflection = True
+        config.max_reflection_loops = 3
+        config.reflection_temperature = 0.7
+        config.reflection_confidence_threshold = 0.7
+        return config
     
     @pytest.fixture
     def reflection_config(self):

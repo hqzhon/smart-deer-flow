@@ -13,7 +13,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 
 from src.utils.reflection.enhanced_reflection import ReflectionResult
-from src.config.configuration import Configuration
+from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,13 @@ class ReflectionAnalyzer:
     Utility class for analyzing reflection results and trends.
     """
     
-    def __init__(self, config: Configuration):
-        self.config = config
+    def __init__(self, config=None):
+        # Get configuration from settings
+        try:
+            settings = get_settings()
+            self.config = settings
+        except Exception:
+            self.config = None
         self.session_history: List[ReflectionSession] = []
     
     def analyze_sufficiency_trend(self, sessions: List[ReflectionSession]) -> Dict[str, Any]:
@@ -98,7 +103,17 @@ class ReflectionAnalyzer:
         
         # Generate recommendation
         latest_score = scores[-1]
-        if latest_score >= self.config.reflection_confidence_threshold:
+        # Get reflection confidence threshold from config or use default
+        threshold = 0.7  # default value
+        if self.config:
+            try:
+                reflection_config = getattr(self.config, 'reflection', None)
+                if reflection_config:
+                    threshold = getattr(reflection_config, 'confidence_threshold', 0.7)
+            except Exception:
+                pass
+        
+        if latest_score >= threshold:
             if trend == "improving":
                 recommendation = "continue_current_approach"
             else:
@@ -200,14 +215,17 @@ class ReflectionTools:
     Main utility class providing reflection tools and analysis capabilities.
     """
     
-    def __init__(self, config: Configuration):
+    def __init__(self, config=None):
         """Initialize reflection tools.
         
         Args:
-            config: Configuration instance
+            config: Configuration instance (optional, will use get_settings() if not provided)
         """
-        self.config = config
-        self.analyzer = ReflectionAnalyzer(config)
+        try:
+            self.config = get_settings() if config is None else config
+        except Exception:
+            self.config = None
+        self.analyzer = ReflectionAnalyzer(self.config)
         self.metrics = ReflectionMetrics()
         self.session_history: List[ReflectionSession] = []
     

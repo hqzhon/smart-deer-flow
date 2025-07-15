@@ -17,9 +17,7 @@ from src.llms.error_handler import safe_llm_call_async
 from src.graph.types import State
 from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from src.config.configuration import Configuration
+# Remove TYPE_CHECKING import for Configuration as it's no longer needed
 
 logger = logging.getLogger(__name__)
 

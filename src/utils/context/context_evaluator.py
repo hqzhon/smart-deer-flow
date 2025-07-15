@@ -16,9 +16,7 @@ from .advanced_context_manager import (
     CompressionStrategy,
 )
 from ..tokens.content_processor import ContentProcessor
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from src.config.configuration import Configuration
+# Remove TYPE_CHECKING import for Configuration as it's no longer needed
 from ..common.structured_logging import get_logger
 
 logger = get_logger(__name__)
@@ -61,13 +59,20 @@ class ContextStateEvaluator:
 
     def __init__(
         self,
-        config: "Configuration",
+        config: Optional[Dict[str, Any]] = None,
         content_processor: Optional[ContentProcessor] = None,
         context_manager: Optional[AdvancedContextManager] = None,
     ):
-        self.config = config
+        self.config = config or {}
+        # Get model token limits from config or use defaults
+        model_token_limits = {}
+        if config and hasattr(config, 'model_token_limits'):
+            model_token_limits = config.model_token_limits
+        elif isinstance(config, dict):
+            model_token_limits = config.get('model_token_limits', {})
+        
         self.content_processor = content_processor or ContentProcessor(
-            config.model_token_limits
+            model_token_limits
         )
         self.context_manager = context_manager or AdvancedContextManager(
             config, self.content_processor
@@ -853,9 +858,9 @@ def get_global_context_evaluator(
 
     if _global_context_evaluator is None:
         if config is None:
-            from src.config.config_loader import config_loader
+            from src.config import get_settings
 
-            config = config_loader.create_configuration()
+            config = get_settings()
 
         _global_context_evaluator = ContextStateEvaluator(config)
         logger.info("Global context evaluator created")

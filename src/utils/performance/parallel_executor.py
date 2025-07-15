@@ -537,10 +537,10 @@ def create_parallel_executor(
 ) -> ParallelExecutor:
     """Create parallel executor with optional shared context for deduplication"""
     # Load default values from config
-    from src.config.config_loader import config_loader
+    from src.config import get_settings
 
     try:
-        config_data = config_loader.load_config()
+        config_data = get_settings().load_config()
         if max_concurrent_tasks is None:
             max_concurrent_tasks = config_data.get("max_parallel_tasks", 3)
             # Ensure max_concurrent_tasks is integer type

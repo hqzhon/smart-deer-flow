@@ -22,7 +22,6 @@ from .researcher import *
 from .performance import *
 from .tokens import *
 from .system import *
-from .config import *
 from .common import *
 
 # Re-export commonly used classes and functions
@@ -74,8 +73,8 @@ __all__ = [
     "DependencyInjection",
     
     # Configuration management
-    "ConfigManager",
-    "CleaningConfig",
+    "# Removed - use get_settings() instead",
+    "# Removed - use get_settings() instead",
     
     # Common utilities
     "safe_background_task",
