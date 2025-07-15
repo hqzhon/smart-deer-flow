@@ -35,6 +35,9 @@ reports/
 
 temp_project/
 
+.vscode/
+.trae/
+
 # Test generated files
 phase2_*.json
 phase2_*.md
