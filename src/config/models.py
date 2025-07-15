@@ -2,8 +2,9 @@
 Pydantic-based configuration models for unified configuration management.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 from pydantic import BaseModel, Field, validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 import os
 
@@ -124,7 +125,129 @@ class MCPSettings(BaseModel):
     timeout: int = Field(default=30, ge=1)
 
 
-class AppSettings(BaseModel):
+class SearchEngine(str, Enum):
+    """Search engine enumeration."""
+    TAVILY = "tavily"
+    DUCKDUCKGO = "duckduckgo"
+    BRAVE_SEARCH = "brave_search"
+    ARXIV = "arxiv"
+
+
+class RAGProvider(str, Enum):
+    """RAG provider enumeration."""
+    RAGFLOW = "ragflow"
+
+
+class ToolSettings(BaseModel):
+    """Tool configuration settings."""
+    search_engine: SearchEngine = SearchEngine.TAVILY
+    rag_provider: Optional[RAGProvider] = None
+
+
+class ConnectionPoolConfig(BaseModel):
+    """Connection pool configuration."""
+    max_connections: int = 50
+    initial_connections: int = 10
+    connection_timeout: float = 30.0
+    idle_timeout: float = 300.0
+    max_retries: int = 3
+
+
+class BatchProcessingConfig(BaseModel):
+    """Batch processing configuration."""
+    batch_size: int = 10
+    batch_timeout: float = 1.5
+    max_queue_size: int = 1000
+    priority_enabled: bool = True
+    adaptive_sizing: bool = True
+
+
+class CacheConfig(BaseModel):
+    """Hierarchical cache configuration."""
+    l1_size: int = 1000
+    l2_size: int = 5000
+    l3_size: int = 10000
+    default_ttl: int = 3600  # 1 hour
+    cleanup_interval: int = 300  # 5 minutes
+    eviction_policy: str = "lru"  # lru, lfu, fifo
+
+
+class RateLimitConfig(BaseModel):
+    """Adaptive rate limiting configuration."""
+    initial_rate: float = 10.0  # requests per second
+    max_rate: float = 100.0
+    min_rate: float = 1.0
+    adaptation_factor: float = 1.2
+    window_size: int = 60  # seconds
+    time_window: int = 60  # seconds (alias for window_size for compatibility)
+    burst_allowance: int = 20
+
+
+class ErrorRecoveryConfig(BaseModel):
+    """Smart error recovery configuration."""
+    max_retries: int = 3
+    base_delay: float = 1.0
+    max_delay: float = 60.0
+    exponential_base: float = 2.0
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_timeout: float = 60.0
+    jitter_enabled: bool = True
+
+
+class ParallelExecutionConfig(BaseModel):
+    """Advanced parallel execution configuration."""
+    max_workers: int = 20
+    queue_size: int = 1000
+    priority_levels: int = 3
+    load_balancing: bool = True
+    worker_timeout: float = 300.0
+    health_check_interval: float = 30.0
+
+
+class MonitoringConfig(BaseModel):
+    """Performance monitoring configuration."""
+    metrics_enabled: bool = True
+    detailed_logging: bool = True
+    slow_request_threshold: float = 10.0  # seconds
+    high_utilization_threshold: float = 0.8
+    metrics_retention: int = 86400  # 24 hours
+    export_interval: int = 60  # seconds
+
+
+class PerformanceSettings(BaseModel):
+    """Performance optimization configuration."""
+    connection_pool: ConnectionPoolConfig = Field(default_factory=ConnectionPoolConfig)
+    batch_processing: BatchProcessingConfig = Field(default_factory=BatchProcessingConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    error_recovery: ErrorRecoveryConfig = Field(default_factory=ErrorRecoveryConfig)
+    parallel_execution: ParallelExecutionConfig = Field(default_factory=ParallelExecutionConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    
+    # Global settings
+    enable_advanced_optimization: bool = True
+    enable_collaboration: bool = True
+    debug_mode: bool = False
+
+
+# Define available LLM types
+LLMType = Literal["basic", "reasoning", "vision"]
+
+
+class AgentLLMSettings(BaseModel):
+    """Agent-LLM mapping configuration."""
+    coordinator: LLMType = "basic"
+    planner: LLMType = "basic"
+    researcher: LLMType = "basic"
+    coder: LLMType = "basic"
+    reporter: LLMType = "basic"
+    podcast_script_writer: LLMType = "basic"
+    ppt_composer: LLMType = "basic"
+    prose_writer: LLMType = "basic"
+    prompt_enhancer: LLMType = "basic"
+
+
+class AppSettings(BaseSettings):
     """Main application configuration."""
     
     # Core settings
@@ -141,15 +264,20 @@ class AppSettings(BaseModel):
     content: ContentSettings = Field(default_factory=ContentSettings)
     advanced_context: AdvancedContextConfig = Field(default_factory=AdvancedContextConfig)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
+    tools: ToolSettings = Field(default_factory=ToolSettings)
+    performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
+    agent_llm_map: AgentLLMSettings = Field(default_factory=AgentLLMSettings)
     
     # Model token limits
     model_token_limits: Dict[str, Dict[str, int]] = Field(default_factory=dict)
     
-    class Config:
-        env_prefix = "DEER_"
-        case_sensitive = False
-        validate_assignment = True
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        env_prefix="DEER_",
+        case_sensitive=False,
+        validate_assignment=True,
+        extra="allow",
+        env_nested_delimiter="__"
+    )
 
     @validator('model_token_limits', pre=True)
     def validate_token_limits(cls, v):
@@ -185,3 +313,15 @@ class AppSettings(BaseModel):
     def get_mcp_config(self) -> MCPSettings:
         """Get MCP configuration."""
         return self.mcp
+
+    def get_tool_config(self) -> ToolSettings:
+        """Get tool configuration."""
+        return self.tools
+
+    def get_performance_config(self) -> PerformanceSettings:
+        """Get performance configuration."""
+        return self.performance
+
+    def get_agent_llm_config(self) -> AgentLLMSettings:
+        """Get agent-LLM mapping configuration."""
+        return self.agent_llm_map

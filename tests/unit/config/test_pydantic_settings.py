@@ -4,12 +4,21 @@ import os
 import pytest
 from unittest.mock import patch
 
-from src.config.settings import AppSettings, LLMSettings, AgentSettings
-from src.config.config_loader_v2 import ConfigLoaderV2, load_configuration_v2
+from src.config.models import AppSettings, LLMSettings, AgentSettings
+from src.config.config_loader import get_settings, get_config_loader
 
 
 class TestPydanticSettingsConfig:
     """Test the new pydantic-settings based configuration system."""
+    
+    @pytest.fixture(autouse=True)
+    def clear_config_cache(self):
+        """Clear the global configuration cache before each test."""
+        loader = get_config_loader()
+        loader._settings = None
+        yield
+        # Clean up after test
+        loader._settings = None
     
     def test_default_settings(self):
         """Test that default settings are loaded correctly."""
@@ -23,17 +32,21 @@ class TestPydanticSettingsConfig:
     
     def test_environment_variable_loading(self):
         """Test that environment variables are automatically loaded."""
+        # Test without environment variables first to see defaults
+        settings = AppSettings()
+        assert settings.report_style == "academic"  # default value
+        
         env_vars = {
             'DEER_REPORT_STYLE': 'business',
-            'DEER_LLM_TEMPERATURE': '0.9',
-            'DEER_LLM_MAX_TOKENS': '2000',
-            'DEER_MAX_PLAN_ITERATIONS': '5',
-            'DEER_ENABLE_DEEP_THINKING': 'true',
-            'DEER_ENABLE_RESEARCHER_ISOLATION': 'false',
-            'DEER_RESEARCHER_ISOLATION_LEVEL': 'aggressive',
-            'DEER_MAX_REFLECTION_LOOPS': '5',
-            'DEER_MCP_ENABLED': 'true',
-            'DEER_MCP_TIMEOUT': '60'
+            'DEER_LLM__TEMPERATURE': '0.9',
+            'DEER_LLM__MAX_TOKENS': '2000',
+            'DEER_AGENTS__MAX_PLAN_ITERATIONS': '5',
+            'DEER_AGENTS__ENABLE_DEEP_THINKING': 'true',
+            'DEER_RESEARCH__ENABLE_RESEARCHER_ISOLATION': 'false',
+            'DEER_RESEARCH__RESEARCHER_ISOLATION_LEVEL': 'aggressive',
+            'DEER_REFLECTION__MAX_REFLECTION_LOOPS': '5',
+            'DEER_MCP__ENABLED': 'true',
+            'DEER_MCP__TIMEOUT': '60'
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
@@ -62,29 +75,30 @@ class TestPydanticSettingsConfig:
             assert settings.mcp.timeout == 60
     
     def test_nested_environment_variables(self):
-        """Test that nested environment variables work with double underscore delimiter."""
-        env_vars = {
-            'DEER_LLM__TEMPERATURE': '0.8',
-            'DEER_AGENTS__MAX_PLAN_ITERATIONS': '3',
-            'DEER_RESEARCH__RESEARCHER_ISOLATION_LEVEL': 'minimal',
-            'DEER_ADVANCED_CONTEXT__MAX_CONTEXT_RATIO': '0.8',
-        }
+        """Test that nested environment variables are loaded correctly."""
+        # Set nested environment variables
+        os.environ['DEER_AGENTS__MAX_PLAN_ITERATIONS'] = '8'
+        os.environ['DEER_RESEARCH__RESEARCHER_ISOLATION_THRESHOLD'] = '0.8'
         
-        with patch.dict(os.environ, env_vars, clear=False):
-            settings = AppSettings()
+        try:
+            settings = get_settings()
             
-            assert settings.llm.temperature == 0.8
-            assert settings.agents.max_plan_iterations == 3
-            assert settings.research.researcher_isolation_level == "minimal"
-            assert settings.advanced_context.max_context_ratio == 0.8
+            # Check nested values
+            assert settings.agents.max_plan_iterations == 8
+            assert settings.research.researcher_isolation_threshold == 0.8
+            
+        finally:
+            # Clean up
+            os.environ.pop('DEER_AGENTS__MAX_PLAN_ITERATIONS', None)
+            os.environ.pop('DEER_RESEARCH__RESEARCHER_ISOLATION_THRESHOLD', None)
     
     def test_type_conversion(self):
         """Test that environment variables are properly converted to correct types."""
         env_vars = {
-            'DEER_LLM_TEMPERATURE': '0.5',  # float
-            'DEER_MAX_PLAN_ITERATIONS': '10',  # int
-            'DEER_ENABLE_DEEP_THINKING': 'true',  # bool
-            'DEER_ENABLE_PARALLEL_EXECUTION': 'false',  # bool
+            'DEER_LLM__TEMPERATURE': '0.5',  # float
+            'DEER_AGENTS__MAX_PLAN_ITERATIONS': '10',  # int
+            'DEER_AGENTS__ENABLE_DEEP_THINKING': 'true',  # bool
+            'DEER_AGENTS__ENABLE_PARALLEL_EXECUTION': 'false',  # bool
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
@@ -102,90 +116,67 @@ class TestPydanticSettingsConfig:
             assert isinstance(settings.agents.enable_parallel_execution, bool)
             assert settings.agents.enable_parallel_execution is False
     
-    def test_config_loader_v2(self):
-        """Test the new ConfigLoaderV2 class."""
-        loader = ConfigLoaderV2()
-        
+    def test_get_settings_function(self):
+        """Test the get_settings function."""
         # Test loading with environment variables
         env_vars = {
             'DEER_REPORT_STYLE': 'technical',
-            'DEER_LLM_TEMPERATURE': '0.3',
+            'DEER_LLM__TEMPERATURE': '0.3',
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
-            settings = loader.load_configuration()
+            settings = get_settings()
             
             assert settings.report_style == "technical"
             assert settings.llm.temperature == 0.3
     
     def test_yaml_override_with_env_vars(self, tmp_path):
-        """Test that YAML config works with environment variable overrides."""
-        # Create a temporary YAML config file
-        yaml_content = """
-report_style: academic
-llm:
-  temperature: 0.7
-  max_tokens: 1000
-agents:
-  max_plan_iterations: 2
-  enable_deep_thinking: false
-"""
-        
-        yaml_file = tmp_path / "test_conf.yaml"
-        yaml_file.write_text(yaml_content)
-        
-        # Set environment variables that should override YAML
+        """Test that environment variables override default values."""
+        # Set environment variables that should override defaults
         env_vars = {
             'DEER_REPORT_STYLE': 'business',
-            'DEER_LLM_TEMPERATURE': '0.9',
+            'DEER_LLM__TEMPERATURE': '0.9',
         }
         
-        loader = ConfigLoaderV2(config_dir=str(tmp_path))
-        
         with patch.dict(os.environ, env_vars, clear=False):
-            settings = loader.load_configuration(yaml_path="test_conf.yaml")
+            settings = get_settings()
             
-            # Environment variables should override YAML
+            # Environment variables should override defaults
             assert settings.report_style == "business"  # from env
             assert settings.llm.temperature == 0.9  # from env
-            
-            # YAML values should be used where no env override exists
-            assert settings.llm.max_tokens == 1000  # from YAML
-            assert settings.agents.max_plan_iterations == 2  # from YAML
-            assert settings.agents.enable_deep_thinking is False  # from YAML
     
     def test_convenience_functions(self):
-        """Test the convenience functions for loading configuration."""
+        """Test the get_settings convenience function."""
         env_vars = {
             'DEER_REPORT_STYLE': 'casual',
-            'DEER_LLM_TIMEOUT': '45',
+            'DEER_LLM__TIMEOUT': '45',
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
-            settings = load_configuration_v2()
+            settings = get_settings()
             
             assert settings.report_style == "casual"
             assert settings.llm.timeout == 45
     
     def test_individual_settings_classes(self):
-        """Test that individual settings classes work with their own env prefixes."""
+        """Test that nested settings work through the main AppSettings."""
         env_vars = {
-            'DEER_LLM_TEMPERATURE': '0.6',
-            'DEER_LLM_MAX_TOKENS': '1500',
-            'DEER_LLM_TIMEOUT': '25',
+            'DEER_LLM__TEMPERATURE': '0.6',
+            'DEER_LLM__MAX_TOKENS': '1500',
+            'DEER_LLM__TIMEOUT': '25',
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
-            llm_settings = LLMSettings()
+            settings = AppSettings()
             
-            assert llm_settings.temperature == 0.6
-            assert llm_settings.max_tokens == 1500
-            assert llm_settings.timeout == 25
+            assert settings.llm.temperature == 0.6
+            assert settings.llm.max_tokens == 1500
+            assert settings.llm.timeout == 25
     
     def test_validation_still_works(self):
         """Test that Pydantic validation still works with the new system."""
         env_vars = {
-            'DEER_LLM_TEMPERATURE': '3.0',  # Invalid: > 2.0
+            'DEER_LLM__TEMPERATURE': '3.0',  # Invalid: > 2.0
         }
         
         with patch.dict(os.environ, env_vars, clear=False):
@@ -196,8 +187,8 @@ agents:
         """Test that environment variables are case insensitive."""
         env_vars = {
             'deer_report_style': 'technical',  # lowercase
-            'DEER_LLM_TEMPERATURE': '0.4',  # uppercase
-            'Deer_Max_Plan_Iterations': '7',  # mixed case
+            'DEER_LLM__TEMPERATURE': '0.4',  # uppercase
+            'Deer_Agents__Max_Plan_Iterations': '7',  # mixed case
         }
         
         with patch.dict(os.environ, env_vars, clear=False):

@@ -12,7 +12,8 @@ from langchain_community.utilities import ArxivAPIWrapper, BraveSearchWrapper
 from langchain_core.tools import BaseTool
 from pydantic import Field
 
-from src.config import SearchEngine, SELECTED_SEARCH_ENGINE
+from src.config.config_loader import get_settings
+from src.config.models import SearchEngine
 from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchResultsWithImages,
 )
@@ -137,8 +138,12 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
     Returns:
         SmartSearchTool wrapper with the selected search engine
     """
+    # Get configuration settings
+    settings = get_settings()
+    selected_search_engine = settings.tools.search_engine
+    
     # Get the base search tool based on selected engine
-    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
+    if selected_search_engine == SearchEngine.TAVILY:
         base_tool = LoggedTavilySearch(
             name="web_search_base",
             max_results=max_search_results,
@@ -146,20 +151,22 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
             include_images=False,
             include_image_descriptions=False,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
+    elif selected_search_engine == SearchEngine.DUCKDUCKGO:
         base_tool = LoggedDuckDuckGoSearch(
             name="web_search_base",
             num_results=max_search_results,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.BRAVE_SEARCH.value:
+    elif selected_search_engine == SearchEngine.BRAVE_SEARCH:
+        # Get API key from configuration
+        brave_api_key = getattr(settings.tools, 'brave_search_api_key', '') or os.getenv("BRAVE_SEARCH_API_KEY", "")
         base_tool = LoggedBraveSearch(
             name="web_search_base",
             search_wrapper=BraveSearchWrapper(
-                api_key=os.getenv("BRAVE_SEARCH_API_KEY", ""),
+                api_key=brave_api_key,
                 search_kwargs={"count": max_search_results},
             ),
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.ARXIV.value:
+    elif selected_search_engine == SearchEngine.ARXIV:
         base_tool = LoggedArxivSearch(
             name="web_search_base",
             api_wrapper=ArxivAPIWrapper(
@@ -169,7 +176,7 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
             ),
         )
     else:
-        raise ValueError(f"Unsupported search engine: {SELECTED_SEARCH_ENGINE}")
+        raise ValueError(f"Unsupported search engine: {selected_search_engine}")
 
     # Wrap with SmartSearchTool for intelligent filtering
     return SmartSearchTool(
@@ -188,7 +195,11 @@ def get_raw_web_search_tool(max_search_results: int):
     Returns:
         Raw search tool without SmartSearchTool wrapper
     """
-    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
+    # Get configuration settings
+    settings = get_settings()
+    selected_search_engine = settings.tools.search_engine
+    
+    if selected_search_engine == SearchEngine.TAVILY:
         return LoggedTavilySearch(
             name="web_search",
             max_results=max_search_results,
@@ -196,20 +207,22 @@ def get_raw_web_search_tool(max_search_results: int):
             include_images=False,
             include_image_descriptions=False,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
+    elif selected_search_engine == SearchEngine.DUCKDUCKGO:
         return LoggedDuckDuckGoSearch(
             name="web_search",
             num_results=max_search_results,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.BRAVE_SEARCH.value:
+    elif selected_search_engine == SearchEngine.BRAVE_SEARCH:
+        # Get API key from configuration
+        brave_api_key = getattr(settings.tools, 'brave_search_api_key', '') or os.getenv("BRAVE_SEARCH_API_KEY", "")
         return LoggedBraveSearch(
             name="web_search",
             search_wrapper=BraveSearchWrapper(
-                api_key=os.getenv("BRAVE_SEARCH_API_KEY", ""),
+                api_key=brave_api_key,
                 search_kwargs={"count": max_search_results},
             ),
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.ARXIV.value:
+    elif selected_search_engine == SearchEngine.ARXIV:
         return LoggedArxivSearch(
             name="web_search",
             api_wrapper=ArxivAPIWrapper(
@@ -219,4 +232,4 @@ def get_raw_web_search_tool(max_search_results: int):
             ),
         )
     else:
-        raise ValueError(f"Unsupported search engine: {SELECTED_SEARCH_ENGINE}")
+        raise ValueError(f"Unsupported search engine: {selected_search_engine}")

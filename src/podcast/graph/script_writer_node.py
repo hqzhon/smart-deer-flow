@@ -5,7 +5,7 @@ import logging
 
 from langchain.schema import HumanMessage, SystemMessage
 
-from src.config.agents import AGENT_LLM_MAP
+from src.config.config_loader import get_settings
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
 from src.utils.template import get_prompt_template
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 def script_writer_node(state: PodcastState):
     logger.info("Generating script for podcast...")
-    model = get_llm_by_type(
-        AGENT_LLM_MAP["podcast_script_writer"]
-    ).with_structured_output(Script, method="json_mode")
+    settings = get_settings()
+    llm_type = settings.agent_llm_map.get("podcast_script_writer", "gpt-4o-mini")
+    model = get_llm_by_type(llm_type).with_structured_output(Script, method="json_mode")
     script = safe_llm_call(
         model.invoke,
         [

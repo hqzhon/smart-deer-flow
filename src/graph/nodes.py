@@ -24,7 +24,8 @@ from src.tools import (
     python_repl_tool,
 )
 
-from src.config.agents import AGENT_LLM_MAP
+from src.config.config_loader import get_settings
+from src.config.models import SearchEngine
 # ExecutionContextManager will be imported dynamically to avoid circular imports
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call, safe_llm_call_async
@@ -33,7 +34,6 @@ from src.utils.common.json_utils import repair_json_output
 from src.utils.tokens.token_manager import TokenManager
 
 from .types import State
-from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 from src.models.planner_model import Plan, Step, StepType
 from src.utils.reflection.enhanced_reflection import ReflectionContext
 
@@ -79,7 +79,11 @@ def background_investigation_node(state: State, config: RunnableConfig):
     # get the background investigation results
     from src.llms.error_handler import safe_llm_call
 
-    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
+    # Get search engine from settings
+    settings = get_settings()
+    selected_search_engine = settings.tools.search_engine
+        
+    if selected_search_engine == SearchEngine.TAVILY.value:
         searched_content = safe_llm_call(
             LoggedTavilySearch(max_results=configurable.max_search_results).invoke,
             query,
@@ -116,16 +120,17 @@ def background_investigation_node(state: State, config: RunnableConfig):
             # get the current llm model name with proper fallback
             model_name = "deepseek-chat"  # Default fallback
             try:
-                current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
+                # Get planner LLM type from settings
+                planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+                current_llm = get_llm_by_type(planner_llm_type)
                 model_name = getattr(
                     current_llm, "model_name", getattr(current_llm, "model", None)
                 )
                 # If model_name is None or 'unknown', use fallback based on agent type
                 if not model_name or model_name == "unknown":
-                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
                     model_name = (
                         "deepseek-reasoner"
-                        if agent_model == "reasoning"
+                        if planner_llm_type == "reasoning"
                         else "deepseek-chat"
                     )
             except Exception as e:
@@ -134,15 +139,13 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 )
                 logger.warning(f"Full traceback: {traceback.format_exc()}")
                 try:
-                    from src.config import get_settings
+                    config_data = settings.load_config()
+                    planner_llm_type = settings.agent_llm_map.get("planner", "basic")
 
-                    config_data = get_settings().load_config()
-                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
-
-                    if agent_model == "basic":
+                    if planner_llm_type == "basic":
                         basic_config = config_data.get("BASIC_MODEL", {})
                         model_name = basic_config.get("model", "deepseek-chat")
-                    elif agent_model == "reasoning":
+                    elif planner_llm_type == "reasoning":
                         reasoning_config = config_data.get("REASONING_MODEL", {})
                         model_name = reasoning_config.get("model", "deepseek-reasoner")
 
@@ -343,15 +346,16 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             # Get current model name
             model_name = "deepseek-chat"  # Default fallback
             try:
-                current_llm = get_llm_by_type(AGENT_LLM_MAP.get("planner", "basic"))
+                settings = get_settings()
+                planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+                current_llm = get_llm_by_type(planner_llm_type)
                 model_name = getattr(
                     current_llm, "model_name", getattr(current_llm, "model", None)
                 )
                 if not model_name or model_name == "unknown":
-                    agent_model = AGENT_LLM_MAP.get("planner", "basic")
                     model_name = (
                         "deepseek-reasoner"
-                        if agent_model == "reasoning"
+                        if planner_llm_type == "reasoning"
                         else "deepseek-chat"
                     )
             except Exception:
@@ -421,8 +425,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             ]
 
     # Configure LLM based on settings
+    settings = get_settings()
+    planner_llm_type = settings.agent_llm_map.get("planner", "basic")
     use_structured_output = (
-        AGENT_LLM_MAP["planner"] == "basic" and not configurable.enable_deep_thinking
+        planner_llm_type == "basic" and not configurable.enable_deep_thinking
     )
 
     if configurable.enable_deep_thinking:
@@ -437,7 +443,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             method="json_mode",
         )
     else:
-        llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
+        llm = get_llm_by_type(planner_llm_type)
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
@@ -630,7 +636,9 @@ def coordinator_node(
     messages = apply_prompt_template("coordinator", state, configurable)
 
     # Context evaluation will be handled automatically by safe_llm_call
-    llm = get_llm_by_type(AGENT_LLM_MAP["coordinator"]).bind_tools([handoff_to_planner])
+    settings = get_settings()
+    coordinator_llm_type = settings.agent_llm_map.get("coordinator", "basic")
+    llm = get_llm_by_type(coordinator_llm_type).bind_tools([handoff_to_planner])
 
     response = safe_llm_call(
         llm.invoke,
@@ -712,7 +720,9 @@ def reporter_node(state: State, config: RunnableConfig):
     logger.debug(f"Current invoke messages: {invoke_messages}")
 
     # Context evaluation will be handled automatically by safe_llm_call
-    llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
+    settings = get_settings()
+    reporter_llm_type = settings.agent_llm_map.get("reporter", "basic")
+    llm = get_llm_by_type(reporter_llm_type)
 
     response = safe_llm_call(
         llm.invoke,

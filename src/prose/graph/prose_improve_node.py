@@ -5,7 +5,7 @@ import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.config.agents import AGENT_LLM_MAP
+from src.config.config_loader import get_settings
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
 from src.prose.graph.state import ProseState
@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 def prose_improve_node(state: ProseState):
     logger.info("Generating prose improve content...")
-    model = get_llm_by_type(AGENT_LLM_MAP["prose_writer"])
+    settings = get_settings()
+    llm_type = settings.agent_llm_map.get("prose_writer", "gpt-4o-mini")
+    model = get_llm_by_type(llm_type)
     prompt_template = get_prompt_template("prose_improver")
     messages = [
         SystemMessage(content=prompt_template),

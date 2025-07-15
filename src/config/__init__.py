@@ -1,25 +1,35 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 """
-Configuration package with new optimized system.
-Provides unified configuration management with Pydantic models.
+Configuration package with unified configuration system.
+Provides type-safe configuration management with Pydantic models.
 """
 
-# New configuration system
-from .models import AppSettings
-from .config_loader import get_settings
+# Unified configuration system
+from .models import (
+    AppSettings,
+    SearchEngine,
+    RAGProvider,
+    LLMType,
+    ReportStyle,
+    SummaryType,
+    IsolationLevel
+)
+from .config_loader import get_settings, get_config_loader
 
 # Backward compatibility
-from .report_style import ReportStyle
 from .questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
-from .tools import SearchEngine, SELECTED_SEARCH_ENGINE
 
 __all__ = [
     "AppSettings",
     "get_settings",
-    "ReportStyle",
-    "BUILT_IN_QUESTIONS",
-    "BUILT_IN_QUESTIONS_ZH_CN",
+    "get_config_loader",
     "SearchEngine",
-    "SELECTED_SEARCH_ENGINE"
+    "RAGProvider",
+    "LLMType",
+    "ReportStyle",
+    "SummaryType",
+    "IsolationLevel",
+    "BUILT_IN_QUESTIONS",
+    "BUILT_IN_QUESTIONS_ZH_CN"
 ]

@@ -128,6 +128,44 @@ class ConfigLoader:
             # MCP settings
             'DEER_MCP_ENABLED': ['mcp', 'enabled'],
             'DEER_MCP_TIMEOUT': ['mcp', 'timeout'],
+            
+            # Tool settings
+            'SELECTED_SEARCH_ENGINE': ['tools', 'search_engine'],
+            'SELECTED_RAG_PROVIDER': ['tools', 'rag_provider'],
+            
+            # Performance settings
+            'DEER_ENABLE_ADVANCED_OPTIMIZATION': ['performance', 'enable_advanced_optimization'],
+            'DEER_ENABLE_COLLABORATION': ['performance', 'enable_collaboration'],
+            'DEER_PERFORMANCE_DEBUG_MODE': ['performance', 'debug_mode'],
+            
+            # Connection pool settings
+            'DEER_MAX_CONNECTIONS': ['performance', 'connection_pool', 'max_connections'],
+            'DEER_INITIAL_CONNECTIONS': ['performance', 'connection_pool', 'initial_connections'],
+            'DEER_CONNECTION_TIMEOUT': ['performance', 'connection_pool', 'connection_timeout'],
+            'DEER_IDLE_TIMEOUT': ['performance', 'connection_pool', 'idle_timeout'],
+            
+            # Batch processing settings
+            'DEER_BATCH_SIZE': ['performance', 'batch_processing', 'batch_size'],
+            'DEER_BATCH_TIMEOUT': ['performance', 'batch_processing', 'batch_timeout'],
+            'DEER_MAX_QUEUE_SIZE': ['performance', 'batch_processing', 'max_queue_size'],
+            
+            # Cache settings
+            'DEER_L1_CACHE_SIZE': ['performance', 'cache', 'l1_size'],
+            'DEER_L2_CACHE_SIZE': ['performance', 'cache', 'l2_size'],
+            'DEER_L3_CACHE_SIZE': ['performance', 'cache', 'l3_size'],
+            'DEER_CACHE_TTL': ['performance', 'cache', 'default_ttl'],
+            
+            # Rate limit settings
+            'DEER_INITIAL_RATE': ['performance', 'rate_limit', 'initial_rate'],
+            'DEER_MAX_RATE': ['performance', 'rate_limit', 'max_rate'],
+            'DEER_MIN_RATE': ['performance', 'rate_limit', 'min_rate'],
+            
+            # Agent LLM mapping settings
+            'DEER_COORDINATOR_LLM': ['agent_llm_map', 'coordinator'],
+            'DEER_PLANNER_LLM': ['agent_llm_map', 'planner'],
+            'DEER_RESEARCHER_LLM': ['agent_llm_map', 'researcher'],
+            'DEER_CODER_LLM': ['agent_llm_map', 'coder'],
+            'DEER_REPORTER_LLM': ['agent_llm_map', 'reporter'],
         }
         
         for env_var, config_key in env_mappings.items():
@@ -143,11 +181,14 @@ class ConfigLoader:
                 elif value.replace('.', '', 1).isdigit():
                     value = float(value)
                 
-                # Handle nested keys
+                # Handle nested keys (supports multi-level nesting)
                 if isinstance(config_key, list):
                     current = env_config
                     for key in config_key[:-1]:
                         if key not in current:
+                            current[key] = {}
+                        elif not isinstance(current[key], dict):
+                            # If existing value is not a dict, convert it to dict
                             current[key] = {}
                         current = current[key]
                     current[config_key[-1]] = value

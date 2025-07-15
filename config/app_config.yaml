@@ -1,0 +1,189 @@
+# DeerFlow Application Configuration
+# This is the main configuration file for the DeerFlow application.
+# All settings can be overridden by environment variables with the DEER_ prefix.
+
+# Core application settings
+report_style: "detailed"  # Options: detailed, concise, academic
+resources: "comprehensive"  # Options: basic, standard, comprehensive
+
+# LLM Configuration
+llm:
+  provider: "openai"  # Options: openai, anthropic, azure, local
+  model: "gpt-4"  # Model name
+  temperature: 0.7  # Creativity level (0.0-1.0)
+  max_tokens: 4096  # Maximum tokens per request
+  timeout: 60  # Request timeout in seconds
+  api_key: null  # Will be loaded from environment variable
+  base_url: null  # Custom API base URL if needed
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 5432
+  name: "deerflow"
+  user: "deerflow_user"
+  password: null  # Will be loaded from environment variable
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false  # Set to true for SQL query logging
+
+# Agent Configuration
+agents:
+  max_plan_iterations: 5
+  max_step_num: 10
+  max_search_results: 10
+  enable_deep_thinking: true
+  enable_parallel_execution: true
+  max_parallel_tasks: 3
+  max_context_steps_parallel: 5
+  disable_context_parallel: false
+
+# Research Configuration
+research:
+  enable_researcher_isolation: true
+  researcher_isolation_level: "moderate"  # Options: low, moderate, high
+  researcher_max_local_context: 1000
+  researcher_isolation_threshold: 0.7
+  researcher_auto_isolation: true
+  researcher_isolation_metrics: ["similarity", "relevance"]
+  max_context_steps_researcher: 10
+
+# Reflection Configuration
+reflection:
+  enable_enhanced_reflection: true
+  max_reflection_loops: 3
+  reflection_temperature: 0.5
+  reflection_trigger_threshold: 0.8
+  reflection_confidence_threshold: 0.9
+  enable_reflection_integration: true
+  enable_progressive_reflection: true
+  enable_reflection_metrics: true
+
+# Iterative Research Configuration
+iterative_research:
+  max_follow_up_iterations: 3
+  sufficiency_threshold: 0.85
+  enable_iterative_research: true
+  max_queries_per_iteration: 5
+  follow_up_delay_seconds: 2
+
+# Content Configuration
+content:
+  enable_content_summarization: true
+  enable_smart_filtering: true
+  summary_type: "extractive"  # Options: extractive, abstractive, hybrid
+
+# Advanced Context Configuration
+advanced_context:
+  max_context_ratio: 0.8
+  sliding_window_size: 1000
+  overlap_ratio: 0.1
+  compression_threshold: 0.7
+  default_strategy: "sliding_window"  # Options: sliding_window, hierarchical, adaptive
+  enable_caching: true
+  enable_analytics: true
+  debug_mode: false
+
+# MCP (Model Context Protocol) Configuration
+mcp:
+  enabled: false
+  timeout: 30
+  servers: []
+
+# Tool Configuration
+tools:
+  search_engine: "tavily"  # Options: tavily, duckduckgo, brave_search, arxiv
+  rag_provider: null  # Options: ragflow, null
+
+# Performance Configuration
+performance:
+  enable_advanced_optimization: true
+  enable_collaboration: true
+  debug_mode: false
+  
+  # Connection Pool Settings
+  connection_pool:
+    max_connections: 50
+    initial_connections: 10
+    connection_timeout: 30.0
+    idle_timeout: 300.0
+    max_retries: 3
+  
+  # Batch Processing Settings
+  batch_processing:
+    batch_size: 10
+    batch_timeout: 1.5
+    max_queue_size: 1000
+    priority_enabled: true
+    adaptive_sizing: true
+  
+  # Cache Settings
+  cache:
+    l1_size: 1000
+    l2_size: 5000
+    l3_size: 10000
+    default_ttl: 3600  # 1 hour
+    cleanup_interval: 300  # 5 minutes
+    eviction_policy: "lru"  # Options: lru, lfu, fifo
+  
+  # Rate Limiting Settings
+  rate_limit:
+    initial_rate: 10.0  # requests per second
+    max_rate: 100.0
+    min_rate: 1.0
+    adaptation_factor: 1.2
+    window_size: 60  # seconds
+    time_window: 60  # seconds (alias for compatibility)
+    burst_allowance: 20
+  
+  # Error Recovery Settings
+  error_recovery:
+    max_retries: 3
+    base_delay: 1.0
+    max_delay: 60.0
+    exponential_base: 2.0
+    circuit_breaker_threshold: 5
+    circuit_breaker_timeout: 60.0
+    jitter_enabled: true
+  
+  # Parallel Execution Settings
+  parallel_execution:
+    max_workers: 20
+    queue_size: 1000
+    priority_levels: 3
+    load_balancing: true
+    worker_timeout: 300.0
+    health_check_interval: 30.0
+  
+  # Monitoring Settings
+  monitoring:
+    metrics_enabled: true
+    detailed_logging: true
+    slow_request_threshold: 10.0  # seconds
+    high_utilization_threshold: 0.8
+    metrics_retention: 86400  # 24 hours
+    export_interval: 60  # seconds
+
+# Agent-LLM Mapping Configuration
+agent_llm_map:
+  coordinator: "basic"
+  planner: "basic"
+  researcher: "basic"
+  coder: "basic"
+  reporter: "basic"
+  podcast_script_writer: "basic"
+  ppt_composer: "basic"
+  prose_writer: "basic"
+  prompt_enhancer: "basic"
+
+# Model Token Limits (for reference)
+model_token_limits:
+  gpt-4: 8192
+  gpt-4-32k: 32768
+  gpt-3.5-turbo: 4096
+  gpt-3.5-turbo-16k: 16384
+  claude-3-opus: 200000
+  claude-3-sonnet: 200000
+  claude-3-haiku: 200000

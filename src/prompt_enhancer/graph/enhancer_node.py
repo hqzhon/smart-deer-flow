@@ -5,7 +5,7 @@ import logging
 
 from langchain.schema import HumanMessage
 
-from src.config.agents import AGENT_LLM_MAP
+from src.config.config_loader import get_settings
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
 from src.utils.template import apply_prompt_template
@@ -18,7 +18,9 @@ def prompt_enhancer_node(state: PromptEnhancerState):
     """Node that enhances user prompts using AI analysis."""
     logger.info("Enhancing user prompt...")
 
-    model = get_llm_by_type(AGENT_LLM_MAP["prompt_enhancer"])
+    settings = get_settings()
+    llm_type = settings.agent_llm_map.get("prompt_enhancer", "gpt-4o-mini")
+    model = get_llm_by_type(llm_type)
 
     try:
 

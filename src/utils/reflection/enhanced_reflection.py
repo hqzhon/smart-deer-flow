@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
-from src.config.agents import AGENT_LLM_MAP
+from src.config.config_loader import get_settings
 from src.utils.reflection.reflection_prompt_manager import ReflectionPromptManager
 from src.report_quality.i18n import Language
 
