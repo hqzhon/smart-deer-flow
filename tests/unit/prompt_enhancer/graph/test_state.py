@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from src.prompt_enhancer.graph.state import PromptEnhancerState
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 
 
 def test_prompt_enhancer_state_creation():

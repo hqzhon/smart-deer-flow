@@ -7,13 +7,11 @@ Uses the new optimized configuration system with Pydantic models.
 import argparse
 import asyncio
 import logging
-import sys
-from pathlib import Path
 
 from InquirerPy import inquirer
 
 from src.config import get_settings
-from src.config.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
+from src.constants.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 from src.workflow import run_agent_workflow_async
 
 # Configure logging
@@ -59,17 +57,17 @@ def ask(
     """
     # Initialize configuration
     settings = initialize_configuration(config_path)
-    
+
     # Override configuration if provided
     if max_plan_iterations is not None:
         settings.agents.max_plan_iterations = max_plan_iterations
     if max_step_num is not None:
         settings.agents.max_step_num = max_step_num
-    
+
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug(f"Configuration: {settings.dict()}")
-    
+
     asyncio.run(
         run_agent_workflow_async(
             user_input=question,
@@ -101,11 +99,11 @@ def main(
     """
     # Initialize configuration
     settings = initialize_configuration(config_path)
-    
+
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug(f"Configuration: {settings.dict()}")
-    
+
     # First select language
     language = inquirer.select(
         message="Select language / 选择语言:",
@@ -162,10 +160,10 @@ Examples:
   %(prog)s --debug --max-plan-iterations 5 "Analyze AI safety concerns"
         """
     )
-    
+
     parser.add_argument(
-        "query", 
-        nargs="*", 
+        "query",
+        nargs="*",
         help="The research query to process"
     )
     parser.add_argument(

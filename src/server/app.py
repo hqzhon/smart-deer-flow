@@ -18,7 +18,7 @@ from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
 from langgraph.types import Command
 from src.utils.decorators import safe_background_task
 
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
 from src.utils.performance.performance_optimizer import (

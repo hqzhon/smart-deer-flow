@@ -3,7 +3,7 @@
 
 import pytest
 from pydantic import ValidationError
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 from src.rag.retriever import Resource
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi import HTTPException

@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from src.server.app import app, _make_event, _astream_workflow_generator
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 from langchain_core.messages import AIMessageChunk

@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from src.prompt_enhancer.graph.enhancer_node import prompt_enhancer_node
 from src.prompt_enhancer.graph.state import PromptEnhancerState
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 
 
 @pytest.fixture

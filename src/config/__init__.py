@@ -18,7 +18,7 @@ from .models import (
 from .config_loader import get_settings, get_config_loader
 
 # Backward compatibility
-from .questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
+from src.constants.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 
 __all__ = [
     "AppSettings",

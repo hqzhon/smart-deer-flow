@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from typing import TypedDict, Optional
-from src.config.report_style import ReportStyle
+from src.models.report_style import ReportStyle
 
 
 class PromptEnhancerState(TypedDict):
