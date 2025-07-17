@@ -147,7 +147,8 @@ def get_configuration_from_config(config):
                     "mcp",
                     type("mcp", (), {"enabled": False, "servers": [], "timeout": 30})(),
                 )
-
+        if "configurable" in config:
+            config = config["configurable"]
         return ConfigWithOverrides(base_settings, config)
 
     except Exception as e:
