@@ -329,10 +329,6 @@ def planner_node(
     # Debug: Log the max_step_num value from configurable
     max_step_num_value = getattr(configurable, "max_step_num", "NOT_FOUND")
     logger.info(f"DEBUG: configurable.max_step_num = {max_step_num_value}")
-    logger.info(f"DEBUG: configurable type = {type(configurable)}")
-    logger.info(
-        f"DEBUG: configurable attributes = {[attr for attr in dir(configurable) if not attr.startswith('_')]}"
-    )
 
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     messages = apply_prompt_template("planner", state, configurable)

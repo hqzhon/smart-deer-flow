@@ -171,9 +171,9 @@ class ContentProcessor:
             # Load model_token_limits from new configuration system
             for model_name, limits_config in settings.model_token_limits.items():
                 model_limits[model_name] = ModelTokenLimits(
-                    input_limit=limits_config.get("input_limit", 32000),
-                    output_limit=limits_config.get("output_limit", 4096),
-                    context_window=limits_config.get("context_window", 32000),
+                    input_limit=limits_config.get("input_limit", 65536),
+                    output_limit=limits_config.get("output_limit", 8192),
+                    context_window=limits_config.get("context_window", 65536),
                     safety_margin=limits_config.get("safety_margin", 0.8),
                 )
                 logger.info(

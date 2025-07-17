@@ -70,7 +70,7 @@ class ResearcherProgressiveEnabler:
         self.reflection_agent = None
         if config and getattr(config, "enable_enhanced_reflection", True):
             try:
-                from .enhanced_reflection import EnhancedReflectionAgent
+                from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent
 
                 self.reflection_agent = EnhancedReflectionAgent(config)
                 logger.info(
@@ -282,7 +282,7 @@ class ResearcherProgressiveEnabler:
         if self.reflection_agent:
             try:
                 # Create reflection context for analysis
-                from .enhanced_reflection import ReflectionContext
+                from src.utils.reflection.enhanced_reflection import ReflectionContext
                 import asyncio
 
                 reflection_context = ReflectionContext(

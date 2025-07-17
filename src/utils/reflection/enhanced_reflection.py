@@ -198,7 +198,8 @@ class EnhancedReflectionAgent:
 
         # Reflection configuration
         self.max_reflection_loops = getattr(self.config, "max_reflection_loops", 3)
-        self.reflection_model = getattr(self.config, "reflection_model", None)
+        self.reflection_model_name = getattr(self.config, "reflection_model", None)
+        self.reflection_model = None  # Will be initialized lazily via _get_reflection_model
         self.reflection_temperature = getattr(
             self.config, "reflection_temperature", 0.7
         )
@@ -719,19 +720,10 @@ class EnhancedReflectionAgent:
         try:
             from src.llms.llm import get_llm_by_type
 
-            # from src.config.configuration import Configuration  # Removed - using new config system
+            # Default to basic model
+            model_type = "basic"
 
-            # Check if we have reflection model configured directly
-            if (
-                hasattr(self.config, "reflection_model")
-                and self.config.reflection_model
-            ):
-                return self.config.reflection_model
-
-            # Use enable_deep_thinking to determine model type, similar to nodes.py
-            model_type = "basic"  # Default fallback
-
-            # Try to get enable_deep_thinking from runnable_config or use basic model
+            # Check enable_deep_thinking from runnable_config
             if runnable_config:
                 try:
                     from src.graph.nodes import get_configuration_from_config
@@ -743,17 +735,16 @@ class EnhancedReflectionAgent:
                         and config.agents.enable_deep_thinking
                     ):
                         model_type = "reasoning"
-                    else:
-                        model_type = "basic"
                 except Exception as config_error:
                     logger.warning(
                         f"Failed to get configuration from runnable_config: {config_error}"
                     )
-                    model_type = "basic"
-            else:
-                model_type = "basic"
 
-            return get_llm_by_type(model_type)
+            # Get the model and cache it
+            model = get_llm_by_type(model_type)
+            if model:
+                self.reflection_model = model
+            return model
 
         except Exception as e:
             logger.warning(f"Failed to get LLM instance: {e}")

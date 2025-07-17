@@ -69,7 +69,7 @@ class ResearcherContextExtension:
         self.reflection_agent = None
         if self.config.get("enable_enhanced_reflection", True):
             try:
-                from .enhanced_reflection import EnhancedReflectionAgent
+                from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent
 
                 self.reflection_agent = EnhancedReflectionAgent(config=self.config)
                 logger.info(
