@@ -141,7 +141,7 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
     # Get configuration settings
     settings = get_settings()
     selected_search_engine = settings.tools.search_engine
-    
+
     # Get the base search tool based on selected engine
     if selected_search_engine == SearchEngine.TAVILY:
         base_tool = LoggedTavilySearch(
@@ -158,7 +158,9 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
         )
     elif selected_search_engine == SearchEngine.BRAVE_SEARCH:
         # Get API key from configuration
-        brave_api_key = getattr(settings.tools, 'brave_search_api_key', '') or os.getenv("BRAVE_SEARCH_API_KEY", "")
+        brave_api_key = getattr(
+            settings.tools, "brave_search_api_key", ""
+        ) or os.getenv("BRAVE_SEARCH_API_KEY", "")
         base_tool = LoggedBraveSearch(
             name="web_search_base",
             search_wrapper=BraveSearchWrapper(
@@ -198,7 +200,7 @@ def get_raw_web_search_tool(max_search_results: int):
     # Get configuration settings
     settings = get_settings()
     selected_search_engine = settings.tools.search_engine
-    
+
     if selected_search_engine == SearchEngine.TAVILY:
         return LoggedTavilySearch(
             name="web_search",
@@ -214,7 +216,9 @@ def get_raw_web_search_tool(max_search_results: int):
         )
     elif selected_search_engine == SearchEngine.BRAVE_SEARCH:
         # Get API key from configuration
-        brave_api_key = getattr(settings.tools, 'brave_search_api_key', '') or os.getenv("BRAVE_SEARCH_API_KEY", "")
+        brave_api_key = getattr(
+            settings.tools, "brave_search_api_key", ""
+        ) or os.getenv("BRAVE_SEARCH_API_KEY", "")
         return LoggedBraveSearch(
             name="web_search",
             search_wrapper=BraveSearchWrapper(

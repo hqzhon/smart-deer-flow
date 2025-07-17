@@ -10,14 +10,13 @@ import logging
 
 from InquirerPy import inquirer
 
-from src.config import get_settings
+from src.config import get_settings, load_configuration
 from src.constants.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 from src.workflow import run_agent_workflow_async
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -25,14 +24,16 @@ logger = logging.getLogger(__name__)
 def initialize_configuration(config_path: str = "conf.yaml"):
     """Initialize the new configuration system."""
     try:
-        settings = get_settings()
-        logger.info("Configuration loaded successfully")
+        # Load configuration from specified path
+        settings = load_configuration(config_path)
+        logger.info(f"Configuration loaded successfully from {config_path}")
         logger.info(f"Configuration summary: {settings.report_style}")
         return settings
     except Exception as e:
-        logger.error(f"Failed to load configuration: {e}")
+        logger.error(f"Failed to load configuration from {config_path}: {e}")
         logger.info("Using default configuration")
-        return get_settings()
+        # Fallback to default configuration
+        return load_configuration("conf.yaml")
 
 
 def ask(
@@ -42,7 +43,7 @@ def ask(
     max_step_num=None,
     enable_background_investigation=True,
     enable_collaboration=True,
-    config_path="conf.yaml"
+    config_path="conf.yaml",
 ):
     """Run the agent workflow with the given question using new configuration.
 
@@ -72,8 +73,9 @@ def ask(
         run_agent_workflow_async(
             user_input=question,
             debug=debug,
+            max_step_num=max_step_num,
             settings=settings,
-            enable_background_investigation=enable_background_investigation,
+            enable_background_research=enable_background_investigation,
             enable_collaboration=enable_collaboration,
         )
     )
@@ -85,7 +87,7 @@ def main(
     max_step_num=None,
     enable_background_investigation=True,
     enable_collaboration=True,
-    config_path="conf.yaml"
+    config_path="conf.yaml",
 ):
     """Interactive mode with built-in questions using new configuration.
 
@@ -143,7 +145,7 @@ def main(
         max_step_num=max_step_num,
         enable_background_investigation=enable_background_investigation,
         enable_collaboration=enable_collaboration,
-        config_path=config_path
+        config_path=config_path,
     )
 
 
@@ -158,41 +160,37 @@ Examples:
   %(prog)s --interactive
   %(prog)s --config custom.yaml "Research renewable energy trends"
   %(prog)s --debug --max-plan-iterations 5 "Analyze AI safety concerns"
-        """
+        """,
     )
 
-    parser.add_argument(
-        "query",
-        nargs="*",
-        help="The research query to process"
-    )
+    parser.add_argument("query", nargs="*", help="The research query to process")
     parser.add_argument(
         "--interactive",
         action="store_true",
-        help="Run in interactive mode with built-in questions"
+        help="Run in interactive mode with built-in questions",
     )
     parser.add_argument(
         "--config",
         type=str,
         default="conf.yaml",
-        help="Configuration file path (default: conf.yaml)"
+        help="Configuration file path (default: conf.yaml)",
     )
     parser.add_argument(
         "--max-plan-iterations",
         type=int,
-        help="Maximum number of plan iterations (overrides config)"
+        help="Maximum number of plan iterations (overrides config)",
     )
     parser.add_argument(
         "--max-step-num",
         type=int,
-        help="Maximum number of steps in a plan (overrides config)"
+        help="Maximum number of steps in a plan (overrides config)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "--no-background-investigation",
         action="store_false",
         dest="enable_background_investigation",
-        help="Disable background investigation before planning"
+        help="Disable background investigation before planning",
     )
 
     args = parser.parse_args()
@@ -204,7 +202,7 @@ Examples:
             max_plan_iterations=args.max_plan_iterations,
             max_step_num=args.max_step_num,
             enable_background_investigation=args.enable_background_investigation,
-            config_path=args.config
+            config_path=args.config,
         )
     else:
         # Parse user input from command line arguments or user input
@@ -220,7 +218,7 @@ Examples:
                 max_plan_iterations=args.max_plan_iterations,
                 max_step_num=args.max_step_num,
                 enable_background_investigation=args.enable_background_investigation,
-                config_path=args.config
+                config_path=args.config,
             )
         else:
             print("No query provided. Use --interactive for guided mode.")

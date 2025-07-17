@@ -15,5 +15,5 @@ __all__ = [
     "repair_json_output",
     "get_logger",
     "EventType",
-    "SearchResultFilter"
+    "SearchResultFilter",
 ]

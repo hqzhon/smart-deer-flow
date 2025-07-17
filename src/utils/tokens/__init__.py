@@ -14,5 +14,5 @@ __all__ = [
     "TokenValidationResult",
     "TokenCounter",
     "ContentProcessor",
-    "EnhancedMessageExtractor"
+    "EnhancedMessageExtractor",
 ]

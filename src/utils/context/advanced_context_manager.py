@@ -78,11 +78,11 @@ class AdvancedContextManager:
         self.config = config or {}
         # Get model token limits from config or use defaults
         model_token_limits = {}
-        if config and hasattr(config, 'model_token_limits'):
+        if config and hasattr(config, "model_token_limits"):
             model_token_limits = config.model_token_limits
         elif isinstance(config, dict):
-            model_token_limits = config.get('model_token_limits', {})
-        
+            model_token_limits = config.get("model_token_limits", {})
+
         self.content_processor = content_processor or ContentProcessor(
             model_token_limits
         )
@@ -281,21 +281,25 @@ class AdvancedContextManager:
 
         return "\n".join(step_info)
 
-    def _validate_token_budget(self, segments: List[ContextSegment], max_tokens: int, model_name: str) -> List[ContextSegment]:
+    def _validate_token_budget(
+        self, segments: List[ContextSegment], max_tokens: int, model_name: str
+    ) -> List[ContextSegment]:
         """Validate and ensure segments fit within token budget using precise calculation.
-        
+
         Args:
             segments: List of context segments
             max_tokens: Maximum token limit
             model_name: Model name for accurate token calculation
-            
+
         Returns:
             Validated segments that fit within token budget
         """
         # Calculate precise token count for all segments
         total_content = "\n\n".join([seg.content for seg in segments])
-        actual_tokens = self.token_manager.count_tokens_precise(total_content, model_name)
-        
+        actual_tokens = self.token_manager.count_tokens_precise(
+            total_content, model_name
+        )
+
         if actual_tokens <= max_tokens:
             # Update segment token counts with more accurate values
             for segment in segments:
@@ -303,23 +307,25 @@ class AdvancedContextManager:
                     segment.content, model_name
                 )
             return segments
-            
+
         logger.warning(
             f"Token validation failed: {actual_tokens} > {max_tokens}, applying emergency truncation"
         )
-        
+
         # Apply emergency truncation with precise token calculation
         validated_segments = []
         used_tokens = 0
-        
+
         # Sort by priority to preserve most important content
-        sorted_segments = sorted(segments, key=lambda x: (x.priority.value, -x.importance_score))
-        
+        sorted_segments = sorted(
+            segments, key=lambda x: (x.priority.value, -x.importance_score)
+        )
+
         for segment in sorted_segments:
             segment_tokens = self.token_manager.count_tokens_precise(
                 segment.content, model_name
             )
-            
+
             if used_tokens + segment_tokens <= max_tokens:
                 segment.token_count = segment_tokens
                 validated_segments.append(segment)
@@ -329,7 +335,11 @@ class AdvancedContextManager:
                 remaining_tokens = max_tokens - used_tokens
                 if remaining_tokens > 50:  # Minimum viable segment size
                     truncated_content = self.token_manager.truncate_to_token_limit(
-                        segment.content, remaining_tokens, model_name, preserve_start=True, preserve_end=False
+                        segment.content,
+                        remaining_tokens,
+                        model_name,
+                        preserve_start=True,
+                        preserve_end=False,
                     )
                     if truncated_content:
                         truncated_segment = ContextSegment(
@@ -342,23 +352,25 @@ class AdvancedContextManager:
                         )
                         validated_segments.append(truncated_segment)
                 break
-                
+
         return validated_segments
-    
-    def _precise_truncate_content(self, content: str, max_tokens: int, model_name: str) -> str:
+
+    def _precise_truncate_content(
+        self, content: str, max_tokens: int, model_name: str
+    ) -> str:
         """Precisely truncate content using TokenManager to fit token limit.
-        
+
         Args:
             content: Content to truncate
             max_tokens: Maximum token limit
             model_name: Model name for token calculation
-            
+
         Returns:
             Truncated content that fits within token limit
         """
         if not content:
             return content
-            
+
         # Use TokenManager for consistent truncation
         return self.token_manager.truncate_to_token_limit(
             content, max_tokens, model_name, preserve_start=True, preserve_end=False
@@ -391,13 +403,17 @@ class AdvancedContextManager:
         elif strategy == CompressionStrategy.SLIDING_WINDOW:
             compressed_segments = self._apply_sliding_window(segments, max_tokens)
         elif strategy == CompressionStrategy.HIERARCHICAL:
-            compressed_segments = self._apply_hierarchical_selection(segments, max_tokens)
+            compressed_segments = self._apply_hierarchical_selection(
+                segments, max_tokens
+            )
         elif strategy == CompressionStrategy.SUMMARIZE:
-            compressed_segments = self._apply_summarization(segments, max_tokens, model_name)
+            compressed_segments = self._apply_summarization(
+                segments, max_tokens, model_name
+            )
         else:
             # Fallback to truncation
             compressed_segments = self._apply_truncation(segments, max_tokens)
-            
+
         # Always validate the final result with precise token calculation
         return self._validate_token_budget(compressed_segments, max_tokens, model_name)
 
@@ -628,11 +644,9 @@ Summary (keep under {remaining_tokens // 4} words):"""
         for sentence in sentences:
             test_content = truncated + sentence + ". "
             if (
-            self.token_manager.count_tokens_precise(
-                test_content, "deepseek-chat"
-            )
-            <= max_tokens
-        ):
+                self.token_manager.count_tokens_precise(test_content, "deepseek-chat")
+                <= max_tokens
+            ):
                 truncated = test_content
             else:
                 break
@@ -649,9 +663,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
 
         # If still too long, apply more aggressive compression
         if (
-            self.token_manager.count_tokens_precise(
-                truncated, "deepseek-chat"
-            )
+            self.token_manager.count_tokens_precise(truncated, "deepseek-chat")
             > max_tokens
         ):
             # Extract key information using regex patterns
@@ -671,9 +683,7 @@ Summary (keep under {remaining_tokens // 4} words):"""
             if key_info:
                 compressed = "\n".join(key_info[:3])  # Top 3 key pieces
                 if (
-                    self.token_manager.count_tokens_precise(
-                        compressed, "deepseek-chat"
-                    )
+                    self.token_manager.count_tokens_precise(compressed, "deepseek-chat")
                     <= max_tokens
                 ):
                     return compressed

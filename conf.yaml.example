@@ -1,74 +1,272 @@
-# [!NOTE]
-# Read the `docs/configuration_guide.md` carefully, and update the
-# configurations to match your specific settings and requirements.
-# - Replace `api_key` with your own credentials.
-# - Replace `base_url` and `model` name if you want to use a custom model.
+# ============================================================================
+# DeerFlow Configuration Example
+# ============================================================================
+# This is a comprehensive configuration example for DeerFlow AI research framework.
+# Read the `docs/configuration_guide.md` carefully, and update the configurations
+# to match your specific settings and requirements.
+#
+# IMPORTANT NOTES:
+# - Replace `api_key` with your own credentials
+# - Replace `base_url` and `model` name if you want to use a custom model
 # - Set `verify_ssl` to `false` if your LLM server uses self-signed certificates
-# - A restart is required every time you change the `config.yaml` file.
+# - A restart is required every time you change the configuration file
+# - All configurations below are optional except for LLM settings
+# ============================================================================
 
-BASIC_MODEL:
-  base_url: https://ark.cn-beijing.volces.com/api/v3
-  model: "doubao-1-5-pro-32k-250115"
-  api_key: xxxx
-  # verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+# ============================================================================
+# REQUIRED CONFIGURATIONS
+# ============================================================================
+# These are the minimum required configurations to run DeerFlow
+
+# LLM Configuration - REQUIRED
+# Configure your Language Learning Models here
+llm:
+  # Basic model configuration - REQUIRED for all operations
+  basic_model:
+    model: "doubao-1-5-pro-32k-250115"           # Model name/identifier
+    api_key: "your_api_key_here"                  # Your API key - REQUIRED
+    base_url: "https://ark.cn-beijing.volces.com/api/v3"  # API endpoint URL
+    temperature: 0.7                              # Response creativity (0.0-2.0)
+    max_tokens: 4096                              # Maximum tokens per response
+    timeout: 30                                   # Request timeout in seconds
+    verify_ssl: true                              # SSL certificate verification
   
-  # Token limit configuration (for smart content processing)
-  token_limits:
-    input_limit: 32000      # Input token limit
-    output_limit: 4096      # Output token limit
-    context_window: 32000   # Context window size
-    safety_margin: 0.8      # Safety margin (actual usage limit = limit * safety margin)
- 
-# Reasoning model is optional.
-# Uncomment the following settings if you want to use reasoning model
-# for planning.
+  # Reasoning model configuration - OPTIONAL
+  # Uncomment and configure if you want to use a specialized reasoning model for planning
+  # reasoning_model:
+  #   model: "doubao-1-5-thinking-pro-m-250428"
+  #   api_key: "your_reasoning_api_key_here"
+  #   base_url: "https://ark-cn-beijing.bytedance.net/api/v3"
+  #   temperature: 0.5
+  #   max_tokens: 8192
+  #   timeout: 60
+  #   verify_ssl: true
+  
+  # Reflection model configuration - OPTIONAL
+  # Uncomment and configure if you want to use a specialized model for reflection tasks
+  # reflection_model:
+  #   model: "your_reflection_model"
+  #   api_key: "your_reflection_api_key_here"
+  #   base_url: "https://your-reflection-api-endpoint.com"
+  #   temperature: 0.6
+  #   max_tokens: 4096
+  #   timeout: 30
+  #   verify_ssl: true
+  
+  # Global LLM settings
+  temperature: 0.7                                # Default temperature for all models
+  max_tokens: 4096                               # Default max tokens for all models
+  timeout: 30                                    # Default timeout for all models
 
-# REASONING_MODEL:
-#   base_url: https://ark-cn-beijing.bytedance.net/api/v3
-#   model: "doubao-1-5-thinking-pro-m-250428"
-#   api_key: xxxx
-#   # Token limit configuration (optional)
-#   token_limits:
-#     input_limit: 32000
-#     output_limit: 8192
-#     context_window: 32000
-#     safety_margin: 0.8
+# Search Engine Configuration - REQUIRED
+# Configure which search engine to use for research
+tools:
+  search_engine: "tavily"                        # Options: tavily, duckduckgo, brave_search, arxiv
+  # rag_provider: "ragflow"                       # Optional: RAG provider for document retrieval
 
-# Smart content processing configuration
-# Used to solve large model token limit issues
-CONTENT_PROCESSING:
-  enable_smart_chunking: true          # Enable smart chunking
-  enable_content_summarization: true   # Enable content summarization
-  enable_smart_filtering: true         # Enable LLM-based search result filtering
-  chunk_strategy: "auto"               # Chunking strategy: auto, sentences, paragraphs
-  summary_type: "comprehensive"        # Summary type: comprehensive, key_points, abstract
+# Report Style Configuration - REQUIRED
+# Determines the style and format of generated reports
+report_style: "academic"                         # Options: academic, business, technical, casual
 
-# Search configuration
-max_search_results: 3  # Maximum number of search results
+# ============================================================================
+# OPTIONAL CONFIGURATIONS
+# ============================================================================
+# All configurations below are optional and will use default values if not specified
 
-# Parallel execution configuration
-PARALLEL_EXECUTION:
-  enable_parallel_execution: true      # Enable parallel execution
-  max_context_steps_parallel: 1        # Maximum context steps in parallel (reduced for token optimization)
-  disable_context_parallel: false      # Disable context sharing in parallel execution
+# Agent Configuration
+# Controls the behavior of AI agents in the research process
+agents:
+  max_plan_iterations: 1                         # Maximum planning iterations per task
+  max_step_num: 3                                # Maximum steps per agent execution
+  max_search_results: 3                          # Maximum search results to process
+  enable_deep_thinking: false                    # Enable deep thinking mode for complex tasks
+  enable_parallel_execution: true                # Enable parallel agent execution
+  max_parallel_tasks: 3                          # Maximum concurrent parallel tasks
+  max_context_steps_parallel: 1                  # Maximum context steps in parallel execution
+  disable_context_parallel: false                # Disable context sharing in parallel execution
 
-# Advanced context management configuration
-# These settings optimize token usage and prevent context length exceeded errors
-ADVANCED_CONTEXT_MANAGEMENT:
-  max_context_ratio: 0.6               # Use 60% of model limit for context
-  sliding_window_size: 5               # Number of recent interactions to keep
-  overlap_ratio: 0.2                   # Overlap between sliding windows (0.0-1.0)
-  compression_threshold: 0.8           # Trigger compression at 80% token capacity
-  default_strategy: "adaptive"         # Default compression strategy: adaptive, hierarchical, sliding_window, summarize, truncate, none
+# Research Configuration
+# Controls research-specific behaviors and optimizations
+research:
+  enable_researcher_isolation: true              # Enable researcher isolation for focused research
+  researcher_isolation_level: "moderate"         # Options: minimal, moderate, aggressive
+  researcher_max_local_context: 5000             # Maximum local context size for researchers
+  researcher_isolation_threshold: 0.7            # Threshold for triggering isolation (0.0-1.0)
+  researcher_auto_isolation: false               # Automatically trigger isolation based on metrics
+  researcher_isolation_metrics: false            # Enable isolation performance metrics
+  max_context_steps_researcher: 2               # Maximum context steps for researcher agents
+
+# Reflection Configuration
+# Controls the reflection and self-improvement capabilities
+reflection:
+  enable_enhanced_reflection: true               # Enable enhanced reflection capabilities
+  max_reflection_loops: 3                        # Maximum reflection iterations
+  reflection_temperature: 0.7                    # Temperature for reflection model
+  reflection_trigger_threshold: 2                # Threshold for triggering reflection
+  reflection_confidence_threshold: 0.7           # Confidence threshold for reflection decisions
+  enable_reflection_integration: true            # Integrate reflection results into main workflow
+  enable_progressive_reflection: true            # Enable progressive reflection improvement
+  enable_reflection_metrics: true                # Enable reflection performance metrics
+
+# Iterative Research Configuration
+# Controls follow-up research and iterative improvement
+iterative_research:
+  max_follow_up_iterations: 3                    # Maximum follow-up research iterations
+  sufficiency_threshold: 0.7                     # Threshold for research sufficiency (0.0-1.0)
+  enable_iterative_research: true                # Enable iterative research capabilities
+  max_queries_per_iteration: 3                   # Maximum queries per iteration
+  follow_up_delay_seconds: 1.0                   # Delay between follow-up queries
+
+# Content Processing Configuration
+# Controls how content is processed and optimized
+content:
+  enable_content_summarization: true             # Enable automatic content summarization
+  enable_smart_filtering: true                   # Enable intelligent content filtering
+  summary_type: "comprehensive"                  # Options: comprehensive, key_points, abstract
+
+# Advanced Context Management
+# Optimizes token usage and prevents context length exceeded errors
+advanced_context:
+  max_context_ratio: 0.6                         # Use 60% of model limit for context
+  sliding_window_size: 5                         # Number of recent interactions to keep
+  overlap_ratio: 0.2                             # Overlap between sliding windows (0.0-1.0)
+  compression_threshold: 0.8                     # Trigger compression at 80% token capacity
+  default_strategy: "adaptive"                   # Options: adaptive, hierarchical, sliding_window, summarize, truncate, none
   
   # Priority weights for content importance
   priority_weights:
-    critical: 1.0                      # System instructions, current task
-    high: 0.7                          # Recent interactions, key decisions
-    medium: 0.4                        # Historical context, background info
-    low: 0.1                           # Auxiliary information
+    critical: 1.0                                # System instructions, current task
+    high: 0.7                                    # Recent interactions, key decisions
+    medium: 0.4                                  # Historical context, background info
+    low: 0.1                                     # Auxiliary information
   
   # Performance optimization settings
-  enable_caching: true                 # Cache compressed content for reuse
-  enable_analytics: true               # Track optimization statistics
-  debug_mode: false                    # Enable detailed debug logging
+  enable_caching: true                           # Cache compressed content for reuse
+  enable_analytics: true                         # Track optimization statistics
+  debug_mode: false                              # Enable detailed debug logging
+
+# Model Context Protocol (MCP) Configuration
+# Configure external tool integrations
+mcp:
+  enabled: false                                 # Enable MCP server integration
+  timeout: 30                                    # MCP request timeout in seconds
+  servers: []                                    # List of MCP server configurations
+  # Example MCP server configuration:
+  # servers:
+  #   - name: "example-server"
+  #     command: "python"
+  #     args: ["-m", "example_mcp_server"]
+  #     env:
+  #       API_KEY: "your_api_key"
+
+# Performance Configuration
+# Advanced performance optimization settings
+performance:
+  enable_advanced_optimization: true             # Enable advanced performance optimizations
+  enable_collaboration: true                     # Enable collaborative features
+  debug_mode: false                              # Enable performance debug logging
+  
+  # Connection Pool Configuration
+  connection_pool:
+    max_connections: 50                          # Maximum concurrent connections
+    initial_connections: 10                      # Initial connection pool size
+    connection_timeout: 30.0                     # Connection timeout in seconds
+    idle_timeout: 300.0                          # Idle connection timeout in seconds
+    max_retries: 3                               # Maximum connection retry attempts
+  
+  # Batch Processing Configuration
+  batch_processing:
+    batch_size: 10                               # Default batch size for operations
+    batch_timeout: 1.5                           # Batch processing timeout in seconds
+    max_queue_size: 1000                         # Maximum queue size for batch operations
+    priority_enabled: true                       # Enable priority-based batch processing
+    adaptive_sizing: true                        # Enable adaptive batch sizing
+  
+  # Cache Configuration
+  cache:
+    l1_size: 1000                                # Level 1 cache size (most frequently used)
+    l2_size: 5000                                # Level 2 cache size (recently used)
+    l3_size: 10000                               # Level 3 cache size (long-term storage)
+    default_ttl: 3600                            # Default time-to-live in seconds (1 hour)
+    cleanup_interval: 300                        # Cache cleanup interval in seconds (5 minutes)
+    eviction_policy: "lru"                       # Options: lru, lfu, fifo
+  
+  # Rate Limiting Configuration
+  rate_limit:
+    initial_rate: 10.0                           # Initial requests per second
+    max_rate: 100.0                              # Maximum requests per second
+    min_rate: 1.0                                # Minimum requests per second
+    adaptation_factor: 1.2                       # Rate adaptation factor
+    window_size: 60                              # Rate limiting window in seconds
+    burst_allowance: 20                          # Burst request allowance
+  
+  # Error Recovery Configuration
+  error_recovery:
+    max_retries: 3                               # Maximum retry attempts
+    base_delay: 1.0                              # Base delay between retries in seconds
+    max_delay: 60.0                              # Maximum delay between retries in seconds
+    exponential_base: 2.0                        # Exponential backoff base
+    circuit_breaker_threshold: 5                 # Circuit breaker failure threshold
+    circuit_breaker_timeout: 60.0               # Circuit breaker timeout in seconds
+    jitter_enabled: true                         # Enable jitter in retry delays
+  
+  # Parallel Execution Configuration
+  parallel_execution:
+    max_workers: 20                              # Maximum worker threads
+    queue_size: 1000                             # Task queue size
+    priority_levels: 3                           # Number of priority levels
+    load_balancing: true                         # Enable load balancing
+    worker_timeout: 300.0                        # Worker timeout in seconds
+    health_check_interval: 30.0                 # Health check interval in seconds
+  
+  # Monitoring Configuration
+  monitoring:
+    metrics_enabled: true                        # Enable performance metrics collection
+    detailed_logging: true                       # Enable detailed performance logging
+    slow_request_threshold: 10.0                 # Slow request threshold in seconds
+    high_utilization_threshold: 0.8              # High utilization threshold (0.0-1.0)
+    metrics_retention: 86400                     # Metrics retention period in seconds (24 hours)
+    export_interval: 60                          # Metrics export interval in seconds
+
+# Agent-LLM Mapping Configuration
+# Configure which LLM type each agent should use
+agent_llm_map:
+  coordinator: "basic"                           # Options: basic, reasoning, vision
+  planner: "basic"                               # Options: basic, reasoning, vision
+  researcher: "basic"                            # Options: basic, reasoning, vision
+  coder: "basic"                                 # Options: basic, reasoning, vision
+  reporter: "basic"                              # Options: basic, reasoning, vision
+  podcast_script_writer: "basic"                # Options: basic, reasoning, vision
+  ppt_composer: "basic"                          # Options: basic, reasoning, vision
+  prose_writer: "basic"                          # Options: basic, reasoning, vision
+  prompt_enhancer: "basic"                       # Options: basic, reasoning, vision
+
+# Model Token Limits Configuration
+# Configure token limits for specific models (optional)
+model_token_limits:
+  # Example configuration for a specific model
+  # "doubao-1-5-pro-32k-250115":
+  #   input_limit: 32000                          # Input token limit
+  #   output_limit: 4096                          # Output token limit
+  #   context_window: 32000                       # Context window size
+  #   safety_margin: 0.8                          # Safety margin (actual usage = limit * margin)
+
+# Database Configuration (optional)
+# Configure database connections if using persistent storage
+# database:
+#   connection_string: "sqlite:///deerflow.db"    # Database connection string
+#   pool_size: 10                                # Connection pool size
+#   max_overflow: 20                             # Maximum pool overflow
+#   pool_timeout: 30                             # Pool timeout in seconds
+
+# Resources Configuration (optional)
+# Configure additional resources for research
+# resources:
+#   - name: "Custom API"
+#     type: "api"
+#     url: "https://api.example.com"
+#     headers:
+#       Authorization: "Bearer your_token_here"
+#   - name: "Local Documents"
+#     type: "local"
+#     path: "/path/to/documents"

@@ -209,33 +209,33 @@ class LLMErrorHandler(BaseLLMErrorHandler):
         if isinstance(error_message, Exception):
             error_message = str(error_message)
         error_message_lower = error_message.lower()
-        
+
         # Define priority order - more specific errors have higher priority
         priority_order = [
-            LLMErrorType.INVALID_API_KEY,           # Most specific authentication issue
-            LLMErrorType.AUTHENTICATION_ERROR,      # General authentication issue
-            LLMErrorType.PERMISSION_ERROR,          # Access permission issue
-            LLMErrorType.QUOTA_EXCEEDED,            # Specific quota issue
-            LLMErrorType.RATE_LIMIT_EXCEEDED,       # Specific rate limiting
-            LLMErrorType.CONCURRENT_LIMIT_EXCEEDED, # Specific concurrency issue
-            LLMErrorType.CONTENT_TOO_LONG,          # Content length issue
-            LLMErrorType.MODEL_NOT_FOUND,           # Model availability issue
-            LLMErrorType.DATA_INSPECTION_FAILED,    # Content safety issue
-            LLMErrorType.BAD_REQUEST,               # Request format issue
-            LLMErrorType.TIMEOUT_ERROR,             # Specific timeout issue
-            LLMErrorType.NETWORK_ERROR,             # Network connectivity issue
-            LLMErrorType.RESOURCE_EXHAUSTED,        # Resource availability issue
-            LLMErrorType.SERVICE_UNAVAILABLE,       # Service availability issue
-            LLMErrorType.INTERNAL_SERVER_ERROR,     # Server-side issue
+            LLMErrorType.INVALID_API_KEY,  # Most specific authentication issue
+            LLMErrorType.AUTHENTICATION_ERROR,  # General authentication issue
+            LLMErrorType.PERMISSION_ERROR,  # Access permission issue
+            LLMErrorType.QUOTA_EXCEEDED,  # Specific quota issue
+            LLMErrorType.RATE_LIMIT_EXCEEDED,  # Specific rate limiting
+            LLMErrorType.CONCURRENT_LIMIT_EXCEEDED,  # Specific concurrency issue
+            LLMErrorType.CONTENT_TOO_LONG,  # Content length issue
+            LLMErrorType.MODEL_NOT_FOUND,  # Model availability issue
+            LLMErrorType.DATA_INSPECTION_FAILED,  # Content safety issue
+            LLMErrorType.BAD_REQUEST,  # Request format issue
+            LLMErrorType.TIMEOUT_ERROR,  # Specific timeout issue
+            LLMErrorType.NETWORK_ERROR,  # Network connectivity issue
+            LLMErrorType.RESOURCE_EXHAUSTED,  # Resource availability issue
+            LLMErrorType.SERVICE_UNAVAILABLE,  # Service availability issue
+            LLMErrorType.INTERNAL_SERVER_ERROR,  # Server-side issue
         ]
-        
+
         # Check patterns in priority order
         for error_type in priority_order:
             if error_type in self.error_patterns:
                 for pattern in self.error_patterns[error_type]:
                     if pattern in error_message_lower:
                         return error_type
-        
+
         return LLMErrorType.UNKNOWN_ERROR
 
     def should_skip_error(self, error_type: str) -> bool:
@@ -312,7 +312,11 @@ class LLMErrorHandler(BaseLLMErrorHandler):
             raise error
 
 
-def handle_llm_errors(operation_name: str = "LLM Operation", context: str = "", error_handler_instance: Optional[BaseLLMErrorHandler] = None):
+def handle_llm_errors(
+    operation_name: str = "LLM Operation",
+    context: str = "",
+    error_handler_instance: Optional[BaseLLMErrorHandler] = None,
+):
     """LLM error handling decorator
 
     Args:
@@ -373,13 +377,15 @@ def _execute_safe_llm_call_sync(
     max_retries: int,
     enable_smart_processing: bool,
     error_handler_instance: BaseLLMErrorHandler,
-    context_optimizer_instance
+    context_optimizer_instance,
 ) -> Any:
     """Synchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
     try:
-        args, kwargs = context_optimizer_instance.evaluate_and_optimize_context_before_call_sync(
-            llm_func, args, kwargs, operation_name, context
+        args, kwargs = (
+            context_optimizer_instance.evaluate_and_optimize_context_before_call_sync(
+                llm_func, args, kwargs, operation_name, context
+            )
         )
     except Exception as e:
         logger.warning(
@@ -401,11 +407,15 @@ def _execute_safe_llm_call_sync(
             if needs_smart_processing and enable_smart_processing:
                 logger.info("Attempting smart content processing for token limit error")
                 try:
-                    return context_optimizer_instance._handle_content_too_long_error(llm_func, e, *args, **kwargs)
+                    return context_optimizer_instance._handle_content_too_long_error(
+                        llm_func, e, *args, **kwargs
+                    )
                 except Exception as smart_error:
                     logger.error(f"Smart content processing failed: {smart_error}")
                     # Create a new exception with more context information
-                    enhanced_error = Exception(f"Smart processing failed: {smart_error}. Original error: {e}")
+                    enhanced_error = Exception(
+                        f"Smart processing failed: {smart_error}. Original error: {e}"
+                    )
                     enhanced_error.__cause__ = smart_error
                     # If smart processing fails, continue with original error handling flow
                     # Store the enhanced error for potential debugging
@@ -413,7 +423,10 @@ def _execute_safe_llm_call_sync(
 
             error_type = error_handler_instance.classify_error(str(e))
 
-            if error_handler_instance.should_retry_error(error_type) and attempt < max_retries:
+            if (
+                error_handler_instance.should_retry_error(error_type)
+                and attempt < max_retries
+            ):
                 wait_time = 2**attempt  # Exponential backoff
                 logger.info(
                     f"Retry {attempt + 1} failed, retrying in {wait_time} seconds..."
@@ -434,13 +447,15 @@ async def _execute_safe_llm_call_async(
     max_retries: int,
     enable_smart_processing: bool,
     error_handler_instance: BaseLLMErrorHandler,
-    context_optimizer_instance
+    context_optimizer_instance,
 ) -> Any:
     """Asynchronous version of safe LLM call with error handling"""
     # Apply context evaluation before the call
     try:
-        args, kwargs = await context_optimizer_instance.evaluate_and_optimize_context_before_call(
-            llm_func, args, kwargs, operation_name, context
+        args, kwargs = (
+            await context_optimizer_instance.evaluate_and_optimize_context_before_call(
+                llm_func, args, kwargs, operation_name, context
+            )
         )
     except Exception as e:
         logger.warning(
@@ -466,13 +481,23 @@ async def _execute_safe_llm_call_async(
                 logger.info("Attempting smart content processing for token limit error")
                 try:
                     if asyncio.iscoroutinefunction(llm_func):
-                        return await context_optimizer_instance._handle_content_too_long_error_async(llm_func, e, *args, **kwargs)
+                        return await context_optimizer_instance._handle_content_too_long_error_async(
+                            llm_func, e, *args, **kwargs
+                        )
                     else:
-                        return context_optimizer_instance._handle_content_too_long_error(llm_func, e, *args, **kwargs)
+                        return (
+                            context_optimizer_instance._handle_content_too_long_error(
+                                llm_func, e, *args, **kwargs
+                            )
+                        )
                 except Exception as smart_error:
-                    logger.error(f"Async smart content processing failed: {smart_error}")
+                    logger.error(
+                        f"Async smart content processing failed: {smart_error}"
+                    )
                     # Create a new exception with more context information
-                    enhanced_error = Exception(f"Async smart processing failed: {smart_error}. Original error: {e}")
+                    enhanced_error = Exception(
+                        f"Async smart processing failed: {smart_error}. Original error: {e}"
+                    )
                     enhanced_error.__cause__ = smart_error
                     # If smart processing fails, continue with original error handling flow
                     # Store the enhanced error for potential debugging
@@ -480,7 +505,10 @@ async def _execute_safe_llm_call_async(
 
             error_type = error_handler_instance.classify_error(str(e))
 
-            if error_handler_instance.should_retry_error(error_type) and attempt < max_retries:
+            if (
+                error_handler_instance.should_retry_error(error_type)
+                and attempt < max_retries
+            ):
                 wait_time = 2**attempt  # Exponential backoff
                 logger.info(
                     f"Retry {attempt + 1} failed, retrying in {wait_time} seconds..."
@@ -500,7 +528,7 @@ def safe_llm_call(
     max_retries: int = 3,
     enable_smart_processing: bool = True,
     error_handler_instance: Optional[BaseLLMErrorHandler] = None,
-    context_optimizer_instance = None,
+    context_optimizer_instance=None,
     **kwargs,
 ) -> Any:
     """Safe LLM call function with retry mechanism and smart content processing
@@ -525,6 +553,7 @@ def safe_llm_call(
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
         from src.utils.context.execution_context_manager import ExecutionContextManager
+
         context_optimizer_instance = ExecutionContextManager()
 
     return _execute_safe_llm_call_sync(
@@ -536,7 +565,7 @@ def safe_llm_call(
         max_retries,
         enable_smart_processing,
         error_handler_instance,
-        context_optimizer_instance
+        context_optimizer_instance,
     )
 
 
@@ -548,7 +577,7 @@ async def safe_llm_call_async(
     max_retries: int = 3,
     enable_smart_processing: bool = True,
     error_handler_instance: Optional[BaseLLMErrorHandler] = None,
-    context_optimizer_instance = None,
+    context_optimizer_instance=None,
     **kwargs,
 ) -> Any:
     """Safe async LLM call function with retry mechanism and smart content processing
@@ -573,6 +602,7 @@ async def safe_llm_call_async(
         error_handler_instance = LLMErrorHandler()
     if context_optimizer_instance is None:
         from src.utils.context.execution_context_manager import ExecutionContextManager
+
         context_optimizer_instance = ExecutionContextManager()
 
     return await _execute_safe_llm_call_async(
@@ -584,7 +614,7 @@ async def safe_llm_call_async(
         max_retries,
         enable_smart_processing,
         error_handler_instance,
-        context_optimizer_instance
+        context_optimizer_instance,
     )
 
 

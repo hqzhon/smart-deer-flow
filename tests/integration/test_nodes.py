@@ -1269,7 +1269,9 @@ async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
         def get_tools(self):
             return [FakeTool("toolA", "descA")]
 
-    with patch("langchain_mcp_adapters.client.MultiServerMCPClient", return_value=FakeClient()):
+    with patch(
+        "langchain_mcp_adapters.client.MultiServerMCPClient", return_value=FakeClient()
+    ):
         await _setup_and_execute_agent_step(
             mock_state_with_steps,
             mock_config,

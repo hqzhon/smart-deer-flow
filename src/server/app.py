@@ -232,7 +232,9 @@ async def _process_enhanced_batch(batch: List[Dict[str, Any]]):
                 tasks = []
                 for request_data in uncached_batch:
                     task = error_recovery.execute_with_recovery(
-                        _process_single_request, request_data, operation_id=f"batch_request_{request_data.get('id', 'unknown')}"
+                        _process_single_request,
+                        request_data,
+                        operation_id=f"batch_request_{request_data.get('id', 'unknown')}",
                     )
                     tasks.append(task)
 

@@ -47,7 +47,7 @@ class TestContextManagement:
         """Test that context evaluation happens before synchronous LLM calls"""
         # Mock LLM to simulate successful call
         self.mock_llm.invoke.return_value = AIMessage(content="Test response")
-        
+
         # Call safe_llm_call which should handle context evaluation internally
         result = safe_llm_call(
             self.mock_llm.invoke,
@@ -58,12 +58,13 @@ class TestContextManagement:
 
         # Verify LLM was called
         self.mock_llm.invoke.assert_called_once()
-        
+
         # Verify result
         assert result.content == "Test response"
 
     async def test_context_evaluation_before_async_call(self):
         """Test that context evaluation happens before asynchronous LLM calls"""
+
         # Make ainvoke async
         async def mock_ainvoke(*args, **kwargs):
             return AIMessage(content="Test async response")
@@ -86,7 +87,8 @@ class TestContextManagement:
         # Create a mock context optimizer instance
         mock_context_optimizer = Mock()
         mock_context_optimizer.evaluate_and_optimize_context_before_call_sync.return_value = (
-            (self.normal_messages,), {}
+            (self.normal_messages,),
+            {},
         )
 
         # Call safe_llm_call with the mock context optimizer
@@ -95,12 +97,12 @@ class TestContextManagement:
             self.normal_messages,
             operation_name="Test Safe Call",
             context="Test Context",
-            context_optimizer_instance=mock_context_optimizer
+            context_optimizer_instance=mock_context_optimizer,
         )
 
         # Verify LLM was called
         self.mock_llm.invoke.assert_called_once()
-        
+
         # Verify that context evaluation was called
         mock_context_optimizer.evaluate_and_optimize_context_before_call_sync.assert_called_once()
 
@@ -127,7 +129,7 @@ class TestContextManagement:
             self.normal_messages,
             operation_name="Test Safe Async Call",
             context="Test Context",
-            context_optimizer_instance=mock_context_optimizer
+            context_optimizer_instance=mock_context_optimizer,
         )
 
         # Verify that context evaluation was called
@@ -196,17 +198,23 @@ class TestContextManagement:
     def test_message_extraction_from_args(self):
         """Test that messages are correctly extracted from function arguments"""
         # This test is skipped as the function it tests doesn't exist
-        pytest.skip("Function _evaluate_and_optimize_context_before_call_sync does not exist")
+        pytest.skip(
+            "Function _evaluate_and_optimize_context_before_call_sync does not exist"
+        )
 
     def test_message_extraction_from_input_dict(self):
         """Test that messages are correctly extracted from input dictionary"""
         # This test is skipped as the function it tests doesn't exist
-        pytest.skip("Function _evaluate_and_optimize_context_before_call_sync does not exist")
+        pytest.skip(
+            "Function _evaluate_and_optimize_context_before_call_sync does not exist"
+        )
 
     def test_model_name_extraction(self):
         """Test that model name is correctly extracted from LLM instance"""
         # This test is skipped as the function it tests doesn't exist
-        pytest.skip("Function _evaluate_and_optimize_context_before_call_sync does not exist")
+        pytest.skip(
+            "Function _evaluate_and_optimize_context_before_call_sync does not exist"
+        )
 
 
 class TestContextManagementIntegration:

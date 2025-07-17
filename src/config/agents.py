@@ -11,7 +11,7 @@ from .config_loader import get_settings
 
 def get_agent_llm_map() -> AgentLLMSettings:
     """Get the agent-LLM mapping configuration.
-    
+
     Returns:
         The agent-LLM mapping settings.
     """
@@ -24,8 +24,4 @@ def get_agent_llm_map() -> AgentLLMSettings:
 
 
 # Backward compatibility exports
-__all__ = [
-    'LLMType',
-    'AgentLLMSettings',
-    'get_agent_llm_map'
-]
+__all__ = ["LLMType", "AgentLLMSettings", "get_agent_llm_map"]

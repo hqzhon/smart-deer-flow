@@ -116,17 +116,19 @@ class ContentProcessor:
             for pattern in self.SQL_INJECTION_PATTERNS
         ]
 
-    def _normalize_model_limits(self, model_limits: Dict[str, Any]) -> Dict[str, ModelTokenLimits]:
+    def _normalize_model_limits(
+        self, model_limits: Dict[str, Any]
+    ) -> Dict[str, ModelTokenLimits]:
         """Convert various model limit formats to ModelTokenLimits objects.
-        
+
         Args:
             model_limits: Model limits in various formats (dict or ModelTokenLimits)
-            
+
         Returns:
             Dictionary mapping model names to ModelTokenLimits objects
         """
         normalized = {}
-        
+
         for model_name, limits in model_limits.items():
             if isinstance(limits, ModelTokenLimits):
                 # Already a ModelTokenLimits object
@@ -135,86 +137,53 @@ class ContentProcessor:
                 # Convert dictionary to ModelTokenLimits
                 try:
                     normalized[model_name] = ModelTokenLimits(
-                        input_limit=limits.get('input_limit', 65536),
-                        output_limit=limits.get('output_limit', 8192),
-                        context_window=limits.get('context_window', 65536),
-                        safety_margin=limits.get('safety_margin', 0.8)
+                        input_limit=limits.get("input_limit", 65536),
+                        output_limit=limits.get("output_limit", 8192),
+                        context_window=limits.get("context_window", 65536),
+                        safety_margin=limits.get("safety_margin", 0.8),
                     )
-                    logger.debug(f"Converted dictionary to ModelTokenLimits for model: {model_name}")
+                    logger.debug(
+                        f"Converted dictionary to ModelTokenLimits for model: {model_name}"
+                    )
                 except Exception as e:
-                    logger.warning(f"Failed to convert model limits for {model_name}: {e}, using defaults")
+                    logger.warning(
+                        f"Failed to convert model limits for {model_name}: {e}, using defaults"
+                    )
                     normalized[model_name] = self.default_limits
             else:
-                logger.warning(f"Unknown model limits format for {model_name}: {type(limits)}, using defaults")
+                logger.warning(
+                    f"Unknown model limits format for {model_name}: {type(limits)}, using defaults"
+                )
                 normalized[model_name] = self.default_limits
-                
+
         return normalized
 
     def _load_model_limits_from_config(self) -> Dict[str, ModelTokenLimits]:
-        """Load model token limits from configuration file as fallback."""
+        """Load model token limits from new configuration system as fallback."""
         try:
-            import yaml
-            from pathlib import Path
+            from src.config.config_loader import load_configuration
 
-            # Find config file
-            config_paths = [
-                Path("conf.yaml"),
-                Path("config.yaml"),
-                Path("src/config/conf.yaml"),
-                Path("../conf.yaml"),
-            ]
-
-            config_file = None
-            for path in config_paths:
-                if path.exists():
-                    config_file = path
-                    break
-
-            if not config_file:
-                logger.warning("Could not find configuration file")
-                return {}
-
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
+            # Load configuration using new unified system
+            settings = load_configuration()
 
             model_limits = {}
 
-            # Load BASIC_MODEL configuration
-            if "BASIC_MODEL" in config:
-                basic_config = config["BASIC_MODEL"]
-                if "token_limits" in basic_config:
-                    token_config = basic_config["token_limits"]
-                    model_name = basic_config.get("model_name", "deepseek-chat")
-                    model_limits[model_name] = ModelTokenLimits(
-                        input_limit=token_config.get("input_limit", 65536),
-                        output_limit=token_config.get("output_limit", 8192),
-                        context_window=token_config.get("context_window", 65536),
-                        safety_margin=token_config.get("safety_margin", 0.8),
-                    )
-                    logger.info(
-                        f"Loaded token limits for {model_name} from BASIC_MODEL config"
-                    )
-
-            # Load REASONING_MODEL configuration
-            if "REASONING_MODEL" in config:
-                reasoning_config = config["REASONING_MODEL"]
-                if "token_limits" in reasoning_config:
-                    token_config = reasoning_config["token_limits"]
-                    model_name = reasoning_config.get("model_name", "deepseek-reasoner")
-                    model_limits[model_name] = ModelTokenLimits(
-                        input_limit=token_config.get("input_limit", 65536),
-                        output_limit=token_config.get("output_limit", 8192),
-                        context_window=token_config.get("context_window", 65536),
-                        safety_margin=token_config.get("safety_margin", 0.8),
-                    )
-                    logger.info(
-                        f"Loaded token limits for {model_name} from REASONING_MODEL config"
-                    )
+            # Load model_token_limits from new configuration system
+            for model_name, limits_config in settings.model_token_limits.items():
+                model_limits[model_name] = ModelTokenLimits(
+                    input_limit=limits_config.get("input_limit", 32000),
+                    output_limit=limits_config.get("output_limit", 4096),
+                    context_window=limits_config.get("context_window", 32000),
+                    safety_margin=limits_config.get("safety_margin", 0.8),
+                )
+                logger.info(
+                    f"Loaded token limits for {model_name} from new configuration system"
+                )
 
             return model_limits
 
         except Exception as e:
-            logger.error(f"Failed to load model limits from config file: {e}")
+            logger.error(f"Failed to load model limits from new config system: {e}")
             return {}
 
     def validate_input_security(self, content: str) -> Tuple[bool, List[str]]:

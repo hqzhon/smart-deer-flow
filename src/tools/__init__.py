@@ -14,11 +14,11 @@ from .python_repl_tool import PythonREPLTool, DataAnalysisTool
 # Make tools available for import
 __all__ = [
     "WebSearchTool",
-    "ArxivSearchTool", 
+    "ArxivSearchTool",
     "CrawlTool",
     "ArticleExtractorTool",
     "PythonREPLTool",
-    "DataAnalysisTool"
+    "DataAnalysisTool",
 ]
 
 # Legacy compatibility - maintain old interface
@@ -29,10 +29,12 @@ from .search import get_web_search_tool
 from .tts import VolcengineTTS
 
 # Export legacy functions for backward compatibility
-__all__.extend([
-    "crawl_tool",
-    "python_repl_tool",
-    "get_web_search_tool",
-    "get_retriever_tool",
-    "VolcengineTTS"
-])
+__all__.extend(
+    [
+        "crawl_tool",
+        "python_repl_tool",
+        "get_web_search_tool",
+        "get_retriever_tool",
+        "VolcengineTTS",
+    ]
+)

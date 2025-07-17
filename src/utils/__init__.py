@@ -33,7 +33,6 @@ __all__ = [
     "ExecutionContextManager",
     "ContextConfig",
     "ContextEvaluator",
-    
     # Researcher utilities
     "ResearcherContextIsolator",
     "ResearcherContextConfig",
@@ -44,7 +43,6 @@ __all__ = [
     "ResearcherPhase4Integration",
     "ResearcherProgressiveEnablement",
     "ResearcherProgressiveEnablementPhase4",
-    
     # Performance optimization
     "PerformanceOptimizer",
     "TaskPriority",
@@ -54,14 +52,12 @@ __all__ = [
     "HierarchicalMemoryManager",
     "CacheLevel",
     "EvictionPolicy",
-    
     # Token and content management
     "TokenManager",
     "TokenValidationResult",
     "TokenCounter",
     "ContentProcessor",
     "EnhancedMessageExtractor",
-    
     # System infrastructure
     "HealthCheck",
     "HealthStatus",
@@ -71,16 +67,14 @@ __all__ = [
     "ErrorRecovery",
     "CallbackSafety",
     "DependencyInjection",
-    
     # Configuration management
     "# Removed - use get_settings() instead",
     "# Removed - use get_settings() instead",
-    
     # Common utilities
     "safe_background_task",
     "retry_with_backoff",
     "JsonUtils",
     "get_logger",
     "EventType",
-    "SearchResultFilter"
+    "SearchResultFilter",
 ]

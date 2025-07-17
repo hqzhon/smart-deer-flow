@@ -13,9 +13,13 @@ from .models import (
     LLMType,
     ReportStyle,
     SummaryType,
-    IsolationLevel
+    IsolationLevel,
 )
-from .config_loader import get_settings, get_config_loader
+from .config_loader import get_settings, get_config_loader, load_configuration
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Backward compatibility
 from src.constants.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
@@ -24,6 +28,7 @@ __all__ = [
     "AppSettings",
     "get_settings",
     "get_config_loader",
+    "load_configuration",
     "SearchEngine",
     "RAGProvider",
     "LLMType",
@@ -31,5 +36,5 @@ __all__ = [
     "SummaryType",
     "IsolationLevel",
     "BUILT_IN_QUESTIONS",
-    "BUILT_IN_QUESTIONS_ZH_CN"
+    "BUILT_IN_QUESTIONS_ZH_CN",
 ]

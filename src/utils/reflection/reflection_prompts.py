@@ -12,7 +12,7 @@ from typing import List, Dict, Any
 def get_reflection_instructions() -> str:
     """
     Get the core reflection analysis instructions.
-    
+
     Returns:
         str: Reflection analysis prompt template
     """
@@ -55,22 +55,26 @@ Be specific and actionable in your recommendations. Focus on concrete steps that
 """
 
 
-def get_context_analysis_prompt(research_topic: str, current_findings: List[str], 
-                               step_count: int, previous_gaps: List[str] = None) -> str:
+def get_context_analysis_prompt(
+    research_topic: str,
+    current_findings: List[str],
+    step_count: int,
+    previous_gaps: List[str] = None,
+) -> str:
     """
     Generate a context-specific reflection prompt.
-    
+
     Args:
         research_topic: The main research topic
         current_findings: List of current research findings
         step_count: Number of research steps completed
         previous_gaps: Previously identified knowledge gaps
-        
+
     Returns:
         str: Formatted reflection prompt
     """
     findings_text = "\n".join([f"- {finding}" for finding in current_findings])
-    
+
     previous_gaps_text = ""
     if previous_gaps:
         previous_gaps_text = f"""
@@ -78,7 +82,7 @@ def get_context_analysis_prompt(research_topic: str, current_findings: List[str]
 Previously Identified Gaps:
 {chr(10).join([f"- {gap}" for gap in previous_gaps])}
         """
-    
+
     return f"""
 Research Topic: {research_topic}
 
@@ -94,16 +98,17 @@ Focus particularly on whether the findings adequately address the research topic
 """
 
 
-def get_progressive_reflection_prompt(complexity_score: float, isolation_active: bool, 
-                                    context_size: int) -> str:
+def get_progressive_reflection_prompt(
+    complexity_score: float, isolation_active: bool, context_size: int
+) -> str:
     """
     Generate a prompt for progressive reflection analysis.
-    
+
     Args:
         complexity_score: Research complexity score (0.0 to 1.0)
         isolation_active: Whether context isolation is active
         context_size: Current context size
-        
+
     Returns:
         str: Progressive reflection prompt
     """
@@ -124,15 +129,16 @@ If context isolation is active, pay special attention to potential information f
 """
 
 
-def get_integration_reflection_prompt(plan_update_needed: bool, 
-                                    researcher_context: Dict[str, Any]) -> str:
+def get_integration_reflection_prompt(
+    plan_update_needed: bool, researcher_context: Dict[str, Any]
+) -> str:
     """
     Generate a prompt for reflection integration with existing components.
-    
+
     Args:
         plan_update_needed: Whether plan updates are needed
         researcher_context: Current researcher context information
-        
+
     Returns:
         str: Integration reflection prompt
     """
@@ -156,10 +162,10 @@ Ensure your recommendations are compatible with the existing DeerFlow architectu
 def get_metrics_reflection_prompt(session_metrics: Dict[str, Any]) -> str:
     """
     Generate a prompt for metrics-based reflection analysis.
-    
+
     Args:
         session_metrics: Current session performance metrics
-        
+
     Returns:
         str: Metrics reflection prompt
     """

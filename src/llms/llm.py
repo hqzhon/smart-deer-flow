@@ -45,13 +45,7 @@ def get_model_token_limits_registry() -> dict[str, ModelTokenLimits]:
     return _model_token_limits_registry.copy()
 
 
-def _get_llm_type_config_keys() -> dict[str, str]:
-    """Get mapping of LLM types to their configuration keys."""
-    return {
-        "reasoning": "REASONING_MODEL",
-        "basic": "BASIC_MODEL",
-        "vision": "VISION_MODEL",
-    }
+# Legacy function removed - no longer needed with new configuration system
 
 
 def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
@@ -69,37 +63,33 @@ def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
     return conf
 
 
-def _create_llm_use_conf(
-    llm_type: LLMType, conf: Any
-) -> ChatOpenAI | ChatDeepSeek:
-    """Create LLM instance using configuration."""
-    import yaml
-    from pathlib import Path
-    
-    # Load the full configuration to get legacy BASIC_MODEL, etc.
-    config_file = Path(__file__).parent.parent.parent / "conf.yaml"
-    with open(config_file, 'r') as f:
-        full_config = yaml.safe_load(f)
-    
-    llm_type_config_keys = _get_llm_type_config_keys()
-    config_key = llm_type_config_keys.get(llm_type)
+def _create_llm_use_conf(llm_type: LLMType, conf: Any) -> ChatOpenAI | ChatDeepSeek:
+    """Create LLM instance using new configuration system."""
+    from src.config.config_loader import load_configuration
 
-    if not config_key:
-        raise ValueError(f"Unknown LLM type: {llm_type}")
+    # Load configuration using new unified system
+    settings = load_configuration()
 
-    # Get configuration from the legacy format (BASIC_MODEL, etc.)
-    llm_conf = full_config.get(config_key, {})
-    if not isinstance(llm_conf, dict):
-        llm_conf = {}
+    # Get LLM configuration based on type
+    llm_config = {}
+    if llm_type == "basic":
+        if settings.llm.basic_model:
+            llm_config = settings.llm.basic_model.model_dump()
+    elif llm_type == "reasoning":
+        if settings.llm.reasoning_model:
+            llm_config = settings.llm.reasoning_model.model_dump()
+    elif llm_type == "vision":
+        # Vision model configuration can be added here in the future
+        pass
 
-    # Get configuration from environment variables
+    if not llm_config:
+        raise ValueError(f"No configuration found for LLM type: {llm_type}")
+
+    # Get configuration from environment variables (still supported for flexibility)
     env_conf = _get_env_llm_conf(llm_type)
 
     # Merge configurations, with environment variables taking precedence
-    merged_conf = {**llm_conf, **env_conf}
-
-    if not merged_conf:
-        raise ValueError(f"No configuration found for LLM type: {llm_type}")
+    merged_conf = {**llm_config, **env_conf}
 
     if llm_type == "reasoning":
         merged_conf["api_base"] = merged_conf.pop("base_url", None)
@@ -107,13 +97,19 @@ def _create_llm_use_conf(
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
 
-    # Store token_limits for ContentProcessor before removing from LLM config
-    # token_limits is used by ContentProcessor for intelligent content processing
-    token_limits = merged_conf.pop("token_limits", None)
-
-    # Store token_limits in a global registry for ContentProcessor access
-    if token_limits and merged_conf.get("model"):
-        _store_model_token_limits(merged_conf["model"], token_limits)
+    # Store model token limits from new configuration system
+    model_name = merged_conf.get("model")
+    if model_name and model_name in settings.model_token_limits:
+        model_limits = settings.model_token_limits[model_name]
+        _store_model_token_limits(
+            model_name,
+            {
+                "input_limit": model_limits.get("input_limit", 32000),
+                "output_limit": model_limits.get("output_limit", 4096),
+                "context_window": model_limits.get("context_window", 32000),
+                "safety_margin": model_limits.get("safety_margin", 0.8),
+            },
+        )
 
     # Create custom HTTP client if SSL verification is disabled
     if not verify_ssl:
@@ -156,27 +152,31 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         Dictionary mapping LLM type to list of configured model names.
     """
     try:
-        import yaml
-        from pathlib import Path
-        
-        # Load the full configuration to get legacy BASIC_MODEL, etc.
-        config_file = Path(__file__).parent.parent.parent / "conf.yaml"
-        with open(config_file, 'r') as f:
-            full_config = yaml.safe_load(f)
-        llm_type_config_keys = _get_llm_type_config_keys()
+        from src.config.config_loader import load_configuration
+
+        # Load configuration using new unified system
+        settings = load_configuration()
 
         configured_models: dict[str, list[str]] = {}
 
         for llm_type in get_args(LLMType):
-            # Get configuration from YAML file
-            config_key = llm_type_config_keys.get(llm_type, "")
-            yaml_conf = full_config.get(config_key, {}) if config_key else {}
+            # Get configuration from new system
+            llm_config = {}
+            if llm_type == "basic" and settings.llm.basic_model:
+                # Convert LLMModelConfig to dict
+                llm_config = settings.llm.basic_model.model_dump()
+            elif llm_type == "reasoning" and settings.llm.reasoning_model:
+                # Convert LLMModelConfig to dict
+                llm_config = settings.llm.reasoning_model.model_dump()
+            elif llm_type == "vision":
+                # Vision model configuration can be added here in the future
+                pass
 
             # Get configuration from environment variables
             env_conf = _get_env_llm_conf(llm_type)
 
             # Merge configurations, with environment variables taking precedence
-            merged_conf = {**yaml_conf, **env_conf}
+            merged_conf = {**llm_config, **env_conf}
 
             # Check if model is configured
             model_name = merged_conf.get("model")

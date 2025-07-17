@@ -190,23 +190,27 @@ class InteractiveElementGenerator:
         # Extract chart elements first
         chart_elements = self._extract_chart_elements(content)
         elements.extend(chart_elements)
-        
+
         # Remove chart trigger texts from content for link extraction
         for chart_element in chart_elements:
-            content_for_links = content_for_links.replace(chart_element.trigger_text, "")
+            content_for_links = content_for_links.replace(
+                chart_element.trigger_text, ""
+            )
 
         # Extract table elements
         table_elements = self._extract_table_elements(content)
         elements.extend(table_elements)
-        
+
         # Remove table trigger texts from content for link extraction
         for table_element in table_elements:
-            content_for_links = content_for_links.replace(table_element.trigger_text, "")
+            content_for_links = content_for_links.replace(
+                table_element.trigger_text, ""
+            )
 
         # Extract code elements
         code_elements = self._extract_code_elements(content)
         elements.extend(code_elements)
-        
+
         # Remove code trigger texts from content for link extraction
         for code_element in code_elements:
             content_for_links = content_for_links.replace(code_element.trigger_text, "")
@@ -218,7 +222,7 @@ class InteractiveElementGenerator:
         # Remove duplicate elements based on trigger_text
         unique_elements = []
         seen_trigger_texts = set()
-        
+
         for element in elements:
             if element.trigger_text not in seen_trigger_texts:
                 unique_elements.append(element)
@@ -359,19 +363,23 @@ class InteractiveElementGenerator:
         for match in matches:
             link_text = match.group(1)
             url = match.group(2)
-            
+
             # Additional check: skip if this looks like an image URL
-            if any(url.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp']):
+            if any(
+                url.lower().endswith(ext)
+                for ext in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]
+            ):
                 continue
-            
+
             # Check if this link is inside a table
             link_start = match.start()
             link_end = match.end()
             is_in_table = any(
-                table_start <= link_start < table_end and table_start < link_end <= table_end
+                table_start <= link_start < table_end
+                and table_start < link_end <= table_end
                 for table_start, table_end in table_regions
             )
-            
+
             # Skip links that are inside tables
             if is_in_table:
                 continue
@@ -601,7 +609,7 @@ class ReportEnhancer:
         for match in matches:
             link_text = match.group(1)
             url = match.group(2)
-            
+
             # Skip if we've already seen this URL
             if url in seen_urls:
                 continue
@@ -720,39 +728,47 @@ class ReportEnhancer:
     ) -> str:
         """Enhance content with interactivity"""
         enhanced = content
-        
+
         # Sort elements by trigger_text length (longest first) to avoid partial matches
-        sorted_elements = sorted(elements, key=lambda x: len(x.trigger_text), reverse=True)
-        
+        sorted_elements = sorted(
+            elements, key=lambda x: len(x.trigger_text), reverse=True
+        )
+
         # Track replaced trigger texts to avoid duplicates
         replaced_triggers = set()
-        
+
         # Apply replacements one by one, checking for overlaps in the current content
         for element in sorted_elements:
             # Skip if this trigger text has already been replaced
             if element.trigger_text in replaced_triggers:
                 continue
-                
+
             # Find the trigger text in current enhanced content
             pos = enhanced.find(element.trigger_text)
             if pos != -1:
                 # Check if this position is already inside an interactive tag
-                before_pos = enhanced.rfind('<interactive', 0, pos)
-                after_pos = enhanced.find('</interactive>', pos)
-                
+                before_pos = enhanced.rfind("<interactive", 0, pos)
+                after_pos = enhanced.find("</interactive>", pos)
+
                 # If we found an opening tag before and closing tag after, skip this replacement
                 if before_pos != -1 and after_pos != -1:
                     # Check if there's a closing tag between the opening tag and our position
-                    closing_between = enhanced.find('</interactive>', before_pos, pos)
+                    closing_between = enhanced.find("</interactive>", before_pos, pos)
                     if closing_between == -1:
                         # We're inside an interactive tag, skip this replacement
                         continue
-                
+
                 # Apply the replacement
                 interactive_marker = f'<interactive id="{element.element_id}" type="{element.element_type.value}" title="{element.title}">'
-                replacement_text = f"{interactive_marker}{element.trigger_text}</interactive>"
-                enhanced = enhanced[:pos] + replacement_text + enhanced[pos + len(element.trigger_text):]
-                
+                replacement_text = (
+                    f"{interactive_marker}{element.trigger_text}</interactive>"
+                )
+                enhanced = (
+                    enhanced[:pos]
+                    + replacement_text
+                    + enhanced[pos + len(element.trigger_text) :]
+                )
+
                 # Mark this trigger as replaced
                 replaced_triggers.add(element.trigger_text)
 
@@ -1103,9 +1119,7 @@ class HTMLGenerator:
         html = self._convert_lists_to_html(html)
 
         # Images (must be processed before regular links)
-        html = re.sub(
-            r"!\[(.*?)\]\((.*?)\)", r'<img src="\2" alt="\1" />', html
-        )
+        html = re.sub(r"!\[(.*?)\]\((.*?)\)", r'<img src="\2" alt="\1" />', html)
 
         # Links (regular links, not images)
         html = re.sub(

@@ -11,17 +11,17 @@ from typing import Dict, Any
 def create_test_config() -> Dict[str, Any]:
     """Create a test configuration dictionary."""
     return {
-        'test_mode': True,
-        'enable_enhanced_reflection': True,
-        'max_reflection_loops': 2,
-        'reflection_model': 'gpt-4',
-        'knowledge_gap_threshold': 0.6,
-        'sufficiency_threshold': 0.7,
-        'llm_provider': 'openai',
-        'model': 'gpt-4',
-        'temperature': 0.7,
-        'max_tokens': 2000,
-        'timeout': 30
+        "test_mode": True,
+        "enable_enhanced_reflection": True,
+        "max_reflection_loops": 2,
+        "reflection_model": "gpt-4",
+        "knowledge_gap_threshold": 0.6,
+        "sufficiency_threshold": 0.7,
+        "llm_provider": "openai",
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout": 30,
     }
 
 
@@ -47,7 +47,7 @@ def mock_config():
     config.test_mode = True
     config.enable_enhanced_reflection = True
     config.max_reflection_loops = 2
-    config.reflection_model = 'gpt-4'
+    config.reflection_model = "gpt-4"
     config.knowledge_gap_threshold = 0.6
     config.sufficiency_threshold = 0.7
     return config
@@ -60,11 +60,13 @@ def mock_metrics():
     metrics.record_reflection_event = Mock()
     metrics.record_research_event = Mock()
     metrics.record_planning_event = Mock()
-    metrics.get_reflection_stats = Mock(return_value={
-        'total_reflections': 5,
-        'avg_confidence': 0.8,
-        'gap_detection_rate': 0.7
-    })
+    metrics.get_reflection_stats = Mock(
+        return_value={
+            "total_reflections": 5,
+            "avg_confidence": 0.8,
+            "gap_detection_rate": 0.7,
+        }
+    )
     return metrics
 
 
@@ -72,14 +74,14 @@ def mock_metrics():
 def sample_research_context():
     """Create sample research context for testing."""
     return {
-        'research_topic': 'Test research topic',
-        'completed_steps': [
-            {'step': 1, 'action': 'Initial search', 'result': 'Found basic information'}
+        "research_topic": "Test research topic",
+        "completed_steps": [
+            {"step": 1, "action": "Initial search", "result": "Found basic information"}
         ],
-        'current_step': {'step': 2, 'action': 'Deep dive research'},
-        'execution_results': ['Result 1', 'Result 2'],
-        'observations': ['Observation 1', 'Observation 2'],
-        'resources_found': 5,
-        'total_steps': 3,
-        'current_step_index': 1
+        "current_step": {"step": 2, "action": "Deep dive research"},
+        "execution_results": ["Result 1", "Result 2"],
+        "observations": ["Observation 1", "Observation 2"],
+        "resources_found": 5,
+        "total_steps": 3,
+        "current_step_index": 1,
     }

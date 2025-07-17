@@ -18,7 +18,7 @@ from src.utils.performance.workflow_optimizer import (
     WorkflowOptimizationLevel,
     create_optimized_workflow,
 )
-from src.utils.performance.memory_manager import HierarchicalMemoryManager, cached
+from src.utils.performance.memory_manager import HierarchicalMemoryManager
 from src.config import get_settings
 
 # Import collaboration modules
@@ -224,11 +224,11 @@ async def run_parallel_report_generation(
         }
 
 
-@cached(ttl=CACHE_TTL, priority=2)
 async def run_agent_workflow_async(
     user_input: str,
     debug: bool = False,
     max_plan_iterations: int = 3,
+    max_step_num: Optional[int] = None,
     enable_background_research: bool = True,
     enable_collaboration: bool = False,
     enable_caching: bool = True,
@@ -237,6 +237,7 @@ async def run_agent_workflow_async(
     optimization_level: Optional[WorkflowOptimizationLevel] = None,
     enable_intelligent_task_decomposition: bool = True,
     enable_dynamic_resource_allocation: bool = True,
+    settings: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Run the agent workflow asynchronously with the given user input.
 
@@ -244,6 +245,7 @@ async def run_agent_workflow_async(
         user_input: The user's query or request
         debug: If True, enables debug level logging
         max_plan_iterations: Maximum number of plan iterations
+        max_step_num: Maximum number of steps in a plan (overrides config)
         enable_background_research: If True, performs web search before planning to enhance context
         enable_collaboration: If True, enables collaboration features
         enable_caching: If True, enables result caching
@@ -252,6 +254,7 @@ async def run_agent_workflow_async(
         optimization_level: Workflow optimization level (BASIC, STANDARD, ADVANCED, MAXIMUM)
         enable_intelligent_task_decomposition: If True, enables intelligent task decomposition
         enable_dynamic_resource_allocation: If True, enables dynamic resource allocation
+        settings: Configuration settings object
 
     Returns:
         The final state after the workflow completes
@@ -304,11 +307,19 @@ async def run_agent_workflow_async(
     # Cache key generation
     cache_key = None
     if enable_caching:
+        # Determine effective max_step_num for caching
+        cache_max_step_num = max_step_num
+        if cache_max_step_num is None and settings is not None:
+            cache_max_step_num = getattr(settings.agents, "max_step_num", 3)
+        if cache_max_step_num is None:
+            cache_max_step_num = 3
+            
         if enable_advanced_optimization:
             # Use hierarchical memory for advanced caching
             cache_key = {
                 "user_input": user_input,
                 "max_plan_iterations": max_plan_iterations,
+                "max_step_num": cache_max_step_num,
                 "enable_background_research": enable_background_research,
                 "enable_collaboration": enable_collaboration,
                 "thread_id": thread_id,
@@ -324,7 +335,7 @@ async def run_agent_workflow_async(
             import hashlib
 
             cache_key = hashlib.md5(
-                f"{user_input}_{max_plan_iterations}_{enable_background_research}_{enable_collaboration}".encode()
+                f"{user_input}_{max_plan_iterations}_{cache_max_step_num}_{enable_background_research}_{enable_collaboration}".encode()
             ).hexdigest()
 
             # Check cache
@@ -376,17 +387,28 @@ async def run_agent_workflow_async(
     }
     # Load model token limits from configuration
     try:
-        settings = get_settings()
-        model_token_limits = getattr(settings, 'model_token_limits', {})
-        logger.debug(f"Loaded model_token_limits: {list(model_token_limits.keys()) if model_token_limits else 'None'}")
+        if settings is None:
+            settings = get_settings()
+        model_token_limits = getattr(settings, "model_token_limits", {})
+        logger.debug(
+            f"Loaded model_token_limits: {list(model_token_limits.keys()) if model_token_limits else 'None'}"
+        )
     except Exception as e:
         logger.warning(f"Failed to load model_token_limits from config: {e}")
         model_token_limits = {}
+
+    # Determine max_step_num value
+    effective_max_step_num = max_step_num
+    if effective_max_step_num is None and settings is not None:
+        effective_max_step_num = getattr(settings.agents, "max_step_num", 3)
+    if effective_max_step_num is None:
+        effective_max_step_num = 3
 
     config = {
         "configurable": {
             "thread_id": thread_id or "default",
             "max_plan_iterations": max_plan_iterations,
+            "max_step_num": effective_max_step_num,
             "enable_collaboration": enable_collaboration
             and collaboration_systems is not None,
             "model_token_limits": model_token_limits,
@@ -439,7 +461,10 @@ async def run_agent_workflow_async(
                 _execute_workflow, operation_id=f"workflow_{thread_id or 'default'}"
             )
         else:
-            final_state = await error_recovery.execute_with_recovery(_execute_workflow, operation_id=f"workflow_{thread_id or 'default'}_fallback")
+            final_state = await error_recovery.execute_with_recovery(
+                _execute_workflow,
+                operation_id=f"workflow_{thread_id or 'default'}_fallback",
+            )
 
         # Cache the result if caching is enabled
         if enable_caching and cache_key and final_state:

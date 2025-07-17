@@ -2,7 +2,7 @@
 Pydantic-based configuration models for unified configuration management.
 """
 
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Any, Literal, Union
 from pydantic import BaseModel, Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
@@ -11,6 +11,7 @@ import os
 
 class ReportStyle(str, Enum):
     """Report style enumeration."""
+
     ACADEMIC = "academic"
     BUSINESS = "business"
     TECHNICAL = "technical"
@@ -19,6 +20,7 @@ class ReportStyle(str, Enum):
 
 class SummaryType(str, Enum):
     """Summary type enumeration."""
+
     COMPREHENSIVE = "comprehensive"
     KEY_POINTS = "key_points"
     ABSTRACT = "abstract"
@@ -26,16 +28,30 @@ class SummaryType(str, Enum):
 
 class IsolationLevel(str, Enum):
     """Researcher isolation level enumeration."""
+
     MINIMAL = "minimal"
     MODERATE = "moderate"
     AGGRESSIVE = "aggressive"
 
 
+class LLMModelConfig(BaseModel):
+    """Individual LLM model configuration."""
+
+    model: str
+    api_key: str
+    base_url: str
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = None
+    timeout: int = Field(default=30, ge=1)
+    verify_ssl: bool = True
+
+
 class LLMSettings(BaseModel):
     """LLM configuration settings."""
-    basic_model: Optional[Any] = None
-    reasoning_model: Optional[Any] = None
-    reflection_model: Optional[Any] = None
+
+    basic_model: Optional[LLMModelConfig] = None
+    reasoning_model: Optional[LLMModelConfig] = None
+    reflection_model: Optional[LLMModelConfig] = None
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: Optional[int] = None
     timeout: int = Field(default=30, ge=1)
@@ -43,6 +59,7 @@ class LLMSettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     """Database configuration settings."""
+
     connection_string: Optional[str] = None
     pool_size: int = Field(default=10, ge=1)
     max_overflow: int = Field(default=20, ge=0)
@@ -51,6 +68,7 @@ class DatabaseSettings(BaseModel):
 
 class AgentSettings(BaseModel):
     """Agent configuration settings."""
+
     max_plan_iterations: int = Field(default=1, ge=1)
     max_step_num: int = Field(default=3, ge=1)
     max_search_results: int = Field(default=3, ge=1)
@@ -63,6 +81,7 @@ class AgentSettings(BaseModel):
 
 class ResearchSettings(BaseModel):
     """Research-specific configuration settings."""
+
     enable_researcher_isolation: bool = True
     researcher_isolation_level: IsolationLevel = IsolationLevel.MODERATE
     researcher_max_local_context: int = Field(default=5000, ge=100)
@@ -74,6 +93,7 @@ class ResearchSettings(BaseModel):
 
 class ReflectionSettings(BaseModel):
     """Reflection configuration settings."""
+
     enable_enhanced_reflection: bool = True
     max_reflection_loops: int = Field(default=3, ge=1)
     reflection_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
@@ -86,6 +106,7 @@ class ReflectionSettings(BaseModel):
 
 class IterativeResearchSettings(BaseModel):
     """Iterative research configuration settings."""
+
     max_follow_up_iterations: int = Field(default=3, ge=1)
     sufficiency_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     enable_iterative_research: bool = True
@@ -95,6 +116,7 @@ class IterativeResearchSettings(BaseModel):
 
 class ContentSettings(BaseModel):
     """Content processing configuration settings."""
+
     enable_content_summarization: bool = True
     enable_smart_filtering: bool = True
     summary_type: SummaryType = SummaryType.COMPREHENSIVE
@@ -102,17 +124,20 @@ class ContentSettings(BaseModel):
 
 class AdvancedContextConfig(BaseModel):
     """Advanced context management configuration."""
+
     max_context_ratio: float = Field(default=0.6, ge=0.0, le=1.0)
     sliding_window_size: int = Field(default=5, ge=1)
     overlap_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     compression_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
     default_strategy: str = "adaptive"
-    priority_weights: Dict[str, float] = Field(default_factory=lambda: {
-        "critical": 1.0,
-        "high": 0.7,
-        "medium": 0.4,
-        "low": 0.1,
-    })
+    priority_weights: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "critical": 1.0,
+            "high": 0.7,
+            "medium": 0.4,
+            "low": 0.1,
+        }
+    )
     enable_caching: bool = True
     enable_analytics: bool = True
     debug_mode: bool = False
@@ -120,6 +145,7 @@ class AdvancedContextConfig(BaseModel):
 
 class MCPSettings(BaseModel):
     """MCP (Model Context Protocol) settings."""
+
     enabled: bool = False
     servers: List[Dict[str, Any]] = Field(default_factory=list)
     timeout: int = Field(default=30, ge=1)
@@ -127,6 +153,7 @@ class MCPSettings(BaseModel):
 
 class SearchEngine(str, Enum):
     """Search engine enumeration."""
+
     TAVILY = "tavily"
     DUCKDUCKGO = "duckduckgo"
     BRAVE_SEARCH = "brave_search"
@@ -135,17 +162,20 @@ class SearchEngine(str, Enum):
 
 class RAGProvider(str, Enum):
     """RAG provider enumeration."""
+
     RAGFLOW = "ragflow"
 
 
 class ToolSettings(BaseModel):
     """Tool configuration settings."""
+
     search_engine: SearchEngine = SearchEngine.TAVILY
     rag_provider: Optional[RAGProvider] = None
 
 
 class ConnectionPoolConfig(BaseModel):
     """Connection pool configuration."""
+
     max_connections: int = 50
     initial_connections: int = 10
     connection_timeout: float = 30.0
@@ -155,6 +185,7 @@ class ConnectionPoolConfig(BaseModel):
 
 class BatchProcessingConfig(BaseModel):
     """Batch processing configuration."""
+
     batch_size: int = 10
     batch_timeout: float = 1.5
     max_queue_size: int = 1000
@@ -164,6 +195,7 @@ class BatchProcessingConfig(BaseModel):
 
 class CacheConfig(BaseModel):
     """Hierarchical cache configuration."""
+
     l1_size: int = 1000
     l2_size: int = 5000
     l3_size: int = 10000
@@ -174,6 +206,7 @@ class CacheConfig(BaseModel):
 
 class RateLimitConfig(BaseModel):
     """Adaptive rate limiting configuration."""
+
     initial_rate: float = 10.0  # requests per second
     max_rate: float = 100.0
     min_rate: float = 1.0
@@ -185,6 +218,7 @@ class RateLimitConfig(BaseModel):
 
 class ErrorRecoveryConfig(BaseModel):
     """Smart error recovery configuration."""
+
     max_retries: int = 3
     base_delay: float = 1.0
     max_delay: float = 60.0
@@ -196,6 +230,7 @@ class ErrorRecoveryConfig(BaseModel):
 
 class ParallelExecutionConfig(BaseModel):
     """Advanced parallel execution configuration."""
+
     max_workers: int = 20
     queue_size: int = 1000
     priority_levels: int = 3
@@ -206,6 +241,7 @@ class ParallelExecutionConfig(BaseModel):
 
 class MonitoringConfig(BaseModel):
     """Performance monitoring configuration."""
+
     metrics_enabled: bool = True
     detailed_logging: bool = True
     slow_request_threshold: float = 10.0  # seconds
@@ -216,14 +252,19 @@ class MonitoringConfig(BaseModel):
 
 class PerformanceSettings(BaseModel):
     """Performance optimization configuration."""
+
     connection_pool: ConnectionPoolConfig = Field(default_factory=ConnectionPoolConfig)
-    batch_processing: BatchProcessingConfig = Field(default_factory=BatchProcessingConfig)
+    batch_processing: BatchProcessingConfig = Field(
+        default_factory=BatchProcessingConfig
+    )
     cache: CacheConfig = Field(default_factory=CacheConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     error_recovery: ErrorRecoveryConfig = Field(default_factory=ErrorRecoveryConfig)
-    parallel_execution: ParallelExecutionConfig = Field(default_factory=ParallelExecutionConfig)
+    parallel_execution: ParallelExecutionConfig = Field(
+        default_factory=ParallelExecutionConfig
+    )
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
-    
+
     # Global settings
     enable_advanced_optimization: bool = True
     enable_collaboration: bool = True
@@ -236,6 +277,7 @@ LLMType = Literal["basic", "reasoning", "vision"]
 
 class AgentLLMSettings(BaseModel):
     """Agent-LLM mapping configuration."""
+
     coordinator: LLMType = "basic"
     planner: LLMType = "basic"
     researcher: LLMType = "basic"
@@ -249,37 +291,43 @@ class AgentLLMSettings(BaseModel):
 
 class AppSettings(BaseSettings):
     """Main application configuration."""
-    
+
     # Core settings
     report_style: ReportStyle = ReportStyle.ACADEMIC
     resources: List[Dict[str, Any]] = Field(default_factory=list)
-    
+
     # Sub-configurations
     llm: LLMSettings = Field(default_factory=LLMSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     agents: AgentSettings = Field(default_factory=AgentSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
     reflection: ReflectionSettings = Field(default_factory=ReflectionSettings)
-    iterative_research: IterativeResearchSettings = Field(default_factory=IterativeResearchSettings)
+    iterative_research: IterativeResearchSettings = Field(
+        default_factory=IterativeResearchSettings
+    )
     content: ContentSettings = Field(default_factory=ContentSettings)
-    advanced_context: AdvancedContextConfig = Field(default_factory=AdvancedContextConfig)
+    advanced_context: AdvancedContextConfig = Field(
+        default_factory=AdvancedContextConfig
+    )
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     tools: ToolSettings = Field(default_factory=ToolSettings)
     performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
     agent_llm_map: AgentLLMSettings = Field(default_factory=AgentLLMSettings)
-    
+
     # Model token limits
-    model_token_limits: Dict[str, Dict[str, int]] = Field(default_factory=dict)
-    
+    model_token_limits: Dict[str, Dict[str, Union[int, float]]] = Field(
+        default_factory=dict
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="DEER_",
         case_sensitive=False,
         validate_assignment=True,
         extra="allow",
-        env_nested_delimiter="__"
+        env_nested_delimiter="__",
     )
 
-    @validator('model_token_limits', pre=True)
+    @validator("model_token_limits", pre=True)
     def validate_token_limits(cls, v):
         """Validate model token limits format."""
         if isinstance(v, dict):

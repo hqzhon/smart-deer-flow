@@ -18,5 +18,5 @@ __all__ = [
     "RateLimiter",
     "ErrorRecoveryManager",
     "SafeCallbackManager",
-    "DependencyInjectionContainer"
+    "DependencyInjectionContainer",
 ]

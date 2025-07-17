@@ -18,6 +18,6 @@ from src.utils.common.decorators import (
 # Re-export for backward compatibility
 __all__ = [
     "safe_background_task",
-    "retry_on_failure", 
+    "retry_on_failure",
     "log_execution_time",
 ]

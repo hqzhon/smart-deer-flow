@@ -6,11 +6,12 @@ import dataclasses
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langgraph.prebuilt.chat_agent_executor import AgentState
+
 # Remove TYPE_CHECKING import for Configuration as it's no longer needed
 
 # Initialize Jinja2 environment
 env = Environment(
-    loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), '..', 'prompts')),
+    loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "..", "prompts")),
     autoescape=select_autoescape(),
     trim_blocks=True,
     lstrip_blocks=True,
@@ -35,7 +36,7 @@ def get_prompt_template(prompt_name: str) -> str:
 
 
 def apply_prompt_template(
-    prompt_name: str, state: AgentState, configurable = None
+    prompt_name: str, state: AgentState, configurable=None
 ) -> list:
     """
     Apply template variables to a prompt template and return formatted messages.
@@ -147,9 +148,9 @@ def apply_prompt_template(
     # Add configurable variables
     if configurable:
         # Handle different types of configurable objects
-        if hasattr(configurable, 'model_dump'):  # Pydantic model
+        if hasattr(configurable, "model_dump"):  # Pydantic model
             state_vars.update(configurable.model_dump())
-        elif hasattr(configurable, '__dict__'):  # Regular class instance
+        elif hasattr(configurable, "__dict__"):  # Regular class instance
             state_vars.update(configurable.__dict__)
         elif dataclasses.is_dataclass(configurable):  # Dataclass instance
             state_vars.update(dataclasses.asdict(configurable))

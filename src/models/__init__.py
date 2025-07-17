@@ -5,6 +5,6 @@ from .planner_model import Plan, Step, StepType
 
 __all__ = [
     "Plan",
-    "Step", 
+    "Step",
     "StepType",
 ]

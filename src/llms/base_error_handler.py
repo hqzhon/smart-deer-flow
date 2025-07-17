@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from langchain_core.messages import AIMessage
 
+
 class BaseLLMErrorHandler(ABC):
     """Abstract base class for LLM error handlers."""
 
