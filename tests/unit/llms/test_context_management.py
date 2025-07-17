@@ -226,7 +226,8 @@ class TestContextManagementIntegration:
         config = Mock()
 
         mock_configurable = Mock()
-        mock_configurable.max_search_results = 5
+        mock_configurable.agents = Mock()
+        mock_configurable.agents.max_search_results = 5
 
         with patch(
             "src.config.configuration.Configuration.from_runnable_config"

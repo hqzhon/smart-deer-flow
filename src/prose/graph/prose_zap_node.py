@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def prose_zap_node(state: ProseState):
     logger.info("Generating prose zap content...")
     settings = get_settings()
-    llm_type = settings.agent_llm_map.get("prose_writer", "gpt-4o-mini")
+    llm_type = getattr(settings.agent_llm_map, "prose_writer", "basic")
     model = get_llm_by_type(llm_type)
     prose_content = safe_llm_call(
         model.invoke,

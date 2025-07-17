@@ -1220,7 +1220,9 @@ async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
         }
     }
     configurable = MagicMock()
-    configurable.mcp_settings = mcp_settings
+    configurable.mcp = MagicMock()
+    configurable.mcp.enabled = True
+    configurable.mcp.servers = [mcp_settings["servers"]["server1"]]
     with patch(
         "src.graph.nodes.Configuration.from_runnable_config",
         return_value=configurable,

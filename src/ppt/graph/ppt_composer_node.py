@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def ppt_composer_node(state: PPTState):
     logger.info("Generating ppt content...")
     settings = get_settings()
-    llm_type = settings.agent_llm_map.get("ppt_composer", "gpt-4o-mini")
+    llm_type = getattr(settings.agent_llm_map, "ppt_composer", "basic")
     model = get_llm_by_type(llm_type)
     ppt_content = safe_llm_call(
         model.invoke,

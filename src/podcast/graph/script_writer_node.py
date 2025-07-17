@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def script_writer_node(state: PodcastState):
     logger.info("Generating script for podcast...")
     settings = get_settings()
-    llm_type = settings.agent_llm_map.get("podcast_script_writer", "gpt-4o-mini")
+    llm_type = getattr(settings.agent_llm_map, "podcast_script_writer", "basic")
     model = get_llm_by_type(llm_type).with_structured_output(Script, method="json_mode")
     script = safe_llm_call(
         model.invoke,

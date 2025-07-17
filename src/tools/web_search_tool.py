@@ -86,7 +86,7 @@ class WebSearchTool(BaseTool):
         """
         try:
             settings = get_settings()
-            search_engine = settings.agents.get("search_engine", "tavily")
+            search_engine = settings.tools.search_engine
             
             if search_engine == "tavily":
                 return self._search_tavily(query, max_results, include_raw_content, include_images)

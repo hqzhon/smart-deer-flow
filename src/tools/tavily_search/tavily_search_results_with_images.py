@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 from langchain.callbacks.manager import (
@@ -14,6 +15,17 @@ from pydantic import Field
 from src.tools.tavily_search.tavily_search_api_wrapper import (
     EnhancedTavilySearchAPIWrapper,
 )
+
+
+def _create_enhanced_tavily_wrapper() -> EnhancedTavilySearchAPIWrapper:
+    """Create EnhancedTavilySearchAPIWrapper with API key from environment."""
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_api_key:
+        raise ValueError(
+            "Did not find tavily_api_key, please add an environment variable "
+            "`TAVILY_API_KEY` which contains it, or pass `tavily_api_key` as a named parameter."
+        )
+    return EnhancedTavilySearchAPIWrapper(tavily_api_key=tavily_api_key)
 
 
 class TavilySearchResultsWithImages(TavilySearchResults):  # type: ignore[override, override]
@@ -99,7 +111,7 @@ class TavilySearchResultsWithImages(TavilySearchResults):  # type: ignore[overri
     Default is False.
     """
 
-    api_wrapper: EnhancedTavilySearchAPIWrapper = Field(default_factory=EnhancedTavilySearchAPIWrapper)  # type: ignore[arg-type]
+    api_wrapper: EnhancedTavilySearchAPIWrapper = Field(default_factory=_create_enhanced_tavily_wrapper)  # type: ignore[arg-type]
 
     def _run(
         self,

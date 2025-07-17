@@ -85,7 +85,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
         
     if selected_search_engine == SearchEngine.TAVILY.value:
         searched_content = safe_llm_call(
-            LoggedTavilySearch(max_results=configurable.max_search_results).invoke,
+            LoggedTavilySearch(max_results=configurable.agents.max_search_results).invoke,
             query,
             operation_name="Background Investigation - Tavily Search",
             context="Search for background information",
@@ -102,7 +102,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             return {"background_investigation_results": ""}
     else:
         background_investigation_results = safe_llm_call(
-            get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering).invoke,
+            get_web_search_tool(configurable.agents.max_search_results, configurable.content.enable_smart_filtering).invoke,
             query,
             operation_name="Background Investigation - Web Search",
             context="Search for background information",
@@ -121,7 +121,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             model_name = "deepseek-chat"  # Default fallback
             try:
                 # Get planner LLM type from settings
-                planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+                planner_llm_type = getattr(settings.agent_llm_map, "planner", "basic")
                 current_llm = get_llm_by_type(planner_llm_type)
                 model_name = getattr(
                     current_llm, "model_name", getattr(current_llm, "model", None)
@@ -140,7 +140,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 logger.warning(f"Full traceback: {traceback.format_exc()}")
                 try:
                     config_data = settings.load_config()
-                    planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+                    planner_llm_type = getattr(settings.agent_llm_map, "planner", "basic")
 
                     if planner_llm_type == "basic":
                         basic_config = config_data.get("BASIC_MODEL", {})
@@ -180,10 +180,10 @@ def background_investigation_node(state: State, config: RunnableConfig):
                 )
 
                 # Use traditional processing as fallback
-                if configurable.enable_content_summarization:
+                if configurable.content.enable_content_summarization:
                     # Use smart summarization
                     processed_results = processor.summarize_content(
-                        raw_results, current_llm, model_name, configurable.summary_type
+                        raw_results, current_llm, model_name, configurable.content.summary_type
                     )
                     logger.info(
                         f"Search results summarized: {len(raw_results)} -> {len(processed_results)} characters"
@@ -347,7 +347,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             model_name = "deepseek-chat"  # Default fallback
             try:
                 settings = get_settings()
-                planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+                planner_llm_type = getattr(settings.agent_llm_map, "planner", "basic")
                 current_llm = get_llm_by_type(planner_llm_type)
                 model_name = getattr(
                     current_llm, "model_name", getattr(current_llm, "model", None)
@@ -426,12 +426,12 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
     # Configure LLM based on settings
     settings = get_settings()
-    planner_llm_type = settings.agent_llm_map.get("planner", "basic")
+    planner_llm_type = getattr(settings.agent_llm_map, "planner", "basic")
     use_structured_output = (
-        planner_llm_type == "basic" and not configurable.enable_deep_thinking
+        planner_llm_type == "basic" and not configurable.agents.enable_deep_thinking
     )
 
-    if configurable.enable_deep_thinking:
+    if configurable.agents.enable_deep_thinking:
         llm = get_llm_by_type("reasoning")
         # llm = get_llm_by_type("reasoning").with_structured_output(
         #    Plan,
@@ -446,7 +446,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         llm = get_llm_by_type(planner_llm_type)
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
-    if plan_iterations >= configurable.max_plan_iterations:
+    if plan_iterations >= configurable.agents.max_plan_iterations:
         return Command(goto="reporter")
 
     # Context evaluation will be handled automatically by safe_llm_call
@@ -637,7 +637,7 @@ def coordinator_node(
 
     # Context evaluation will be handled automatically by safe_llm_call
     settings = get_settings()
-    coordinator_llm_type = settings.agent_llm_map.get("coordinator", "basic")
+    coordinator_llm_type = getattr(settings.agent_llm_map, "coordinator", "basic")
     llm = get_llm_by_type(coordinator_llm_type).bind_tools([handoff_to_planner])
 
     response = safe_llm_call(
@@ -721,7 +721,7 @@ def reporter_node(state: State, config: RunnableConfig):
 
     # Context evaluation will be handled automatically by safe_llm_call
     settings = get_settings()
-    reporter_llm_type = settings.agent_llm_map.get("reporter", "basic")
+    reporter_llm_type = getattr(settings.agent_llm_map, "reporter", "basic")
     llm = get_llm_by_type(reporter_llm_type)
 
     response = safe_llm_call(
@@ -1328,8 +1328,8 @@ async def _setup_and_execute_agent_step(
     enabled_tools = {}
 
     # Extract MCP server configuration for this agent type
-    if configurable.mcp_settings:
-        for server_name, server_config in configurable.mcp_settings["servers"].items():
+    if configurable.mcp.enabled and configurable.mcp.servers:
+        for server_config in configurable.mcp.servers:
             if (
                 server_config["enabled_tools"]
                 and agent_type in server_config["add_to_agents"]
@@ -1434,7 +1434,7 @@ async def researcher_node_with_isolation(
             reflection_agent = None
     
     # Setup tools
-    tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
+    tools = [get_web_search_tool(configurable.agents.max_search_results, configurable.content.enable_smart_filtering), crawl_tool]
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)
@@ -1443,8 +1443,8 @@ async def researcher_node_with_isolation(
     mcp_servers = {}
     enabled_tools = {}
     
-    if configurable.mcp_settings:
-        for server_name, server_config in configurable.mcp_settings["servers"].items():
+    if configurable.mcp.enabled and configurable.mcp.servers:
+        for server_config in configurable.mcp.servers:
             if (
                 server_config["enabled_tools"]
                 and "researcher" in server_config["add_to_agents"]
@@ -1734,7 +1734,7 @@ async def researcher_node(
     else:
         print("DEBUG: === Using standard researcher node ===")
         logger.info("Using standard researcher node")
-        tools = [get_web_search_tool(configurable.max_search_results, configurable.enable_smart_filtering), crawl_tool]
+        tools = [get_web_search_tool(configurable.agents.max_search_results, configurable.content.enable_smart_filtering), crawl_tool]
         retriever_tool = get_retriever_tool(state.get("resources", []))
         if retriever_tool:
             tools.insert(0, retriever_tool)

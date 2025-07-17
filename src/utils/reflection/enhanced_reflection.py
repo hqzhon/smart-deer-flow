@@ -601,8 +601,17 @@ class EnhancedReflectionAgent:
             model_type = "basic"  # Default fallback
             
             # Try to get enable_deep_thinking from runnable_config or use basic model
-            if runnable_config and runnable_config.get('configurable', {}).get('enable_deep_thinking'):
-                model_type = "reasoning"
+            if runnable_config:
+                try:
+                    from src.graph.nodes import get_configuration_from_config
+                    config = get_configuration_from_config(runnable_config)
+                    if hasattr(config, 'agents') and hasattr(config.agents, 'enable_deep_thinking') and config.agents.enable_deep_thinking:
+                        model_type = "reasoning"
+                    else:
+                        model_type = "basic"
+                except Exception as config_error:
+                    logger.warning(f"Failed to get configuration from runnable_config: {config_error}")
+                    model_type = "basic"
             else:
                 model_type = "basic"
             

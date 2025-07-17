@@ -19,7 +19,7 @@ def prompt_enhancer_node(state: PromptEnhancerState):
     logger.info("Enhancing user prompt...")
 
     settings = get_settings()
-    llm_type = settings.agent_llm_map.get("prompt_enhancer", "gpt-4o-mini")
+    llm_type = getattr(settings.agent_llm_map, "prompt_enhancer", "basic")
     model = get_llm_by_type(llm_type)
 
     try:

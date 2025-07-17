@@ -146,7 +146,13 @@ def apply_prompt_template(
 
     # Add configurable variables
     if configurable:
-        state_vars.update(dataclasses.asdict(configurable))
+        # Handle different types of configurable objects
+        if hasattr(configurable, 'model_dump'):  # Pydantic model
+            state_vars.update(configurable.model_dump())
+        elif hasattr(configurable, '__dict__'):  # Regular class instance
+            state_vars.update(configurable.__dict__)
+        elif dataclasses.is_dataclass(configurable):  # Dataclass instance
+            state_vars.update(dataclasses.asdict(configurable))
 
     try:
         template = env.get_template(f"{prompt_name}.md")

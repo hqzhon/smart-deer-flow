@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def prose_fix_node(state: ProseState):
     logger.info("Generating prose fix content...")
     settings = get_settings()
-    llm_type = settings.agent_llm_map.get("prose_writer", "gpt-4o-mini")
+    llm_type = getattr(settings.agent_llm_map, "prose_writer", "basic")
     model = get_llm_by_type(llm_type)
     messages = [
         SystemMessage(content=get_prompt_template("prose/prose_fix")),

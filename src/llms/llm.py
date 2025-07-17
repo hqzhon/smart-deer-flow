@@ -70,18 +70,27 @@ def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
 
 
 def _create_llm_use_conf(
-    llm_type: LLMType, conf: Dict[str, Any]
+    llm_type: LLMType, conf: Any
 ) -> ChatOpenAI | ChatDeepSeek:
     """Create LLM instance using configuration."""
+    import yaml
+    from pathlib import Path
+    
+    # Load the full configuration to get legacy BASIC_MODEL, etc.
+    config_file = Path(__file__).parent.parent.parent / "conf.yaml"
+    with open(config_file, 'r') as f:
+        full_config = yaml.safe_load(f)
+    
     llm_type_config_keys = _get_llm_type_config_keys()
     config_key = llm_type_config_keys.get(llm_type)
 
     if not config_key:
         raise ValueError(f"Unknown LLM type: {llm_type}")
 
-    llm_conf = conf.get(config_key, {})
+    # Get configuration from the legacy format (BASIC_MODEL, etc.)
+    llm_conf = full_config.get(config_key, {})
     if not isinstance(llm_conf, dict):
-        raise ValueError(f"Invalid LLM configuration for {llm_type}: {llm_conf}")
+        llm_conf = {}
 
     # Get configuration from environment variables
     env_conf = _get_env_llm_conf(llm_type)
@@ -147,7 +156,13 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         Dictionary mapping LLM type to list of configured model names.
     """
     try:
-        conf = get_settings().llm
+        import yaml
+        from pathlib import Path
+        
+        # Load the full configuration to get legacy BASIC_MODEL, etc.
+        config_file = Path(__file__).parent.parent.parent / "conf.yaml"
+        with open(config_file, 'r') as f:
+            full_config = yaml.safe_load(f)
         llm_type_config_keys = _get_llm_type_config_keys()
 
         configured_models: dict[str, list[str]] = {}
@@ -155,7 +170,7 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         for llm_type in get_args(LLMType):
             # Get configuration from YAML file
             config_key = llm_type_config_keys.get(llm_type, "")
-            yaml_conf = conf.get(config_key, {}) if config_key else {}
+            yaml_conf = full_config.get(config_key, {}) if config_key else {}
 
             # Get configuration from environment variables
             env_conf = _get_env_llm_conf(llm_type)

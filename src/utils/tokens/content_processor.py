@@ -63,7 +63,7 @@ class ContentProcessor:
         r"sp_executesql",  # SQL Server dynamic SQL
     ]
 
-    def __init__(self, model_limits: Optional[Dict[str, ModelTokenLimits]] = None):
+    def __init__(self, model_limits: Optional[Dict[str, Any]] = None):
         # If no model_limits provided, try to get from llm registry first
         if model_limits is None or not model_limits:
             try:
@@ -89,7 +89,8 @@ class ContentProcessor:
                 )
                 model_limits = self._load_model_limits_from_config()
 
-        self.model_limits = model_limits or {}
+        # Convert dictionary format to ModelTokenLimits objects if needed
+        self.model_limits = self._normalize_model_limits(model_limits or {})
         self.default_limits = ModelTokenLimits(
             input_limit=65536,
             output_limit=8192,
@@ -114,6 +115,40 @@ class ContentProcessor:
             re.compile(pattern, re.IGNORECASE | re.DOTALL)
             for pattern in self.SQL_INJECTION_PATTERNS
         ]
+
+    def _normalize_model_limits(self, model_limits: Dict[str, Any]) -> Dict[str, ModelTokenLimits]:
+        """Convert various model limit formats to ModelTokenLimits objects.
+        
+        Args:
+            model_limits: Model limits in various formats (dict or ModelTokenLimits)
+            
+        Returns:
+            Dictionary mapping model names to ModelTokenLimits objects
+        """
+        normalized = {}
+        
+        for model_name, limits in model_limits.items():
+            if isinstance(limits, ModelTokenLimits):
+                # Already a ModelTokenLimits object
+                normalized[model_name] = limits
+            elif isinstance(limits, dict):
+                # Convert dictionary to ModelTokenLimits
+                try:
+                    normalized[model_name] = ModelTokenLimits(
+                        input_limit=limits.get('input_limit', 65536),
+                        output_limit=limits.get('output_limit', 8192),
+                        context_window=limits.get('context_window', 65536),
+                        safety_margin=limits.get('safety_margin', 0.8)
+                    )
+                    logger.debug(f"Converted dictionary to ModelTokenLimits for model: {model_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to convert model limits for {model_name}: {e}, using defaults")
+                    normalized[model_name] = self.default_limits
+            else:
+                logger.warning(f"Unknown model limits format for {model_name}: {type(limits)}, using defaults")
+                normalized[model_name] = self.default_limits
+                
+        return normalized
 
     def _load_model_limits_from_config(self) -> Dict[str, ModelTokenLimits]:
         """Load model token limits from configuration file as fallback."""
