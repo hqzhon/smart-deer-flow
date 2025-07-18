@@ -4,7 +4,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from src.config.models import AppSettings, LLMSettings, AgentSettings
+from src.config.models import AppSettings
 from src.config.config_loader import get_settings, get_config_loader
 
 

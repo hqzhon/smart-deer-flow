@@ -10,19 +10,15 @@ import time
 import json
 import logging
 import statistics
-import threading
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import deque, defaultdict
 from threading import Lock, Timer
 from enum import Enum
 
 # Import Phase 3 components
 from .researcher_isolation_metrics import (
-    IsolationSession,
-    IsolationMetricsSummary,
     ResearcherIsolationMetrics as BaseMetrics,
 )
 
@@ -584,7 +580,7 @@ class AdvancedResearcherIsolationMetrics(BaseMetrics):
             suggestions.append("资源利用率较高，考虑限制并发隔离会话数量")
 
         # Update suggestions (keep only recent unique suggestions)
-        current_time = time.time()
+        time.time()
         self.optimization_suggestions = [
             f"{datetime.now().strftime('%H:%M')} - {suggestion}"
             for suggestion in suggestions

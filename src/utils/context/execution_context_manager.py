@@ -7,11 +7,10 @@
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
+from langchain_core.messages import BaseMessage
 
 from ..tokens.token_counter import count_tokens
 from typing import NamedTuple
-import time
 import hashlib
 
 logger = logging.getLogger(__name__)
@@ -550,7 +549,7 @@ class ExecutionContextManager:
                 return args, kwargs
 
             # 获取模型名称
-            model_name = self._extract_model_name(llm_func, kwargs)
+            self._extract_model_name(llm_func, kwargs)
 
             # 应用消息优化
             optimized_messages = self.optimize_messages(messages)
@@ -596,7 +595,7 @@ class ExecutionContextManager:
                 return args, kwargs
 
             # 获取模型名称
-            model_name = self._extract_model_name(llm_func, kwargs)
+            self._extract_model_name(llm_func, kwargs)
 
             # 应用消息优化
             optimized_messages = self.optimize_messages(messages)

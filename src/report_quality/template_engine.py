@@ -742,9 +742,15 @@ def demo_template_engine():
         # Validate sample content
         sample_content = {
             "exec_summary": "This report analyzes the company's financial condition...",
-            "financial_overview": "| Metric | 2023 | 2024 |\n|------|------|------|\n| Revenue | 100M | 115M |",
-            "performance_analysis": "The company's performance is excellent, with 15% year-over-year growth",
-            "risk_assessment": "Main risks include market volatility and policy changes",
+            "financial_overview": (
+                "| Metric | 2023 | 2024 |\n|------|------|------|\n| Revenue | 100M | 115M |"
+            ),
+            "performance_analysis": (
+                "The company's performance is excellent, with 15% year-over-year growth"
+            ),
+            "risk_assessment": (
+                "Main risks include market volatility and policy changes"
+            ),
             "recommendations": "Recommend increasing holdings of this stock",
         }
 

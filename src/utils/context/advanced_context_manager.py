@@ -599,11 +599,16 @@ class AdvancedContextManager:
             combined_content = "\n\n".join([seg.content for seg in other_segments])
 
             # Create a summarized version
-            summary_prompt = f"""Please provide a concise summary of the following execution steps and results, focusing on key outcomes and any important information:
+            from src.prompts.prompt_manager import get_prompt_with_variables
 
-{combined_content}
-
-Summary (keep under {remaining_tokens // 4} words):"""
+            get_prompt_with_variables(
+                "context_summary",
+                {
+                    "content": combined_content,
+                    "max_words": remaining_tokens // 4,
+                    "locale": "en-US",
+                },
+            )
 
             try:
                 # Use a simple text compression as fallback if LLM summarization fails
@@ -793,8 +798,9 @@ Summary (keep under {remaining_tokens // 4} words):"""
         return {
             "total_tokens": context_window.total_tokens,
             "max_tokens": context_window.max_tokens,
-            "token_utilization": context_window.total_tokens
-            / context_window.max_tokens,
+            "token_utilization": (
+                context_window.total_tokens / context_window.max_tokens
+            ),
             "compression_ratio": context_window.compression_ratio,
             "strategy_used": context_window.strategy_used.value,
             "segment_count": len(context_window.segments),

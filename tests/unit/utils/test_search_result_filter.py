@@ -15,7 +15,6 @@ from src.utils.common.search_result_filter import (
     SearchResultCleaner,
     SearchResultFilter,
 )
-from src.utils.tokens.content_processor import ContentProcessor
 
 
 class TestSearchResultCleaner(unittest.TestCase):
@@ -55,7 +54,9 @@ class TestSearchResultCleaner(unittest.TestCase):
             },
             {
                 "name": "双重编码问题",
-                "input": "&amp;lt;script&amp;gt;alert(&amp;quot;test&amp;quot;)&amp;lt;/script&amp;gt;",
+                "input": (
+                    "&amp;lt;script&amp;gt;alert(&amp;quot;test&amp;quot;)&amp;lt;/script&amp;gt;"
+                ),
                 "should_fix": True,
             },
             {
@@ -108,27 +109,37 @@ class TestSearchResultCleaner(unittest.TestCase):
         test_cases = [
             {
                 "name": "广告和推广内容",
-                "input": "Click here to read more! Subscribe to our newsletter! This is useful content.",
+                "input": (
+                    "Click here to read more! Subscribe to our newsletter! This is useful content."
+                ),
                 "expected_keywords": ["useful", "content"],
             },
             {
                 "name": "联系信息",
-                "input": "Contact us at info@example.com or call 123-456-7890. Learn Python programming.",
+                "input": (
+                    "Contact us at info@example.com or call 123-456-7890. Learn Python programming."
+                ),
                 "expected_keywords": ["Learn", "Python", "programming"],
             },
             {
                 "name": "JavaScript代码",
-                "input": 'alert("popup"); console.log("debug"); This is useful content about programming.',
+                "input": (
+                    'alert("popup"); console.log("debug"); This is useful content about programming.'
+                ),
                 "expected_keywords": ["useful", "content", "programming"],
             },
             {
                 "name": "HTML标签",
-                "input": '<script>alert("hello");</script>Python is a great language for beginners.',
+                "input": (
+                    '<script>alert("hello");</script>Python is a great language for beginners.'
+                ),
                 "expected_keywords": ["Python", "great", "language", "beginners"],
             },
             {
                 "name": "CSS样式",
-                "input": "<style>body{color:red;}</style>This article covers advanced topics.",
+                "input": (
+                    "<style>body{color:red;}</style>This article covers advanced topics."
+                ),
                 "expected_keywords": ["article", "covers", "advanced", "topics"],
             },
             {
@@ -166,7 +177,9 @@ class TestSearchResultCleaner(unittest.TestCase):
         """测试内容质量评估功能"""
         test_cases = [
             {
-                "text": "Python is a high-level programming language. It's known for its simplicity and readability.",
+                "text": (
+                    "Python is a high-level programming language. It's known for its simplicity and readability."
+                ),
                 "expected_range": (0.7, 1.0),
                 "description": "高质量技术内容",
             },
@@ -177,7 +190,9 @@ class TestSearchResultCleaner(unittest.TestCase):
             },
             {"text": "Short.", "expected_range": (0.0, 0.2), "description": "过短内容"},
             {
-                "text": "This comprehensive guide covers machine learning algorithms from basic concepts to advanced implementations.",
+                "text": (
+                    "This comprehensive guide covers machine learning algorithms from basic concepts to advanced implementations."
+                ),
                 "expected_range": (0.5, 1.0),
                 "description": "中高质量教育内容",
             },
@@ -244,17 +259,23 @@ class TestSearchResultFilter(unittest.TestCase):
         search_results = [
             {
                 "title": "Python Programming Guide",
-                "content": "This is a comprehensive guide to Python programming. Learn advanced techniques and best practices.",
+                "content": (
+                    "This is a comprehensive guide to Python programming. Learn advanced techniques and best practices."
+                ),
                 "url": "https://realpython.com/python-guide",
             },
             {
                 "title": "Buy Python Course Now!",
-                "content": "Limited time offer! Subscribe to our newsletter! Click here!",
+                "content": (
+                    "Limited time offer! Subscribe to our newsletter! Click here!"
+                ),
                 "url": "https://spam-site.com/course",
             },
             {
                 "title": "Machine Learning with Python",
-                "content": "Machine learning enables computers to learn from data. Python provides excellent libraries like scikit-learn.",
+                "content": (
+                    "Machine learning enables computers to learn from data. Python provides excellent libraries like scikit-learn."
+                ),
                 "url": "https://github.com/ml-guide",
             },
         ]

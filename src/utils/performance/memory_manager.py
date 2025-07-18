@@ -388,7 +388,7 @@ class HierarchicalMemoryManager(Generic[T]):
 
     async def _cleanup_expired_entries(self):
         """Clean up expired entries from all cache levels."""
-        current_time = time.time()
+        time.time()
 
         # Clean L1
         with self.l1_lock:

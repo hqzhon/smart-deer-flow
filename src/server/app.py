@@ -454,8 +454,9 @@ async def _get_connection_metrics() -> Dict[str, Any]:
         return {
             "active_connections": conn_pool["active_connections"],
             "max_connections": conn_pool["max_connections"],
-            "utilization": conn_pool["active_connections"]
-            / conn_pool["max_connections"],
+            "utilization": (
+                conn_pool["active_connections"] / conn_pool["max_connections"]
+            ),
             "total_acquired": metrics["total_acquired"],
             "total_released": metrics["total_released"],
             "peak_usage": metrics["peak_usage"],
@@ -686,7 +687,7 @@ async def _astream_workflow_generator(
     # Retry mechanism to handle Rate Limiting errors
     for attempt in range(max_retries + 1):
         try:
-            async for agent, _, event_data in graph.astream(
+            async for agent, stream_type, event_data in graph.astream(
                 input_,
                 config={
                     "thread_id": thread_id,
@@ -797,7 +798,9 @@ async def _astream_workflow_generator(
                         "error",
                         {
                             "thread_id": thread_id,
-                            "error": "Service temporarily unavailable, please try again later.",
+                            "error": (
+                                "Service temporarily unavailable, please try again later."
+                            ),
                         },
                     )
                     return
@@ -820,7 +823,9 @@ async def _astream_workflow_generator(
                             "error",
                             {
                                 "thread_id": thread_id,
-                                "error": "Network or timeout error occurred. Please try again.",
+                                "error": (
+                                    "Network or timeout error occurred. Please try again."
+                                ),
                             },
                         )
                     else:
@@ -828,10 +833,13 @@ async def _astream_workflow_generator(
                             "error",
                             {
                                 "thread_id": thread_id,
-                                "error": "An unexpected error occurred. Please try again.",
+                                "error": (
+                                    "An unexpected error occurred. Please try again."
+                                ),
                             },
                         )
                     return
+
 
 
 def _make_event(event_type: str, data: dict[str, any]):
@@ -1116,7 +1124,9 @@ async def get_metrics():
             },
             "advanced_optimizations": advanced_metrics,
             "system_info": {
-                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "python_version": (
+                    f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+                ),
                 "platform": sys.platform,
             },
         }

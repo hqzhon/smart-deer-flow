@@ -2,16 +2,15 @@
 Reflection component for modular graph architecture.
 Provides a reusable reflection loop that can be integrated into larger workflows.
 """
-
-from typing import Any, Dict, List, Optional, Callable
+import logging
+from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
-from langchain_core.runnables import RunnableConfig
 
-from src.graph.types import AgentState
-from src.agents.agents import create_agent
-from src.prompts.prompt_manager import get_prompt
+from src.graph.types import State as AgentState
+from src.agents.agents import create_agent_with_managed_prompt
 
+logger = logging.getLogger(__name__)
 
 class ReflectionConfig:
     """Configuration for the reflection component."""
@@ -31,18 +30,17 @@ class ReflectionConfig:
         self.enable_progressive_reflection = enable_progressive_reflection
 
 
-def create_reflection_agent(llm, prompt_name: str = "reflection_analysis"):
+def create_reflection_agent(tools: List, prompt_name: str = "reflection_analysis"):
     """Create a reflection agent with the specified prompt.
 
     Args:
-        llm: Language model instance.
+        tools: List of tools available to the agent.
         prompt_name: Name of the prompt to use for reflection.
 
     Returns:
         Configured reflection agent.
     """
-    prompt = get_prompt(prompt_name)
-    return create_agent(llm, prompt)
+    return create_agent_with_managed_prompt(prompt_name, "reflection", tools)
 
 
 def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> str:
@@ -56,7 +54,7 @@ def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> s
         "continue" or "end" based on reflection criteria.
     """
     reflection_count = state.get("reflection_count", 0)
-
+    logger.info(f"Current reflection count: {reflection_count}")
     # Check if we've reached max loops
     if reflection_count >= config.max_reflection_loops:
         return "end"
@@ -94,10 +92,35 @@ def reflection_node(state: AgentState, reflection_agent) -> Dict[str, Any]:
         "current_plan": current_plan,
         "findings": findings,
         "reflection_count": state.get("reflection_count", 0) + 1,
+        "locale": state.get("locale", "en-US"),
     }
 
     # Execute reflection
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    logger.info(
+        f"Starting reflection analysis (iteration {reflection_input['reflection_count']})"
+    )
+    logger.debug(f"Reflection input: {reflection_input}")
+
     reflection_result = reflection_agent.invoke(reflection_input)
+
+    # Log AI reflection results
+    logger.info("Reflection analysis completed successfully")
+    logger.debug(f"Reflection agent result: {reflection_result}")
+
+    # Log specific reflection content
+    if reflection_result.get("content"):
+        logger.info(f"Reflection content length: {len(reflection_result['content'])}")
+        logger.debug(f"Reflection content: {reflection_result['content']}")
+
+    if reflection_result.get("suggestions"):
+        logger.info(
+            f"Reflection suggestions count: {len(reflection_result['suggestions'])}"
+        )
+        logger.debug(f"Reflection suggestions: {reflection_result['suggestions']}")
 
     # Update state with reflection results
     updates = {
@@ -106,6 +129,10 @@ def reflection_node(state: AgentState, reflection_agent) -> Dict[str, Any]:
         "confidence": reflection_result.get("confidence", 0.5),
         "suggested_improvements": reflection_result.get("suggestions", []),
     }
+
+    logger.info(
+        f"Reflection state updates: confidence={updates['confidence']}, improvements_count={len(updates['suggested_improvements'])}"
+    )
 
     # Update plan if suggestions include plan modifications
     if "suggested_improvements" in reflection_result:

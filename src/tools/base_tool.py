@@ -4,7 +4,7 @@ All tools must inherit from BaseTool to be automatically discovered.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -139,7 +139,6 @@ class ToolRegistry:
 
         # Import all Python files in the tools directory
         import importlib.util
-        import sys
 
         for py_file in tools_dir.glob("*.py"):
             if py_file.name.startswith("_"):

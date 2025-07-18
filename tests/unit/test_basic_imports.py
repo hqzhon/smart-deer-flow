@@ -88,7 +88,7 @@ class TestBasicImports:
     def test_import_error_handling(self):
         """Test handling of import errors for non-existent modules."""
         with pytest.raises(ImportError):
-            from src.non_existent_module import NonExistentClass
+            pass
 
     def test_module_instantiation(self):
         """Test that imported modules can be instantiated."""

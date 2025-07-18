@@ -7,7 +7,6 @@ including session management, metrics collection, and health monitoring.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 import time
 
 from src.utils.researcher.researcher_isolation_metrics import ResearcherIsolationMetrics
@@ -75,7 +74,7 @@ class TestResearcherIsolationMetrics:
         metrics = ResearcherIsolationMetrics()
 
         # Start a session first
-        session = metrics.start_isolation_session(
+        metrics.start_isolation_session(
             session_id="test_session_1",
             task_complexity="medium",
             isolation_level="moderate",
@@ -94,7 +93,7 @@ class TestResearcherIsolationMetrics:
         """Test multiple updates to the same session."""
         metrics = ResearcherIsolationMetrics()
 
-        session = metrics.start_isolation_session(
+        metrics.start_isolation_session(
             session_id="test_session_1",
             task_complexity="medium",
             isolation_level="moderate",
@@ -118,7 +117,7 @@ class TestResearcherIsolationMetrics:
         metrics = ResearcherIsolationMetrics()
 
         # Start and end a session
-        session = metrics.start_isolation_session(
+        metrics.start_isolation_session(
             session_id="test_session_1",
             task_complexity="medium",
             isolation_level="moderate",
@@ -135,7 +134,7 @@ class TestResearcherIsolationMetrics:
         """Test ending an isolation session with failure."""
         metrics = ResearcherIsolationMetrics()
 
-        session = metrics.start_isolation_session(
+        metrics.start_isolation_session(
             session_id="test_session_1",
             task_complexity="medium",
             isolation_level="moderate",

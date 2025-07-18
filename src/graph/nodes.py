@@ -15,7 +15,8 @@ from langchain_core.tools import tool
 from langgraph.types import Command, interrupt
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from src.agents import create_agent
+# Delayed import to avoid circular import
+# from src.agents import create_agent, create_agent_with_managed_prompt
 from src.tools.search import LoggedTavilySearch
 from src.tools import (
     crawl_tool,
@@ -32,12 +33,9 @@ from src.llms.error_handler import safe_llm_call, safe_llm_call_async
 from src.llms.llm import get_llm_by_type
 from src.utils.template import apply_prompt_template
 from src.utils.common.json_utils import repair_json_output
-from src.utils.tokens.token_manager import TokenManager
 
 from .types import State
 from src.models.planner_model import Plan, Step, StepType
-from src.utils.reflection.enhanced_reflection import ReflectionContext
-
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +126,17 @@ def get_configuration_from_config(config):
                 self.enable_reflection_integration = getattr(
                     base_settings, "enable_reflection_integration", True
                 )
+                
+                # Reflection integration configuration for initial stage skipping
+                self.skip_initial_stage_reflection = getattr(
+                    base_settings.reflection, "skip_initial_stage_reflection", True
+                )
+                self.initial_stage_min_observations = getattr(
+                    base_settings.reflection, "initial_stage_min_observations", 2
+                )
+                self.initial_stage_min_content_length = getattr(
+                    base_settings.reflection, "initial_stage_min_content_length", 500
+                )
 
                 # Max step num configuration with override - prioritize API override
                 if "max_step_num" in self._overrides:
@@ -147,6 +156,7 @@ def get_configuration_from_config(config):
                     "mcp",
                     type("mcp", (), {"enabled": False, "servers": [], "timeout": 30})(),
                 )
+
         if "configurable" in config:
             config = config["configurable"]
         return ConfigWithOverrides(base_settings, config)
@@ -358,7 +368,7 @@ def planner_node(
                 ReflectionConfig,
             )
 
-            reflection_agent_config = ReflectionConfig(
+            ReflectionConfig(
                 enable_enhanced_reflection=True,
                 max_reflection_loops=reflection_config["max_reflection_loops"],
                 reflection_model=reflection_config["reflection_model"],
@@ -408,7 +418,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 logger.info("Performing planner-specific reflection analysis")
 
                 # Analyze the planning context for completeness
-                planning_context = {
+                {
                     "current_plan_context": str(state.get("current_plan", ""))[:1000],
                     "reflection_insights": reflection_insights,
                     "planning_objective": state.get("research_topic", ""),
@@ -640,10 +650,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 return Command(goto="__end__")
         # Phase 5: Add reflection metadata to command result
         reflection_metadata = {
-            "reflection_applied": reflection_config.get(
-                "enable_reflection_integration", True
-            )
-            and reflection_insights is not None,
+            "reflection_applied": (
+                reflection_config.get("enable_reflection_integration", True)
+                and reflection_insights is not None
+            ),
             "timestamp": datetime.now().isoformat(),
             "planner_reflection_enabled": reflection_agent is not None,
             "reflection_config": reflection_config,
@@ -672,10 +682,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
     # Phase 5: Add reflection metadata for human feedback path as well
     reflection_metadata = {
-        "reflection_applied": reflection_config.get(
-            "enable_reflection_integration", True
-        )
-        and reflection_insights is not None,
+        "reflection_applied": (
+            reflection_config.get("enable_reflection_integration", True)
+            and reflection_insights is not None
+        ),
         "timestamp": datetime.now().isoformat(),
         "planner_reflection_enabled": reflection_agent is not None,
         "reflection_config": reflection_config,
@@ -1513,10 +1523,16 @@ async def _setup_and_execute_agent_step(
                         f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                     )
                     loaded_tools.append(tool)
+            # Delayed import to avoid circular import
+            from src.agents import create_agent
+
             agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
             return await _execute_agent_step(state, config, agent, agent_type)
     else:
         # Use default tools if no MCP servers are configured
+        # Delayed import to avoid circular import
+        from src.agents import create_agent
+
         agent = create_agent(agent_type, agent_type, default_tools, agent_type)
         return await _execute_agent_step(state, config, agent, agent_type)
 
@@ -1533,7 +1549,6 @@ async def researcher_node_with_isolation(
         ResearcherContextExtension,
         ResearcherContextConfig,
     )
-    from src.agents import create_agent
 
     logger.info("Executing researcher node with context isolation (Phase 4)")
     configurable = get_configuration_from_config(config)
@@ -1653,14 +1668,22 @@ async def researcher_node_with_isolation(
                         f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                     )
                     loaded_tools.append(tool)
-            agent = create_agent("researcher", "researcher", loaded_tools, "researcher")
+            # Delayed import to avoid circular import
+            from src.agents import create_agent_with_managed_prompt
+
+            agent = create_agent_with_managed_prompt(
+                "researcher", "researcher", loaded_tools
+            )
             isolation_result = (
                 await context_extension.execute_researcher_step_with_isolation(
                     state, config, agent, "researcher"
                 )
             )
     else:
-        agent = create_agent("researcher", "researcher", tools, "researcher")
+        # Delayed import to avoid circular import
+        from src.agents import create_agent_with_managed_prompt
+
+        agent = create_agent_with_managed_prompt("researcher", "researcher", tools)
         isolation_result = (
             await context_extension.execute_researcher_step_with_isolation(
                 state, config, agent, "researcher"
@@ -1908,7 +1931,9 @@ async def researcher_node_with_isolation(
                 isolation_result.update["observations"] = all_observations
 
                 isolation_result.update["reflection_insights"] = {
-                    "comprehensive_report": final_reflection_result.comprehensive_report,
+                    "comprehensive_report": (
+                        final_reflection_result.comprehensive_report
+                    ),
                     "knowledge_gaps": [
                         gap.to_dict() if hasattr(gap, "to_dict") else gap
                         for gap in final_reflection_result.knowledge_gaps
@@ -1974,9 +1999,11 @@ async def researcher_node_with_isolation(
         # This avoids Pydantic __setattr__ issues with Command objects
         reflection_helpers = {
             "has_reflection_insights": "reflection_insights" in isolation_result.update,
-            "is_research_sufficient": isolation_result.update.get(
-                "reflection_insights", {}
-            ).get("is_sufficient", True),
+            "is_research_sufficient": (
+                isolation_result.update.get("reflection_insights", {}).get(
+                    "is_sufficient", True
+                )
+            ),
             "reflection_insights": isolation_result.update.get(
                 "reflection_insights", {}
             ),

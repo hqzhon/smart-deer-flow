@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from collections import defaultdict, deque
+from collections import deque
 import json
 import threading
 
@@ -166,9 +166,13 @@ class ReflectionPerformanceMonitor:
             dashboard = {
                 "current_metrics": {
                     "reflection_accuracy": self.current_metrics.reflection_accuracy,
-                    "knowledge_gap_identification_rate": self.current_metrics.knowledge_gap_identification_rate,
+                    "knowledge_gap_identification_rate": (
+                        self.current_metrics.knowledge_gap_identification_rate
+                    ),
                     "error_rate": self.current_metrics.error_rate,
-                    "research_completeness_score": self.current_metrics.research_completeness_score,
+                    "research_completeness_score": (
+                        self.current_metrics.research_completeness_score
+                    ),
                     "cache_hit_rate": self.current_metrics.cache_hit_rate,
                     "last_updated": self.current_metrics.timestamp.isoformat(),
                 },
@@ -237,7 +241,7 @@ class ReflectionPerformanceMonitor:
             # Get events from different time windows
             events_1h = self._get_recent_events(hours=1)
             events_24h = self._get_recent_events(hours=24)
-            events_7d = self._get_recent_events(hours=168)  # 7 days
+            self._get_recent_events(hours=168)  # 7 days
 
             trends = {}
 
@@ -308,7 +312,9 @@ class ReflectionPerformanceMonitor:
                     "metric": "error_rate",
                     "current_value": metrics.error_rate,
                     "threshold": thresholds["error_rate"],
-                    "message": f"Error rate ({metrics.error_rate:.2%}) exceeds critical threshold",
+                    "message": (
+                        f"Error rate ({metrics.error_rate:.2%}) exceeds critical threshold"
+                    ),
                 }
             )
 
@@ -320,7 +326,9 @@ class ReflectionPerformanceMonitor:
                     "metric": "reflection_accuracy",
                     "current_value": metrics.reflection_accuracy,
                     "threshold": thresholds["reflection_accuracy"],
-                    "message": f"Reflection accuracy ({metrics.reflection_accuracy:.2%}) below target",
+                    "message": (
+                        f"Reflection accuracy ({metrics.reflection_accuracy:.2%}) below target"
+                    ),
                 }
             )
 
@@ -334,7 +342,9 @@ class ReflectionPerformanceMonitor:
                     "metric": "knowledge_gap_identification_rate",
                     "current_value": metrics.knowledge_gap_identification_rate,
                     "threshold": thresholds["knowledge_gap_identification_rate"],
-                    "message": f"Gap identification rate ({metrics.knowledge_gap_identification_rate:.2%}) below target",
+                    "message": (
+                        f"Gap identification rate ({metrics.knowledge_gap_identification_rate:.2%}) below target"
+                    ),
                 }
             )
 

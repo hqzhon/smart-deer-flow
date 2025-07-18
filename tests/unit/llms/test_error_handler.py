@@ -311,7 +311,6 @@ class TestLogicIssues:
             # This should not cause infinite loop
             content = "test content"
             left, right = 0, len(content)
-            best_content = ""
             max_tokens = 100
             iterations = 0
 
@@ -322,7 +321,6 @@ class TestLogicIssues:
                 test_tokens = mock_processor.estimate_tokens(test_content, "test-model")
 
                 if test_tokens <= max_tokens:
-                    best_content = test_content
                     left = mid + 1
                 else:
                     right = mid - 1

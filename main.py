@@ -10,7 +10,7 @@ import logging
 
 from InquirerPy import inquirer
 
-from src.config import get_settings, load_configuration
+from src.config import load_configuration
 from src.constants.questions import BUILT_IN_QUESTIONS, BUILT_IN_QUESTIONS_ZH_CN
 from src.workflow import run_agent_workflow_async
 
@@ -44,6 +44,7 @@ def ask(
     enable_background_investigation=True,
     enable_collaboration=True,
     config_path="conf.yaml",
+    locale="en-US",
 ):
     """Run the agent workflow with the given question using new configuration.
 
@@ -77,6 +78,7 @@ def ask(
             settings=settings,
             enable_background_research=enable_background_investigation,
             enable_collaboration=enable_collaboration,
+            locale=locale,
         )
     )
 
@@ -112,6 +114,9 @@ def main(
         choices=["English", "中文"],
     ).execute()
 
+    # Convert language selection to locale
+    locale = "en-US" if language == "English" else "zh-CN"
+
     # Choose questions based on language
     questions = (
         BUILT_IN_QUESTIONS if language == "English" else BUILT_IN_QUESTIONS_ZH_CN
@@ -146,6 +151,7 @@ def main(
         enable_background_investigation=enable_background_investigation,
         enable_collaboration=enable_collaboration,
         config_path=config_path,
+        locale=locale,
     )
 
 

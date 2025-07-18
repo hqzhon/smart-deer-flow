@@ -6,7 +6,7 @@ Provides unified web search functionality with multiple search engines.
 import json
 import os
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.tools.base_tool import BaseTool, ToolInput, ToolOutput
 from src.config import get_settings
@@ -193,7 +193,7 @@ class WebSearchTool(BaseTool):
             results = search_tool.invoke(query)
             return ToolOutput(
                 success=True,
-                message=f"Found results via Brave Search",
+                message="Found results via Brave Search",
                 data=[{"content": results, "title": query}],
             )
 

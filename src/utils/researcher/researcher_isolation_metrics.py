@@ -12,7 +12,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from threading import Lock
 
 logger = logging.getLogger(__name__)
@@ -222,13 +222,15 @@ class ResearcherIsolationMetrics:
 
             return {
                 "total_reflection_sessions": len(reflection_sessions),
-                "average_insights_per_session": total_insights
-                / len(reflection_sessions),
+                "average_insights_per_session": (
+                    total_insights / len(reflection_sessions)
+                ),
                 "average_knowledge_gaps": total_gaps / len(reflection_sessions),
                 "average_follow_up_queries": total_queries / len(reflection_sessions),
                 "average_processing_time": total_time / len(reflection_sessions),
-                "reflection_effectiveness": total_queries
-                / max(1, total_gaps),  # Queries generated per gap
+                "reflection_effectiveness": (
+                    total_queries / max(1, total_gaps)
+                ),  # Queries generated per gap
                 "total_knowledge_gaps_identified": total_gaps,
                 "total_follow_up_queries_generated": total_queries,
             }

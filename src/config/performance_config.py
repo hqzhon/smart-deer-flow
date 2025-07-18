@@ -7,7 +7,6 @@ Provides functions to get, update, and reset performance configuration.
 
 import threading
 from typing import Dict, Any
-from copy import deepcopy
 
 from .models import PerformanceSettings
 from .config_loader import get_settings

@@ -9,12 +9,11 @@ including automated validation, reporting, and continuous monitoring.
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 import statistics
 import json
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +141,9 @@ class ReflectionSuccessValidator:
                 threshold=self.thresholds.max_response_time_p95,
                 status=self._evaluate_response_time(response_time_p95),
                 details={
-                    "description": "95th percentile response time for reflection operations"
+                    "description": (
+                        "95th percentile response time for reflection operations"
+                    )
                 },
             )
         )
@@ -242,7 +243,9 @@ class ReflectionSuccessValidator:
                     query_improvement_rate, self.thresholds.min_query_improvement_rate
                 ),
                 details={
-                    "description": "Rate of successful query improvements through reflection"
+                    "description": (
+                        "Rate of successful query improvements through reflection"
+                    )
                 },
             )
         )
@@ -290,7 +293,9 @@ class ReflectionSuccessValidator:
                 threshold=self.thresholds.min_task_completion_rate,
                 status=self._evaluate_completion_rate(task_completion_rate),
                 details={
-                    "description": "Rate of successful task completion with reflection assistance"
+                    "description": (
+                        "Rate of successful task completion with reflection assistance"
+                    )
                 },
             )
         )
@@ -340,7 +345,9 @@ class ReflectionSuccessValidator:
                 threshold=self.thresholds.min_research_efficiency_gain,
                 status=self._evaluate_efficiency_gain(efficiency_gain),
                 details={
-                    "description": "Improvement in research efficiency due to reflection"
+                    "description": (
+                        "Improvement in research efficiency due to reflection"
+                    )
                 },
             )
         )

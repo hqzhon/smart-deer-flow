@@ -3,7 +3,6 @@ Prompt Manager for standardized prompt management.
 Handles loading, caching, and providing prompts to agents.
 """
 
-import os
 import logging
 from typing import Dict, Optional, Any
 from pathlib import Path

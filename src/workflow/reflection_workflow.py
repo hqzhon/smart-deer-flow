@@ -4,9 +4,8 @@ Reflection Workflow Integration
 Integrates enhanced reflection capabilities into the research workflow
 """
 
-import asyncio
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -163,8 +162,9 @@ class WorkflowResult:
 class ReflectionWorkflow:
     """Enhanced research workflow with integrated reflection capabilities."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, locale: str = "en-US"):
         self.config = config or get_settings().model_dump()
+        self.locale = locale
         self.reflection_agent = EnhancedReflectionAgent(self.config)
         self.progressive_enabler = ResearcherProgressiveEnabler(self.config)
         self.isolation_metrics = ResearcherIsolationMetrics(self.config)
@@ -230,12 +230,20 @@ class ReflectionWorkflow:
         try:
             logger.info(f"Starting reflection workflow for query: {research_query}")
 
+            # Get locale from initial_context if available, otherwise use instance locale
+            context_locale = None
+            if initial_context:
+                context_locale = initial_context.get("locale")
+            if context_locale:
+                self.locale = context_locale
+
             # Initialize workflow context
             self.workflow_context = {
                 "query": research_query,
                 "initial_context": initial_context or {},
                 "start_time": start_time,
                 "stage_count": len(self.stages),
+                "locale": self.locale,
             }
 
             # Execute each stage
@@ -366,10 +374,13 @@ class ReflectionWorkflow:
 
         # Create reflection context
         reflection_context = ReflectionContext(
-            query=query,
-            context=initial_context,
-            previous_results=[],
-            metadata={"stage": "context_analysis"},
+            research_topic=query,
+            completed_steps=[],
+            execution_results=[str(initial_context)],
+            observations=[],
+            total_steps=1,
+            current_step_index=0,
+            locale=self.locale,
         )
 
         # Analyze knowledge gaps
@@ -413,7 +424,7 @@ class ReflectionWorkflow:
         planning_result = (
             self.execution_history[-1]["result"] if self.execution_history else {}
         )
-        research_plan = planning_result.get("research_plan", {})
+        planning_result.get("research_plan", {})
 
         # Simulate information gathering
         gathered_info = {
@@ -435,7 +446,7 @@ class ReflectionWorkflow:
         gathering_result = (
             self.execution_history[-1]["result"] if self.execution_history else {}
         )
-        gathered_info = gathering_result.get("gathered_information", {})
+        gathering_result.get("gathered_information", {})
 
         # Synthesize information
         synthesis = {
@@ -481,23 +492,43 @@ class ReflectionWorkflow:
         try:
             # Create reflection context
             reflection_context = ReflectionContext(
-                query=self.workflow_context["query"],
-                context=stage_result,
-                previous_results=self.execution_history,
-                metadata={"stage": stage.name},
+                research_topic=self.workflow_context.get("query", ""),
+                completed_steps=[],
+                execution_results=[str(stage_result)],
+                observations=[str(result) for result in self.execution_history],
+                total_steps=len(self.stages),
+                current_step_index=len(self.execution_history),
+                locale=self.locale,
             )
 
             # Perform reflection
+            logger.info(f"Applying reflection to stage {stage.name}")
+            logger.debug(f"Reflection context: {reflection_context}")
+
             reflection_insights = await self.reflection_agent.analyze_knowledge_gaps(
                 reflection_context
             )
 
+            # Log reflection insights
+            logger.info(f"Reflection insights generated for stage {stage.name}")
+            logger.debug(f"Reflection insights: {reflection_insights}")
+
+            # Log specific insight details
+            if reflection_insights.get("knowledge_gaps"):
+                gaps_count = len(reflection_insights["knowledge_gaps"])
+                logger.info(f"Reflection identified {gaps_count} knowledge gaps")
+
+            if reflection_insights.get("follow_up_queries"):
+                queries_count = len(reflection_insights["follow_up_queries"])
+                logger.info(f"Reflection generated {queries_count} follow-up queries")
+
+            confidence = reflection_insights.get("confidence_score", 0.5)
+            logger.info(f"Reflection confidence score: {confidence}")
+
             return {
                 "reflection_applied": True,
                 "reflection_insights": [reflection_insights],
-                "reflection_confidence": reflection_insights.get(
-                    "confidence_score", 0.5
-                ),
+                "reflection_confidence": confidence,
             }
 
         except Exception as e:

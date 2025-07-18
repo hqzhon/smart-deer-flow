@@ -412,12 +412,16 @@ class ConsensusBuilder:
                 "decision": f"Support agent {best_claim['agent_id']}'s claim",
                 "winning_claim": best_claim,
                 "all_scores": claim_scores,
-                "reason": f"Highest evidence quality, total score: {best_claim['total_score']:.2f}",
+                "reason": (
+                    f"Highest evidence quality, total score: {best_claim['total_score']:.2f}"
+                ),
             }
         else:
             return {
                 "success": False,
-                "reason": "Evidence quality of all claims is insufficient to make a decision",
+                "reason": (
+                    "Evidence quality of all claims is insufficient to make a decision"
+                ),
             }
 
     async def _voting_based_resolution(self, conflict: Conflict) -> Dict[str, Any]:
@@ -452,7 +456,9 @@ class ConsensusBuilder:
                 "method": "voting_based",
                 "decision": f"Voting results support agent {winner[0]}",
                 "vote_details": votes,
-                "reason": f"Received {winner[1]:.1f} votes, accounting for {winner[1]/sum(votes.values())*100:.1f}% of total votes",
+                "reason": (
+                    f"Received {winner[1]:.1f} votes, accounting for {winner[1]/sum(votes.values())*100:.1f}% of total votes"
+                ),
             }
         else:
             return {
@@ -544,14 +550,18 @@ class ConsensusBuilder:
             return {
                 "success": True,
                 "method": "external_verification",
-                "decision": f"External verification supports agent {winner['agent_id']}",
+                "decision": (
+                    f"External verification supports agent {winner['agent_id']}"
+                ),
                 "verification_results": verification_results,
                 "reason": "Only one claim passed external verification",
             }
         elif len(verified_claims) > 1:
             return {
                 "success": False,
-                "reason": "Multiple claims passed external verification, further analysis needed",
+                "reason": (
+                    "Multiple claims passed external verification, further analysis needed"
+                ),
             }
         else:
             return {
@@ -648,10 +658,10 @@ class ConflictResolutionSystem:
         return {
             "active_conflicts": len(self.active_conflicts),
             "total_resolutions": len(self.resolution_history),
-            "success_rate": len(
-                [r for r in self.resolution_history if r["resolution"]["success"]]
-            )
-            / max(1, len(self.resolution_history)),
+            "success_rate": (
+                len([r for r in self.resolution_history if r["resolution"]["success"]])
+                / max(1, len(self.resolution_history))
+            ),
             "recent_conflicts": (
                 self.resolution_history[-5:] if self.resolution_history else []
             ),

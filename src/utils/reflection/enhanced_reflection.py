@@ -8,7 +8,6 @@ follow-up query generation, and research sufficiency assessment.
 """
 
 import logging
-import time
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -52,7 +51,6 @@ class ReflectionConfig(BaseModel):
 from langchain_core.runnables import RunnableConfig
 from src.llms.error_handler import safe_llm_call_async
 from src.config import get_settings
-from src.models.planner_model import Step
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +197,9 @@ class EnhancedReflectionAgent:
         # Reflection configuration
         self.max_reflection_loops = getattr(self.config, "max_reflection_loops", 3)
         self.reflection_model_name = getattr(self.config, "reflection_model", None)
-        self.reflection_model = None  # Will be initialized lazily via _get_reflection_model
+        self.reflection_model = (
+            None  # Will be initialized lazily via _get_reflection_model
+        )
         self.reflection_temperature = getattr(
             self.config, "reflection_temperature", 0.7
         )
@@ -255,6 +255,16 @@ class EnhancedReflectionAgent:
             # Create messages for the model
             messages = [HumanMessage(content=reflection_prompt)]
 
+            # Log analysis start
+            logger.info(
+                f"Starting knowledge gap analysis with reflection prompt length: {len(reflection_prompt)}"
+            )
+            logger.debug(
+                f"Knowledge gap analysis input prompt: {reflection_prompt[:500]}..."
+                if len(reflection_prompt) > 500
+                else f"Knowledge gap analysis input prompt: {reflection_prompt}"
+            )
+
             # Use safe_llm_call_async with structured model
             try:
                 result = await safe_llm_call_async(
@@ -264,10 +274,26 @@ class EnhancedReflectionAgent:
                     context="Analyzing research knowledge gaps and sufficiency",
                 )
 
+                # Log AI analysis results
+                logger.info("Knowledge gap analysis AI response received successfully")
+                logger.debug(f"Knowledge gap analysis AI result: {result}")
+
                 # If result is None or invalid, use fallback
                 if not result or not isinstance(result, ReflectionResult):
                     logger.warning("Invalid reflection result, using fallback")
                     result = self._create_basic_reflection_result(context)
+                else:
+                    # Log detailed analysis results
+                    logger.info(
+                        f"Knowledge gap analysis completed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gaps_found={len(result.knowledge_gaps)}"
+                    )
+                    logger.debug(f"Knowledge gaps identified: {result.knowledge_gaps}")
+                    logger.debug(
+                        f"Follow-up queries generated: {result.follow_up_queries}"
+                    )
+                    logger.debug(
+                        f"Comprehensive report length: {len(result.comprehensive_report)}"
+                    )
 
             except Exception as parse_error:
                 logger.warning(
@@ -356,14 +382,27 @@ class EnhancedReflectionAgent:
 
             response = await self._call_reflection_model(model, prompt)
 
+            # Log AI response details
+            logger.info("Follow-up queries generation - AI response received")
+            logger.debug(f"Follow-up queries AI raw response: {response}")
+
             # Parse response
             import json
 
             try:
                 result = json.loads(response.content)
-                return result.get("follow_up_queries", [])
+                follow_up_queries = result.get("follow_up_queries", [])
+
+                # Log parsed results
+                logger.info(f"Generated {len(follow_up_queries)} follow-up queries")
+                logger.debug(f"Follow-up queries result: {follow_up_queries}")
+
+                return follow_up_queries
             except (json.JSONDecodeError, AttributeError):
                 # Fallback
+                logger.warning(
+                    "Failed to parse follow-up queries response, using fallback"
+                )
                 if language == Language.ZH_CN:
                     return [
                         f"关于{gap}的更多信息需要什么？" for gap in knowledge_gaps[:3]
@@ -704,7 +743,7 @@ class EnhancedReflectionAgent:
             logger.error(f"Failed to extract partial data: {extract_error}")
             # Use basic fallback
             extracted_data["comprehensive_report"] = (
-                f"研究分析报告\n\n由于技术限制，无法生成完整的综合报告。"
+                "研究分析报告\n\n由于技术限制，无法生成完整的综合报告。"
                 if context.locale.startswith("zh")
                 else "Research Analysis Report\n\nUnable to generate complete comprehensive report due to technical limitations."
             )
@@ -763,7 +802,27 @@ class EnhancedReflectionAgent:
         """
         try:
             messages = [HumanMessage(content=prompt)]
+
+            logger.info(f"Calling reflection model with prompt length: {len(prompt)}")
+            logger.debug(
+                f"Reflection model input prompt: {prompt[:500]}..."
+                if len(prompt) > 500
+                else f"Reflection model input prompt: {prompt}"
+            )
+
             response = await model.ainvoke(messages)
+
+            # Log AI return results
+            logger.info("Reflection model response received successfully")
+            logger.debug(f"Reflection model response: {response}")
+
+            # Log response content if available
+            if hasattr(response, "content"):
+                logger.info(
+                    f"Reflection model content length: {len(str(response.content))}"
+                )
+                logger.debug(f"Reflection model content: {response.content}")
+
             return response
         except Exception as e:
             logger.error(f"Error calling reflection model: {e}")

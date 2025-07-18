@@ -5,10 +5,9 @@ and prevent token management failures due to message extraction issues.
 """
 
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
-from collections import Counter
 import math
 import re
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage

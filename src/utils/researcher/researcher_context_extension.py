@@ -7,7 +7,7 @@ integrating with the existing architecture while adding isolation capabilities.
 import logging
 import os
 import traceback
-from typing import Dict, List, Any, Optional, Literal
+from typing import Dict, Any, Optional, Literal
 from langchain_core.messages import HumanMessage, AIMessage
 from .researcher_context_isolator import (
     ResearcherContextIsolator,
@@ -69,7 +69,9 @@ class ResearcherContextExtension:
         self.reflection_agent = None
         if self.config.get("enable_enhanced_reflection", True):
             try:
-                from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent
+                from src.utils.reflection.enhanced_reflection import (
+                    EnhancedReflectionAgent,
+                )
 
                 self.reflection_agent = EnhancedReflectionAgent(config=self.config)
                 logger.info(
@@ -372,6 +374,7 @@ class ResearcherContextExtension:
                     observations=observations,
                     total_steps=len(current_plan.steps) if current_plan else 0,
                     current_step_index=len(completed_steps),
+                    locale=state.get("locale", "en-US"),
                 )
 
                 # Get reflection insights - need to await the coroutine

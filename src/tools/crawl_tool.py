@@ -4,7 +4,7 @@ Provides web content extraction and processing capabilities.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from urllib.parse import urlparse
 
 from src.tools.base_tool import BaseTool, ToolInput, ToolOutput

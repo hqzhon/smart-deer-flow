@@ -8,7 +8,6 @@ intelligent coordination between components.
 
 import time
 import logging
-import asyncio
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -17,24 +16,19 @@ from enum import Enum
 
 # Import Phase 4 components
 from .researcher_progressive_enablement_phase4 import (
-    AdvancedResearcherProgressiveEnabler,
     get_advanced_progressive_enabler,
 )
 from .researcher_isolation_metrics_phase4 import (
-    AdvancedResearcherIsolationMetrics,
     get_advanced_isolation_metrics,
     SystemAlert,
     AlertLevel,
 )
 from .researcher_config_optimizer_phase4 import (
-    ConfigurationOptimizer,
     get_config_optimizer,
     ConfigOptimizationLevel,
 )
 
 # Import Phase 3 components for backward compatibility
-from .researcher_context_extension import ResearcherContextExtension
-from .researcher_context_isolator import ResearcherContextIsolator
 
 logger = logging.getLogger(__name__)
 

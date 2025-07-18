@@ -7,7 +7,6 @@ for researcher nodes based on task complexity, performance metrics, and user fee
 """
 
 import logging
-import time
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -70,7 +69,9 @@ class ResearcherProgressiveEnabler:
         self.reflection_agent = None
         if config and getattr(config, "enable_enhanced_reflection", True):
             try:
-                from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent
+                from src.utils.reflection.enhanced_reflection import (
+                    EnhancedReflectionAgent,
+                )
 
                 self.reflection_agent = EnhancedReflectionAgent(config)
                 logger.info(
@@ -291,6 +292,7 @@ class ResearcherProgressiveEnabler:
                     execution_results=[],
                     total_steps=scenario.step_count,
                     current_step_index=0,
+                    locale="en-US",
                 )
 
                 # Use analyze_knowledge_gaps for full reflection analysis

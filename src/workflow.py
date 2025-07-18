@@ -238,6 +238,7 @@ async def run_agent_workflow_async(
     enable_intelligent_task_decomposition: bool = True,
     enable_dynamic_resource_allocation: bool = True,
     settings: Optional[Any] = None,
+    locale: str = "en-US",
 ) -> Dict[str, Any]:
     """Run the agent workflow asynchronously with the given user input.
 
@@ -313,7 +314,7 @@ async def run_agent_workflow_async(
             cache_max_step_num = getattr(settings.agents, "max_step_num", 3)
         if cache_max_step_num is None:
             cache_max_step_num = 3
-            
+
         if enable_advanced_optimization:
             # Use hierarchical memory for advanced caching
             cache_key = {
@@ -365,10 +366,12 @@ async def run_agent_workflow_async(
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],
+        "locale": locale,  # 使用传入的locale参数，确保首次researcher报告有正确的多语言设置
         "auto_accepted_plan": True,
         "enable_background_research": enable_background_research,
-        "enable_collaboration": enable_collaboration
-        and collaboration_systems is not None,
+        "enable_collaboration": (
+            enable_collaboration and collaboration_systems is not None
+        ),
         "collaboration_systems": collaboration_systems,
         "start_time": start_time,
         "thread_id": thread_id or "default",
@@ -409,8 +412,9 @@ async def run_agent_workflow_async(
             "thread_id": thread_id or "default",
             "max_plan_iterations": max_plan_iterations,
             "max_step_num": effective_max_step_num,
-            "enable_collaboration": enable_collaboration
-            and collaboration_systems is not None,
+            "enable_collaboration": (
+                enable_collaboration and collaboration_systems is not None
+            ),
             "model_token_limits": model_token_limits,
             "mcp_settings": {
                 "servers": {

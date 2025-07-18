@@ -8,17 +8,13 @@ dynamic threshold adjustment, and intelligent auto-tuning capabilities.
 
 import logging
 import time
-import math
 import statistics
-from typing import Dict, Any, Optional, List, Tuple, Set
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
-from enum import Enum
 from collections import defaultdict, deque
 
 # Import Phase 3 components
 from .researcher_progressive_enablement import (
-    TaskComplexity,
-    IsolationStrategy,
     ScenarioContext,
     ResearcherProgressiveEnabler as BaseEnabler,
 )
@@ -582,7 +578,7 @@ class AdvancedResearcherProgressiveEnabler(BaseEnabler):
 
         for decision_record in decisions:
             features = decision_record["features"]
-            decision = decision_record["decision"]
+            decision_record["decision"]
             confidence = decision_record["confidence"].confidence_score
 
             # Weight by confidence - more confident decisions contribute more

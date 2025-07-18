@@ -335,8 +335,9 @@ class InteractiveElementGenerator:
                 trigger_text=table_content,
                 metadata={
                     "table_index": i,
-                    "row_count": len(table_content.split("\n"))
-                    - 2,  # Subtract header and separator rows
+                    "row_count": (
+                        len(table_content.split("\n")) - 2
+                    ),  # Subtract header and separator rows
                     "supports_sorting": True,
                     "supports_filtering": True,
                 },
@@ -819,7 +820,6 @@ class HTMLGenerator:
 
     def _get_html_template(self) -> str:
         """Get HTML template"""
-        lang_code = "zh-CN" if self.language == Language.ZH_CN else "en-US"
         return """
 <!DOCTYPE html>
 <html lang="{lang_code}">

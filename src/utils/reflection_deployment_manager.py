@@ -7,7 +7,6 @@ including progressive enablement, A/B testing, and rollback capabilities.
 """
 
 import logging
-import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, field
@@ -164,7 +163,9 @@ class ReflectionDeploymentManager:
                 "ab_test_percentage": self.config.ab_test_percentage,
                 "ab_test_duration_days": self.config.ab_test_duration_days,
                 "monitoring_enabled": self.config.monitoring_enabled,
-                "health_check_interval_minutes": self.config.health_check_interval_minutes,
+                "health_check_interval_minutes": (
+                    self.config.health_check_interval_minutes
+                ),
                 "last_updated": self.config.last_updated.isoformat(),
             }
 
@@ -236,7 +237,9 @@ class ReflectionDeploymentManager:
             ):
                 return {
                     "success": False,
-                    "error": f"Invalid phase transition from {current_phase} to {target_phase}",
+                    "error": (
+                        f"Invalid phase transition from {current_phase} to {target_phase}"
+                    ),
                 }
 
             # Check safety conditions
@@ -544,7 +547,9 @@ class ReflectionDeploymentManager:
                 "configuration": {
                     "test_user_groups": list(self.config.test_user_groups),
                     "limited_user_groups": list(self.config.limited_user_groups),
-                    "gradual_rollout_percentage": self.config.gradual_rollout_percentage,
+                    "gradual_rollout_percentage": (
+                        self.config.gradual_rollout_percentage
+                    ),
                     "auto_rollback_enabled": self.config.auto_rollback_enabled,
                     "ab_testing_enabled": self.config.ab_testing_enabled,
                 },

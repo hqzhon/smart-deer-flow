@@ -667,7 +667,6 @@ def test_coordinator_node_tool_calls_exception_handling(
     patch_logger,
 ):
     # tool_calls raises exception in processing
-    tool_calls = [{"name": "handoff_to_planner", "args": None}]
     with (
         patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,

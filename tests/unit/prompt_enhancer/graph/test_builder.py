@@ -47,7 +47,7 @@ class TestBuildGraph:
         mock_state_graph.return_value = mock_builder
         mock_builder.compile.return_value = mock_compiled_graph
 
-        result = build_graph()
+        build_graph()
 
         # Verify the correct node function was added
         mock_builder.add_node.assert_called_once_with("enhancer", mock_enhancer_node)

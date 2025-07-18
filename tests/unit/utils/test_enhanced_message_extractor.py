@@ -5,7 +5,7 @@ and intelligent content deduplication functionality.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 from src.utils.tokens.enhanced_message_extractor import (

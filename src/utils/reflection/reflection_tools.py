@@ -8,7 +8,7 @@ Provides helper functions for reflection result processing and analysis.
 
 import json
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
@@ -392,6 +392,11 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
     Returns:
         Parsed ReflectionResult or None if parsing fails
     """
+    logger.info(
+        f"Parsing reflection result from raw output (length: {len(raw_output)})"
+    )
+    logger.debug(f"Raw reflection output: {raw_output}")
+
     try:
         # Try to extract JSON from the output
         if "{" in raw_output and "}" in raw_output:
@@ -399,10 +404,14 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
             end_idx = raw_output.rfind("}") + 1
             json_str = raw_output[start_idx:end_idx]
 
+            logger.debug(f"Extracted JSON string: {json_str}")
+
             data = json.loads(json_str)
+            logger.info("Successfully parsed JSON data from reflection output")
+            logger.debug(f"Parsed reflection data: {data}")
 
             # Create ReflectionResult with validation
-            return ReflectionResult(
+            result = ReflectionResult(
                 is_sufficient=data.get("is_sufficient", False),
                 confidence_score=data.get("confidence_score"),
                 knowledge_gaps=data.get("knowledge_gaps", []),
@@ -411,10 +420,18 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
                 recommendations=data.get("recommendations", []),
                 priority_areas=data.get("priority_areas", []),
             )
+
+            # Log parsed result details
+            logger.info(
+                f"Reflection result parsed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gaps={len(result.knowledge_gaps)}, queries={len(result.follow_up_queries)}"
+            )
+
+            return result
     except (json.JSONDecodeError, KeyError, TypeError) as e:
         logger.warning(f"Failed to parse reflection result: {e}")
         logger.debug(f"Raw output: {raw_output}")
 
+    logger.warning("Could not parse reflection result, returning None")
     return None
 
 

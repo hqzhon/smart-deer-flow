@@ -6,9 +6,7 @@ from src.utils.performance.parallel_executor import (
     ParallelExecutor,
     SharedTaskContext,
     ParallelTask,
-    TaskPriority,
     TaskStatus,
-    TaskResult,
     create_parallel_executor,
 )
 

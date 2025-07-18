@@ -5,7 +5,6 @@ Provides validation functions for configuration data
 """
 
 import logging
-import os
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 

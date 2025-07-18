@@ -411,7 +411,7 @@ class ParallelExecutor:
         # Process completed tasks
         for task in done:
             try:
-                result = await task  # Get result or exception
+                await task  # Get result or exception
                 # Find task ID for better logging
                 task_id = None
                 for tid, running_task in self.running_tasks.items():

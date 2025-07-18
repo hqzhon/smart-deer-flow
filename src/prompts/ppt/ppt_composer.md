@@ -105,3 +105,4 @@ Typical structure includes:
 - Begin your response with the title using a single # heading
 - For images, ONLY use the exact image URLs found in the source content. DO NOT invent or create fictional image URLs
 - If the source content contains images, incorporate them in your presentation using the exact same URLs
+- Always use the language specified by the locale = **{{ locale }}**

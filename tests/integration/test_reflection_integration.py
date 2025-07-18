@@ -8,9 +8,7 @@ and planner nodes with enhanced reflection capabilities.
 """
 
 import pytest
-import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any, List
 
 # Add src to path for imports
 import sys
@@ -22,11 +20,8 @@ from src.utils.reflection.enhanced_reflection import (
     EnhancedReflectionAgent,
     ReflectionResult,
     ReflectionContext,
-    KnowledgeGap,
 )
 from src.utils.reflection.enhanced_reflection import ReflectionConfig
-from src.graph.nodes import researcher_node_with_isolation
-from src.graph.nodes import planner_node
 
 # from src.config.configuration import Configuration  # Removed - using new config system
 
@@ -102,7 +97,9 @@ class TestReflectionIntegration:
         async def research_with_reflection(query):
             return {
                 "initial_findings": "Mock research findings",
-                "reflection_analysis": reflection_agent.analyze_knowledge_gaps.return_value,
+                "reflection_analysis": (
+                    reflection_agent.analyze_knowledge_gaps.return_value
+                ),
                 "follow_up_research": [],
                 "final_findings": "Mock final findings",
             }
@@ -135,7 +132,9 @@ class TestReflectionIntegration:
                 "initial_plan": {
                     "research_steps": [{"step": 1, "action": "Mock planning step"}]
                 },
-                "reflection_analysis": reflection_agent.analyze_knowledge_gaps.return_value,
+                "reflection_analysis": (
+                    reflection_agent.analyze_knowledge_gaps.return_value
+                ),
                 "enhanced_plan": {
                     "research_steps": [
                         {"step": 1, "action": "Mock planning step"},
@@ -473,9 +472,7 @@ class TestReflectionIntegration:
                 )
 
                 # Execute research with reflection
-                result = await researcher_node.research_with_reflection(
-                    sample_research_query
-                )
+                await researcher_node.research_with_reflection(sample_research_query)
 
                 # Verify metrics were recorded
                 mock_metrics.record_reflection_event.assert_called()
@@ -546,7 +543,7 @@ class TestReflectionIntegration:
     ):
         """Test how different reflection configurations affect integration behavior."""
         # Test with strict reflection configuration
-        strict_config = ReflectionConfig(
+        ReflectionConfig(
             enable_enhanced_reflection=True,
             knowledge_gap_threshold=0.9,
             sufficiency_threshold=0.95,
@@ -581,7 +578,7 @@ class TestReflectionIntegration:
         strict_researcher.research_with_reflection = strict_research_with_reflection
 
         # Test with lenient reflection configuration
-        lenient_config = ReflectionConfig(
+        ReflectionConfig(
             enable_enhanced_reflection=True,
             knowledge_gap_threshold=0.3,
             sufficiency_threshold=0.5,
@@ -702,8 +699,8 @@ class TestReflectionSystemIntegration:
         """Test proper initialization of reflection system components."""
         from unittest.mock import Mock
 
-        metrics = Mock()
-        reflection_config = ReflectionConfig()
+        Mock()
+        ReflectionConfig()
 
         # Initialize reflection agent
         reflection_agent = EnhancedReflectionAgent(config=config)
@@ -723,8 +720,8 @@ class TestReflectionSystemIntegration:
     @pytest.mark.asyncio
     async def test_reflection_system_cleanup(self, config):
         """Test proper cleanup of reflection system resources."""
-        metrics = Mock()
-        reflection_config = ReflectionConfig(enable_reflection_caching=True)
+        Mock()
+        ReflectionConfig(enable_reflection_caching=True)
 
         reflection_agent = EnhancedReflectionAgent(config=config)
 

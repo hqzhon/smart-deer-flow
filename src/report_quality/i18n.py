@@ -54,10 +54,14 @@ class I18nManager:
                 "impact_levels": {"high": "高", "medium": "中等", "low": "低"},
                 # Limitation descriptions
                 "limitation_descriptions": {
-                    "small_sample_size": "样本规模较小（n={sample_size}），可能影响结果的普适性",
+                    "small_sample_size": (
+                        "样本规模较小（n={sample_size}），可能影响结果的普适性"
+                    ),
                     "short_time_span": "分析时间跨度较短，可能无法捕捉长期趋势",
                     "outdated_data": "数据相对过时（{year}年），当前相关性可能有限",
-                    "geographic_limitation": "研究范围限于特定地理区域，结果外推性可能有限",
+                    "geographic_limitation": (
+                        "研究范围限于特定地理区域，结果外推性可能有限"
+                    ),
                     "single_methodology": "依赖单一研究方法可能引入方法学偏差",
                     "single_data_source": "依赖单一数据源可能引入数据偏差",
                     "no_control_group": "缺乏对照组使得难以建立因果关系",
@@ -87,7 +91,9 @@ class I18nManager:
                     "use_validated_methods": "使用经过验证的方法",
                     "explain_method_limits": "说明方法局限性",
                     "multiple_methods": "采用多种研究方法进行交叉验证",
-                    "explain_methodology_limits": "详细说明所采用方法的局限性和适用范围",
+                    "explain_methodology_limits": (
+                        "详细说明所采用方法的局限性和适用范围"
+                    ),
                     "sensitivity_analysis": "进行敏感性分析以测试结论的稳健性",
                 },
                 # Bias types and descriptions
@@ -201,69 +207,137 @@ class I18nManager:
                 "impact_levels": {"high": "High", "medium": "Medium", "low": "Low"},
                 # Limitation descriptions
                 "limitation_descriptions": {
-                    "small_sample": "Small sample size may affect statistical significance",
-                    "short_time_range": "Short analysis period may not capture long-term trends",
-                    "outdated_data": "Data may be outdated and not reflect current situation",
-                    "limited_geographic_scope": "Analysis limited to specific geographic regions",
-                    "methodology_constraints": "Research methodology has certain limitations",
-                    "single_data_source": "Reliance on single data source may introduce data bias",
-                    "no_control_group": "Lack of control group makes it difficult to establish causal relationships",
+                    "small_sample": (
+                        "Small sample size may affect statistical significance"
+                    ),
+                    "short_time_range": (
+                        "Short analysis period may not capture long-term trends"
+                    ),
+                    "outdated_data": (
+                        "Data may be outdated and not reflect current situation"
+                    ),
+                    "limited_geographic_scope": (
+                        "Analysis limited to specific geographic regions"
+                    ),
+                    "methodology_constraints": (
+                        "Research methodology has certain limitations"
+                    ),
+                    "single_data_source": (
+                        "Reliance on single data source may introduce data bias"
+                    ),
+                    "no_control_group": (
+                        "Lack of control group makes it difficult to establish causal relationships"
+                    ),
                 },
                 # Mitigation suggestions
                 "mitigation_suggestions": {
-                    "multiple_data_sources": "Use multiple data sources for cross-validation",
+                    "multiple_data_sources": (
+                        "Use multiple data sources for cross-validation"
+                    ),
                     "assess_source_reliability": "Assess data source reliability",
-                    "explain_single_source_limits": "Explain limitations of single data source",
+                    "explain_single_source_limits": (
+                        "Explain limitations of single data source"
+                    ),
                     "setup_control_groups": "Set up appropriate control groups",
-                    "quasi_experimental_design": "Use natural or quasi-experimental designs",
-                    "clarify_correlation_causation": "Clarify distinction between correlation and causation",
+                    "quasi_experimental_design": (
+                        "Use natural or quasi-experimental designs"
+                    ),
+                    "clarify_correlation_causation": (
+                        "Clarify distinction between correlation and causation"
+                    ),
                     "increase_sample_size": "Increase sample size",
-                    "use_statistical_methods": "Use statistical methods to assess representativeness",
+                    "use_statistical_methods": (
+                        "Use statistical methods to assess representativeness"
+                    ),
                     "acknowledge_sample_limits": "Acknowledge sample limitations",
                     "extend_time_range": "Extend time range",
                     "use_recent_data": "Use more recent data",
                     "explain_time_limits": "Explain temporal limitations",
-                    "explain_short_term_limits": "Explain limitations and potential biases of short-term data",
-                    "compare_historical_trends": "Compare with historical trends to enhance credibility",
+                    "explain_short_term_limits": (
+                        "Explain limitations and potential biases of short-term data"
+                    ),
+                    "compare_historical_trends": (
+                        "Compare with historical trends to enhance credibility"
+                    ),
                     "expand_geographic_scope": "Expand geographic scope",
                     "use_representative_regions": "Use representative regions",
                     "explain_geographic_limits": "Explain geographic limitations",
                     "improve_methodology": "Improve research methodology",
                     "use_validated_methods": "Use validated methods",
                     "explain_method_limits": "Explain methodological limitations",
-                    "multiple_methods": "Employ multiple research methods for cross-validation",
-                    "explain_methodology_limits": "Provide detailed explanation of methodological limitations and scope",
-                    "sensitivity_analysis": "Conduct sensitivity analysis to test robustness of conclusions",
+                    "multiple_methods": (
+                        "Employ multiple research methods for cross-validation"
+                    ),
+                    "explain_methodology_limits": (
+                        "Provide detailed explanation of methodological limitations and scope"
+                    ),
+                    "sensitivity_analysis": (
+                        "Conduct sensitivity analysis to test robustness of conclusions"
+                    ),
                 },
                 "confidence_reasoning": {
-                    "very_high": "Based on {count} high-quality evidence items, conclusion has very high confidence",
-                    "high": "With {count} supporting evidence items, conclusion is relatively reliable",
-                    "medium": "With {count} evidence items supporting, but more verification needed",
-                    "low": "Limited evidence ({count} items), conclusion should be treated with caution",
-                    "very_low": "Insufficient evidence ({count} items), conclusion has high uncertainty",
+                    "very_high": (
+                        "Based on {count} high-quality evidence items, conclusion has very high confidence"
+                    ),
+                    "high": (
+                        "With {count} supporting evidence items, conclusion is relatively reliable"
+                    ),
+                    "medium": (
+                        "With {count} evidence items supporting, but more verification needed"
+                    ),
+                    "low": (
+                        "Limited evidence ({count} items), conclusion should be treated with caution"
+                    ),
+                    "very_low": (
+                        "Insufficient evidence ({count} items), conclusion has high uncertainty"
+                    ),
                     "error": "Confidence assessment error",
                     "high_indicator": "High confidence indicator found: '{indicator}'",
-                    "moderate_indicator": "Moderate confidence indicator found: '{indicator}'",
-                    "neutral_indicator": "Neutral confidence indicator found: '{indicator}'",
+                    "moderate_indicator": (
+                        "Moderate confidence indicator found: '{indicator}'"
+                    ),
+                    "neutral_indicator": (
+                        "Neutral confidence indicator found: '{indicator}'"
+                    ),
                     "low_indicator": "Low confidence indicator found: '{indicator}'",
-                    "very_low_indicator": "Very low confidence indicator found: '{indicator}'",
+                    "very_low_indicator": (
+                        "Very low confidence indicator found: '{indicator}'"
+                    ),
                     "evidence_count": "Supporting evidence count: {count}",
                     "no_evidence": "No supporting evidence provided",
                 },
                 "bias_types": {
-                    "confirmation_bias": "Confirmation bias: tendency to seek evidence supporting existing views",
-                    "survivorship_bias": "Survivorship bias: only considering successful cases while ignoring failures",
-                    "availability_bias": "Availability bias: over-reliance on easily accessible information",
-                    "anchoring_bias": "Anchoring bias: over-reliance on initial information",
-                    "selection_bias": "Selection bias: convenience sampling may lead to non-representative samples",
-                    "temporal_bias": "Temporal bias: data collected during special periods may lack generalizability",
+                    "confirmation_bias": (
+                        "Confirmation bias: tendency to seek evidence supporting existing views"
+                    ),
+                    "survivorship_bias": (
+                        "Survivorship bias: only considering successful cases while ignoring failures"
+                    ),
+                    "availability_bias": (
+                        "Availability bias: over-reliance on easily accessible information"
+                    ),
+                    "anchoring_bias": (
+                        "Anchoring bias: over-reliance on initial information"
+                    ),
+                    "selection_bias": (
+                        "Selection bias: convenience sampling may lead to non-representative samples"
+                    ),
+                    "temporal_bias": (
+                        "Temporal bias: data collected during special periods may lack generalizability"
+                    ),
                 },
                 "potential_impacts": {
-                    "confirmation_bias": "May affect objectivity and accuracy of conclusions",
+                    "confirmation_bias": (
+                        "May affect objectivity and accuracy of conclusions"
+                    ),
                     "survivorship_bias": "May lead to overly optimistic conclusions",
-                    "availability_bias": "May lead to decisions based on incomplete information",
+                    "availability_bias": (
+                        "May lead to decisions based on incomplete information"
+                    ),
                     "anchoring_bias": "May limit consideration of alternative options",
-                    "selection_bias": "Results may not be generalizable to the population",
+                    "selection_bias": (
+                        "Results may not be generalizable to the population"
+                    ),
                     "temporal_bias": "Conclusions may not apply to normal periods",
                 },
                 "bias_mitigation": {
@@ -315,7 +389,9 @@ class I18nManager:
                     "chart_title": "Chart",
                     "chart_description": "Click for details",
                     "clickable_chart_title": "Clickable Chart: {alt_text}",
-                    "clickable_chart_description": "Click to view detailed chart information and data",
+                    "clickable_chart_description": (
+                        "Click to view detailed chart information and data"
+                    ),
                     "table_title": "Data Table",
                     "table_description": "Sortable data table",
                     "link_title": "External Link",

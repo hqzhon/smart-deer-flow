@@ -4,7 +4,7 @@ Token estimation utilities for content processing.
 """
 
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from dataclasses import dataclass
 
 

@@ -12,7 +12,6 @@ from langchain_core.messages import AIMessage
 from src.utils.common.structured_logging import get_logger
 from src.llms.base_error_handler import BaseLLMErrorHandler
 
-
 logger = get_logger(__name__)
 
 
@@ -157,22 +156,52 @@ class LLMErrorHandler(BaseLLMErrorHandler):
         }
 
         self.fallback_responses = {
-            LLMErrorType.DATA_INSPECTION_FAILED: "Unable to process this request due to content safety restrictions. Please try with different content.",
-            LLMErrorType.RATE_LIMIT_EXCEEDED: "Request rate limit exceeded, please try again later.",
-            LLMErrorType.QUOTA_EXCEEDED: "API quota exhausted, please check your account quota.",
-            LLMErrorType.INVALID_API_KEY: "Invalid API key, please check your configuration.",
-            LLMErrorType.AUTHENTICATION_ERROR: "Authentication failed, please check your credentials.",
-            LLMErrorType.PERMISSION_ERROR: "Permission denied, please check your access rights.",
-            LLMErrorType.MODEL_NOT_FOUND: "Specified model does not exist, please check model configuration.",
-            LLMErrorType.CONTENT_TOO_LONG: "Content too long, please shorten the input.",
-            LLMErrorType.NETWORK_ERROR: "Network connection error, please check your network connection.",
+            LLMErrorType.DATA_INSPECTION_FAILED: (
+                "Unable to process this request due to content safety restrictions. Please try with different content."
+            ),
+            LLMErrorType.RATE_LIMIT_EXCEEDED: (
+                "Request rate limit exceeded, please try again later."
+            ),
+            LLMErrorType.QUOTA_EXCEEDED: (
+                "API quota exhausted, please check your account quota."
+            ),
+            LLMErrorType.INVALID_API_KEY: (
+                "Invalid API key, please check your configuration."
+            ),
+            LLMErrorType.AUTHENTICATION_ERROR: (
+                "Authentication failed, please check your credentials."
+            ),
+            LLMErrorType.PERMISSION_ERROR: (
+                "Permission denied, please check your access rights."
+            ),
+            LLMErrorType.MODEL_NOT_FOUND: (
+                "Specified model does not exist, please check model configuration."
+            ),
+            LLMErrorType.CONTENT_TOO_LONG: (
+                "Content too long, please shorten the input."
+            ),
+            LLMErrorType.NETWORK_ERROR: (
+                "Network connection error, please check your network connection."
+            ),
             LLMErrorType.TIMEOUT_ERROR: "Request timeout, please try again later.",
-            LLMErrorType.SERVICE_UNAVAILABLE: "Service temporarily unavailable, please try again later.",
-            LLMErrorType.INTERNAL_SERVER_ERROR: "Internal server error occurred, please try again later.",
-            LLMErrorType.BAD_REQUEST: "Invalid request format, please check your input.",
-            LLMErrorType.RESOURCE_EXHAUSTED: "System resources exhausted, please try again later.",
-            LLMErrorType.CONCURRENT_LIMIT_EXCEEDED: "Too many concurrent requests, please try again later.",
-            LLMErrorType.UNKNOWN_ERROR: "Unknown error occurred, please try again later.",
+            LLMErrorType.SERVICE_UNAVAILABLE: (
+                "Service temporarily unavailable, please try again later."
+            ),
+            LLMErrorType.INTERNAL_SERVER_ERROR: (
+                "Internal server error occurred, please try again later."
+            ),
+            LLMErrorType.BAD_REQUEST: (
+                "Invalid request format, please check your input."
+            ),
+            LLMErrorType.RESOURCE_EXHAUSTED: (
+                "System resources exhausted, please try again later."
+            ),
+            LLMErrorType.CONCURRENT_LIMIT_EXCEEDED: (
+                "Too many concurrent requests, please try again later."
+            ),
+            LLMErrorType.UNKNOWN_ERROR: (
+                "Unknown error occurred, please try again later."
+            ),
         }
 
         self.skip_errors = {

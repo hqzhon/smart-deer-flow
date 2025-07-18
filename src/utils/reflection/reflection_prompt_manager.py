@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from datetime import datetime
 from pathlib import Path
 
@@ -86,44 +86,27 @@ class ReflectionPromptManager:
         Returns:
             格式化的后续查询生成Prompt
         """
-        if language == Language.ZH_CN:
-            prompt = f"""基于以下研究主题和知识缺口，生成3-5个具体的后续查询问题：
+        # 设置语言环境
+        locale = "zh-CN" if language == Language.ZH_CN else "en-US"
 
-研究主题：{research_topic}
+        # 准备模板变量
+        template_vars = {
+            "CURRENT_TIME": datetime.now().isoformat(),
+            "locale": locale,
+            "research_topic": research_topic,
+            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "knowledge_gaps": knowledge_gaps,
+            "priority_areas": priority_areas,
+        }
 
-知识缺口：
-{chr(10).join(f"- {gap}" for gap in knowledge_gaps)}
-
-优先关注领域：
-{chr(10).join(f"- {area}" for area in priority_areas)}
-
-请生成具体、可操作的查询问题，每个问题应该：
-1. 针对特定的知识缺口
-2. 包含必要的上下文信息
-3. 能够通过搜索或研究获得答案
-4. 有助于完善整体研究
-
-以JSON数组格式返回查询列表。"""
-        else:
-            prompt = f"""Based on the following research topic and knowledge gaps, generate 3-5 specific follow-up queries:
-
-Research Topic: {research_topic}
-
-Knowledge Gaps:
-{chr(10).join(f"- {gap}" for gap in knowledge_gaps)}
-
-Priority Areas:
-{chr(10).join(f"- {area}" for area in priority_areas)}
-
-Generate specific, actionable query questions where each question should:
-1. Target a specific knowledge gap
-2. Include necessary context information
-3. Be answerable through search or research
-4. Help complete the overall research
-
-Return the query list in JSON array format."""
-
-        return prompt
+        # Apply template using the project's template system
+        # Convert template_vars to AgentState format
+        agent_state = {**template_vars, "messages": []}
+        result = apply_prompt_template("reflection_follow_up_queries", agent_state)
+        # Extract the system prompt content
+        if result and len(result) > 0 and "content" in result[0]:
+            return result[0]["content"]
+        return "Template rendering failed"
 
     def get_quality_assessment_labels(
         self, language: Language = Language.EN_US

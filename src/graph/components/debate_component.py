@@ -6,11 +6,9 @@ Provides multi-agent debate functionality for critical analysis.
 from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
-from langchain_core.runnables import RunnableConfig
 
-from src.graph.types import AgentState
-from src.agents.agents import create_agent
-from src.prompts.prompt_manager import get_prompt
+from src.graph.types import State as AgentState
+from src.agents.agents import create_agent_with_managed_prompt
 
 
 class DebateConfig:
@@ -29,11 +27,11 @@ class DebateConfig:
         self.consensus_threshold = consensus_threshold
 
 
-def create_debater_agent(llm, role: str, prompt_name: str = None):
+def create_debater_agent(tools: List, role: str, prompt_name: str = None):
     """Create a debater agent with specific role and prompt.
 
     Args:
-        llm: Language model instance.
+        tools: List of tools available to the agent.
         role: Role of the debater (e.g., "optimist", "pessimist", "neutral").
         prompt_name: Name of the prompt to use. Auto-generated if None.
 
@@ -43,12 +41,7 @@ def create_debater_agent(llm, role: str, prompt_name: str = None):
     if prompt_name is None:
         prompt_name = f"debater_{role}"
 
-    prompt = get_prompt(prompt_name, get_prompt("debater_default"))
-
-    # Customize prompt with role
-    role_prompt = prompt.format(role=role)
-
-    return create_agent(llm, role_prompt)
+    return create_agent_with_managed_prompt(prompt_name, "debater", tools)
 
 
 def prepare_debate_context(state: AgentState, config: DebateConfig) -> Dict[str, Any]:

@@ -867,9 +867,7 @@ class AdvancedParallelExecutor:
             )
 
             # 3. 负载均衡
-            load_balanced_assignment = await self.load_balancer.balance_load(
-                tasks, self.max_workers
-            )
+            await self.load_balancer.balance_load(tasks, self.max_workers)
 
             # 4. 按批次提交任务
             submitted_task_ids = []
@@ -1004,7 +1002,7 @@ class AdvancedParallelExecutor:
                     self.thread_pool, task.func, *task.args
                 )
 
-            execution_time = time.time() - start_time
+            time.time() - start_time
 
             # Mark task as completed
             self.dependency_resolver.mark_task_completed(task.task_id)
@@ -1012,7 +1010,7 @@ class AdvancedParallelExecutor:
             return result
 
         except Exception as e:
-            execution_time = time.time() - start_time
+            time.time() - start_time
             logger.error(f"Parallel task {task.task_id} failed: {e}")
             raise e
 
@@ -1076,7 +1074,7 @@ class AdvancedParallelExecutor:
                 self.active_tasks[task_id].status = "running"
 
             # Execute the task
-            result = await func(*args, **kwargs)
+            await func(*args, **kwargs)
 
             # Update metrics on success
             if self.enable_metrics and task_id in self.active_tasks:

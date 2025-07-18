@@ -7,7 +7,6 @@ providing seamless integration with ResearcherContextExtension and other Phase 3
 """
 
 import logging
-import time
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
@@ -39,6 +38,9 @@ class ReflectionIntegrationConfig:
     reflection_confidence_threshold: float = 0.7
     enable_progressive_reflection: bool = True
     enable_reflection_metrics: bool = True
+    skip_initial_stage_reflection: bool = True  # Skip reflection in initial research stage
+    initial_stage_min_observations: int = 2  # Minimum observations to exit initial stage
+    initial_stage_min_content_length: int = 500  # Minimum content length to exit initial stage
 
 
 class ReflectionIntegrator:
@@ -106,6 +108,15 @@ class ReflectionIntegrator:
             "has_plan": state.get("current_plan") is not None,
             "has_results": len(state.get("observations", [])) > 0,
         }
+
+        # Check if we're in the initial research stage - skip reflection
+        if self.config.skip_initial_stage_reflection and self._is_initial_research_stage(state, current_step):
+            decision_factors["trigger_reason"] = "initial_stage_skip"
+            return (
+                False,
+                "Skipping reflection in initial research stage",
+                decision_factors,
+            )
 
         # Check step count threshold
         step_count = len(state.get("observations", []))
@@ -319,7 +330,7 @@ class ReflectionIntegrator:
         self, state: State, current_step: Step, agent_name: str
     ) -> ScenarioContext:
         """Create scenario context for progressive enablement."""
-        current_plan = state.get("current_plan")
+        state.get("current_plan")
         observations = state.get("observations", [])
 
         return ScenarioContext(
@@ -372,6 +383,40 @@ class ReflectionIntegrator:
             locale=state.get("locale", "en-US"),
             max_reflection_loops=self.config.max_reflection_iterations,
         )
+
+    def _is_initial_research_stage(self, state: State, current_step: Optional[Step] = None) -> bool:
+        """Determine if we're in the initial research stage where reflection should be skipped.
+        
+        Args:
+            state: Current graph state
+            current_step: Current step being executed
+            
+        Returns:
+            True if in initial research stage, False otherwise
+        """
+        # Check if we have minimal observations
+        observations = state.get("observations", [])
+        if len(observations) < self.config.initial_stage_min_observations:
+            return True
+            
+        # Check if we have no meaningful execution results
+        current_plan = state.get("current_plan")
+        if current_plan and hasattr(current_plan, "steps"):
+            executed_steps = [step for step in current_plan.steps if step.execution_res]
+            if len(executed_steps) < self.config.initial_stage_min_observations:
+                return True
+                
+        # Check if we have minimal resources found
+        resources = state.get("resources", [])
+        if len(resources) < self.config.initial_stage_min_observations:
+            return True
+            
+        # Check if total research content is minimal
+        total_content_length = sum(len(str(obs)) for obs in observations)
+        if total_content_length < self.config.initial_stage_min_content_length:
+            return True
+            
+        return False
 
     def _is_complex_research_scenario(self, state: State, current_step: Step) -> bool:
         """Determine if the current scenario is complex enough to warrant reflection."""

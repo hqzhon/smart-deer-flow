@@ -6,11 +6,9 @@ Provides reusable research workflow that can be integrated into larger systems.
 from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
-from langchain_core.runnables import RunnableConfig
 
-from src.graph.types import AgentState
-from src.agents.agents import create_agent
-from src.prompts.prompt_manager import get_prompt
+from src.graph.types import State as AgentState
+from src.agents.agents import create_agent_with_managed_prompt
 from src.tools.base_tool import get_tool_registry
 
 
@@ -32,18 +30,17 @@ class ResearchConfig:
         self.summary_type = summary_type
 
 
-def create_research_agent(llm, prompt_name: str = "researcher"):
+def create_research_agent(tools: List, prompt_name: str = "researcher"):
     """Create a research agent with the specified prompt.
 
     Args:
-        llm: Language model instance.
+        tools: List of tools available to the agent.
         prompt_name: Name of the prompt to use for research.
 
     Returns:
         Configured research agent.
     """
-    prompt = get_prompt(prompt_name)
-    return create_agent(llm, prompt)
+    return create_agent_with_managed_prompt(prompt_name, "researcher", tools)
 
 
 def create_research_tools() -> List:
@@ -118,15 +115,17 @@ def research_step(
         # Update state
         updates = {
             "findings": previous_findings + processed_findings,
-            "research_steps": research_steps
-            + [
-                {
-                    "step": len(research_steps) + 1,
-                    "query": query,
-                    "findings": len(processed_findings),
-                    "timestamp": result.get("timestamp", ""),
-                }
-            ],
+            "research_steps": (
+                research_steps
+                + [
+                    {
+                        "step": len(research_steps) + 1,
+                        "query": query,
+                        "findings": len(processed_findings),
+                        "timestamp": result.get("timestamp", ""),
+                    }
+                ]
+            ),
             "last_research_result": result,
         }
 
@@ -136,15 +135,17 @@ def research_step(
         logger.error(f"Research step failed: {e}")
         return {
             "findings": previous_findings,
-            "research_steps": research_steps
-            + [
-                {
-                    "step": len(research_steps) + 1,
-                    "query": query,
-                    "error": str(e),
-                    "status": "failed",
-                }
-            ],
+            "research_steps": (
+                research_steps
+                + [
+                    {
+                        "step": len(research_steps) + 1,
+                        "query": query,
+                        "error": str(e),
+                        "status": "failed",
+                    }
+                ]
+            ),
         }
 
 

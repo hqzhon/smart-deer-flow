@@ -356,7 +356,9 @@ class HumanLoopController:
             return {
                 "decision": "apply_pattern",
                 "pattern": best_pattern,
-                "reasoning": f"Based on historical success pattern, success rate: {best_pattern.get('success_rate', 0):.2f}",
+                "reasoning": (
+                    f"Based on historical success pattern, success rate: {best_pattern.get('success_rate', 0):.2f}"
+                ),
             }
 
         # 选择第一个替代方案
@@ -368,7 +370,9 @@ class HumanLoopController:
             return {
                 "decision": "use_alternative",
                 "alternative": best_alternative,
-                "reasoning": f"Choose alternative with highest confidence: {best_alternative.get('confidence', 0):.2f}",
+                "reasoning": (
+                    f"Choose alternative with highest confidence: {best_alternative.get('confidence', 0):.2f}"
+                ),
             }
 
         return {
