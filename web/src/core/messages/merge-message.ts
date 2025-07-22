@@ -8,6 +8,10 @@ import type {
   ToolCallChunksEvent,
   ToolCallResultEvent,
   ToolCallsEvent,
+  ReflectionInsightsEvent,
+  IsolationMetricsEvent,
+  ResearchProgressEvent,
+  NodeUpdateEvent,
 } from "../api";
 import { deepClone } from "../utils/deep-clone";
 
@@ -22,6 +26,14 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     mergeToolCallResultMessage(message, event);
   } else if (event.type === "interrupt") {
     mergeInterruptMessage(message, event);
+  } else if (event.type === "reflection_insights") {
+    mergeReflectionInsightsMessage(message, event);
+  } else if (event.type === "isolation_metrics") {
+    mergeIsolationMetricsMessage(message, event);
+  } else if (event.type === "research_progress") {
+    mergeResearchProgressMessage(message, event);
+  } else if (event.type === "node_update") {
+    mergeNodeUpdateMessage(message, event);
   }
   if ('finish_reason' in event.data && event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
@@ -106,4 +118,38 @@ function mergeToolCallResultMessage(
 function mergeInterruptMessage(message: Message, event: InterruptEvent) {
   message.isStreaming = false;
   message.options = event.data.options;
+}
+
+function mergeReflectionInsightsMessage(
+  message: Message,
+  event: ReflectionInsightsEvent,
+) {
+  message.reflectionInsights = event.data.insights ?? {};
+}
+
+function mergeIsolationMetricsMessage(
+  message: Message,
+  event: IsolationMetricsEvent,
+) {
+  message.isolationMetrics = event.data.metrics;
+}
+
+function mergeResearchProgressMessage(
+  message: Message,
+  event: ResearchProgressEvent,
+) {
+  message.researchProgress = event.data.progress;
+}
+
+function mergeNodeUpdateMessage(
+  message: Message,
+  event: NodeUpdateEvent,
+) {
+  message.nodeUpdates = message.nodeUpdates ?? [];
+  message.nodeUpdates.push({
+    node: event.data.node,
+    agent: event.data.agent,
+    data: event.data.data,
+    timestamp: event.data.timestamp,
+  });
 }

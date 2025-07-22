@@ -108,8 +108,7 @@ reflection:
   enable_progressive_reflection: true            # Enable progressive reflection improvement
   enable_reflection_metrics: true                # Enable reflection performance metrics
   skip_initial_stage_reflection: true            # Skip reflection in initial research stage
-  initial_stage_min_observations: 2              # Minimum observations to exit initial stage
-  initial_stage_min_content_length: 500          # Minimum content length to exit initial stage
+
 
 # Iterative Research Configuration
 # Controls follow-up research and iterative improvement

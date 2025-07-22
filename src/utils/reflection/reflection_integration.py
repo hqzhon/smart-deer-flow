@@ -178,7 +178,7 @@ class ReflectionIntegrator:
                     f"Progressive enabler suggests reflection: {reason}",
                     decision_factors,
                 )
-        
+
         # Check for complex research scenarios
         if current_step and self._is_complex_research_scenario(state, current_step):
             decision_factors["trigger_reason"] = "complex_scenario"
@@ -533,15 +533,11 @@ class ReflectionIntegrator:
             logger.info("[DEBUG] No current plan or plan has no steps")
 
         # Check if observations exist (no length requirement)
-        logger.info(
-            f"[DEBUG] Found {len(observations)} observations"
-        )
+        logger.info(f"[DEBUG] Found {len(observations)} observations")
 
         for i, obs in enumerate(observations[:3]):  # Log first 3 observations
             obs_preview = str(obs)[:100] + "..." if len(str(obs)) > 100 else str(obs)
-            logger.info(
-                f"[DEBUG] Observation {i+1} preview: {obs_preview}"
-            )
+            logger.info(f"[DEBUG] Observation {i+1} preview: {obs_preview}")
 
         if len(observations) < 1:
             logger.info("[DEBUG] No observations found - returning False")

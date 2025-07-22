@@ -2,6 +2,7 @@
 Reflection component for modular graph architecture.
 Provides a reusable reflection loop that can be integrated into larger workflows.
 """
+
 import logging
 from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
@@ -11,6 +12,7 @@ from src.graph.types import State as AgentState
 from src.agents.agents import create_agent_with_managed_prompt
 
 logger = logging.getLogger(__name__)
+
 
 class ReflectionConfig:
     """Configuration for the reflection component."""

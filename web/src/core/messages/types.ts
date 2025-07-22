@@ -24,6 +24,36 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
+  // Structured Data
+  reflectionInsights?: {
+    comprehensive_report?: string;
+    knowledge_gaps?: string[];
+    follow_up_queries?: string[];
+    is_sufficient?: boolean;
+    confidence_score?: number;
+  };
+  isolationMetrics?: {
+    session_id?: string;
+    compression_ratio?: number;
+    token_savings?: number;
+    performance_impact?: number;
+    success_rate?: number;
+    memory_usage?: number;
+    [key: string]: unknown;
+  };
+  researchProgress?: {
+    current_step?: string;
+    completion_percentage?: number;
+    estimated_time_remaining?: number;
+    status?: string;
+    [key: string]: unknown;
+  };
+  nodeUpdates?: Array<{
+    node: string;
+    agent: string;
+    data: Record<string, unknown>;
+    timestamp: number;
+  }>;
 }
 
 export interface Option {

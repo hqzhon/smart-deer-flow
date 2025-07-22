@@ -546,9 +546,9 @@ def create_parallel_executor(
     from src.config import get_settings
 
     try:
-        config_data = get_settings().load_config()
+        settings = get_settings()
         if max_concurrent_tasks is None:
-            max_concurrent_tasks = config_data.get("max_parallel_tasks", 3)
+            max_concurrent_tasks = settings.agents.max_parallel_tasks
             # Ensure max_concurrent_tasks is integer type
             if isinstance(max_concurrent_tasks, str):
                 max_concurrent_tasks = int(max_concurrent_tasks)

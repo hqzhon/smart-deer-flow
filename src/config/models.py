@@ -101,9 +101,14 @@ class ReflectionSettings(BaseModel):
     enable_reflection_integration: bool = True
     enable_progressive_reflection: bool = True
     enable_reflection_metrics: bool = True
-    skip_initial_stage_reflection: bool = Field(default=True, description="Skip reflection in initial research stage")
-    initial_stage_min_observations: int = Field(default=2, ge=1, description="Minimum observations to exit initial stage")
-    initial_stage_min_content_length: int = Field(default=500, ge=100, description="Minimum content length to exit initial stage")
+    skip_initial_stage_reflection: bool = Field(
+        default=True, description="Skip reflection in initial research stage"
+    )
+
+    reflection_model: Optional[str] = Field(
+        default=None,
+        description="Model to use for reflection analysis. If None, uses basic model or reasoning model if enabled",
+    )
 
 
 class IterativeResearchSettings(BaseModel):

@@ -357,13 +357,92 @@ class InteractiveElementGenerator:
         for table_match in table_matches:
             table_regions.append((table_match.start(), table_match.end()))
 
-        # Find Markdown links, but exclude image links (![alt](url))
+        # Identify list regions that contain links
+        list_regions = []
+        lines = content.split("\n")
+        current_list_start = None
+        current_list_lines = []
+
+        for i, line in enumerate(lines):
+            # Check if line is a list item with a link
+            if re.match(r"^\s*[-*]\s+.*\[.*?\]\(https?://.*?\)", line):
+                if current_list_start is None:
+                    current_list_start = i
+                    current_list_lines = [line]
+                else:
+                    current_list_lines.append(line)
+            elif current_list_start is not None:
+                # End of list found
+                if (
+                    len(current_list_lines) > 1
+                ):  # Only process lists with multiple items
+                    list_content = "\n".join(current_list_lines)
+                    list_regions.append(
+                        {
+                            "start_line": current_list_start,
+                            "end_line": current_list_start
+                            + len(current_list_lines)
+                            - 1,
+                            "content": list_content,
+                            "links": re.findall(
+                                r"\[(.*?)\]\((https?://.*?)\)", list_content
+                            ),
+                        }
+                    )
+                current_list_start = None
+                current_list_lines = []
+
+        # Handle case where list is at the end of content
+        if current_list_start is not None and len(current_list_lines) > 1:
+            list_content = "\n".join(current_list_lines)
+            list_regions.append(
+                {
+                    "start_line": current_list_start,
+                    "end_line": current_list_start + len(current_list_lines) - 1,
+                    "content": list_content,
+                    "links": re.findall(r"\[(.*?)\]\((https?://.*?)\)", list_content),
+                }
+            )
+
+        # Create elements for link lists
+        processed_links = set()
+        for list_region in list_regions:
+            if len(list_region["links"]) > 1:  # Multiple links in a list
+                # Create a single element for the entire list
+                element = InteractiveElement(
+                    element_id=self._generate_element_id("link_list"),
+                    element_type=InteractiveElementType.SOURCE_LINK,
+                    title=get_text(
+                        self.language, "interactive_elements", "source_link_title"
+                    ).format(link_text=f"{len(list_region['links'])} 个参考链接"),
+                    description=get_text(
+                        self.language, "interactive_elements", "source_link_description"
+                    ),
+                    target_content=list_region["content"],
+                    trigger_text=list_region["content"],
+                    metadata={
+                        "link_count": len(list_region["links"]),
+                        "links": list_region["links"],
+                        "is_list": True,
+                    },
+                )
+                elements.append(element)
+                # Mark these links as processed
+                for link in list_region["links"]:
+                    processed_links.add(f"[{link[0]}]({link[1]})")
+
+        # Find individual Markdown links, but exclude image links and processed list links
         link_pattern = r"(?<!!)\[(.*?)\]\((https?://.*?)\)"
         matches = re.finditer(link_pattern, content)
 
         for match in matches:
             link_text = match.group(1)
             url = match.group(2)
+            full_link = match.group(0)
+
+            # Skip if already processed as part of a list
+            if full_link in processed_links:
+                continue
 
             # Additional check: skip if this looks like an image URL
             if any(
@@ -401,6 +480,7 @@ class InteractiveElementGenerator:
                     "url": url,
                     "domain": self._extract_domain(url),
                     "is_external": True,
+                    "is_list": False,
                 },
             )
             elements.append(element)
@@ -801,20 +881,6 @@ class HTMLGenerator:
             "{{INTERACTIVE_ELEMENTS}}",
             self._generate_elements_js(report.interactive_elements),
         )
-        html = html.replace(
-            "{{DATA_SOURCES}}", self._generate_data_sources_html(report.data_sources)
-        )
-        html = html.replace(
-            "{{CODE_BLOCKS}}", self._generate_code_blocks_html(report.code_blocks)
-        )
-        html = html.replace(
-            "{{DATA_SOURCES_TITLE}}",
-            get_text(self.language, "interactive_elements", "data_sources"),
-        )
-        html = html.replace(
-            "{{CODE_BLOCKS_TITLE}}",
-            get_text(self.language, "interactive_elements", "code_blocks"),
-        )
 
         return html
 
@@ -926,33 +992,7 @@ class HTMLGenerator:
         .close:hover {
             color: black;
         }
-        .sidebar {
-            position: fixed;
-            right: -300px;
-            top: 0;
-            width: 300px;
-            height: 100%;
-            background: white;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-            transition: right 0.3s ease;
-            z-index: 999;
-            overflow-y: auto;
-        }
-        .sidebar.open {
-            right: 0;
-        }
-        .sidebar-toggle {
-            position: fixed;
-            right: 20px;
-            top: 20px;
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 1000;
-        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -1021,15 +1061,7 @@ class HTMLGenerator:
         </div>
     </div>
     
-    <button class="sidebar-toggle" onclick="toggleSidebar()">📊</button>
-    
-    <div class="sidebar" id="sidebar">
-        <h3>{{DATA_SOURCES_TITLE}}</h3>
-        {{DATA_SOURCES}}
-        
-        <h3>{{CODE_BLOCKS_TITLE}}</h3>
-        {{CODE_BLOCKS}}
-    </div>
+
     
     <div class="modal" id="modal">
         <div class="modal-content">
@@ -1052,10 +1084,7 @@ class HTMLGenerator:
         
         {{INTERACTIVE_ELEMENTS}}
         
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-        }
+
         
         function openModal(content) {
             const modal = document.getElementById('modal');
@@ -1115,16 +1144,14 @@ class HTMLGenerator:
         html = re.sub(r"^## (.*?)$", r"<h2>\1</h2>", html, flags=re.MULTILINE)
         html = re.sub(r"^# (.*?)$", r"<h1>\1</h1>", html, flags=re.MULTILINE)
 
-        # Lists (支持-号列表)
+        # Lists (支持-号列表) - this will handle link lists as interactive elements
         html = self._convert_lists_to_html(html)
 
         # Images (must be processed before regular links)
         html = re.sub(r"!\[(.*?)\]\((.*?)\)", r'<img src="\2" alt="\1" />', html)
 
-        # Links (regular links, not images)
-        html = re.sub(
-            r"\[(.*?)\]\((.*?)\)", r'<a href="\2" target="_blank">\1</a>', html
-        )
+        # Links (regular links, not images) - but skip links that are already in interactive elements
+        html = self._convert_remaining_links_to_html(html)
 
         # Bold
         html = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", html)
@@ -1148,13 +1175,27 @@ class HTMLGenerator:
         in_list = False
         list_level = 0
 
-        for line in lines:
+        for i, line in enumerate(lines):
+            # Skip lines that already contain interactive elements
+            if "<interactive" in line and 'type="source_link"' in line:
+                # This line contains interactive elements, keep as-is but wrap in proper list structure
+                if not in_list:
+                    result.append("<ul>")
+                    in_list = True
+                    list_level = 0
+                # Extract the interactive content and wrap it in <li>
+                interactive_content = line.strip()
+                if interactive_content.startswith("- "):
+                    interactive_content = interactive_content[2:]  # Remove "- " prefix
+                result.append(f"<li>{interactive_content}</li>")
+                continue
+
             # 检测列表项 (支持 - 和 * 开头的列表)
             list_match = re.match(r"^(\s*)[-*]\s+(.*)", line)
 
             if list_match:
                 indent = len(list_match.group(1))
-                content = list_match.group(2)
+                content_text = list_match.group(2)
                 current_level = indent // 2  # 假设每级缩进2个空格
 
                 if not in_list:
@@ -1171,7 +1212,7 @@ class HTMLGenerator:
                         result.append("</ul>")
                     list_level = current_level
 
-                result.append(f"<li>{content}</li>")
+                result.append(f"<li>{content_text}</li>")
             else:
                 if in_list:
                     # 结束列表
@@ -1185,6 +1226,27 @@ class HTMLGenerator:
         if in_list:
             for _ in range(list_level + 1):
                 result.append("</ul>")
+
+        return "\n".join(result)
+
+    def _convert_remaining_links_to_html(self, content: str) -> str:
+        """Convert remaining links to HTML, skipping those already in interactive elements"""
+        # Skip links that are inside interactive element placeholders
+        # Interactive elements are marked with specific patterns
+        lines = content.split("\n")
+        result = []
+
+        for line in lines:
+            # Check if line contains interactive element markers
+            if '<div class="interactive"' in line or "data-element-id=" in line:
+                # This line contains interactive elements, don't process links
+                result.append(line)
+            else:
+                # Process regular links in this line
+                processed_line = re.sub(
+                    r"\[(.*?)\]\((.*?)\)", r'<a href="\2" target="_blank">\1</a>', line
+                )
+                result.append(processed_line)
 
         return "\n".join(result)
 
@@ -1299,13 +1361,40 @@ document.addEventListener('DOMContentLoaded', function() {{
 }});
 """
             elif element.element_type == InteractiveElementType.CODE_VIEWER:
-                safe_code = element.target_content.replace("'", "\\'")
+                # Properly escape JavaScript string content
+                safe_code = (
+                    element.target_content.replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace('"', '\\"')
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+                )
+
+                safe_title = (
+                    element.title.replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace('"', '\\"')
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+                )
+
+                safe_description = (
+                    element.description.replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace('"', '\\"')
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+                )
+
                 js += f"""
 document.addEventListener('DOMContentLoaded', function() {{
     const element = document.querySelector('[id="{element.element_id}"]');
     if (element) {{
         element.addEventListener('click', function() {{
-            openModal('<h3>{element.title}</h3><p>{element.description}</p><div class="code-block"><pre><code>{safe_code}</code></pre></div>');
+            openModal('<h3>{safe_title}</h3><p>{safe_description}</p><div class="code-block"><pre><code>{safe_code}</code></pre></div>');
         }});
     }}
 }});
@@ -1338,13 +1427,21 @@ document.addEventListener('DOMContentLoaded', function() {{
 
         html = "<ul>"
         for block in blocks:
-            html += f'''
+            # Properly escape JavaScript string content
+            safe_code = (
+                block.code.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace('"', '\\"')
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+            )
+
+            html += f"""
             <li>
-                <strong>{block.description}</strong><br>
-                <small>{get_text(self.language, 'interactive_elements', 'language_label')}: {block.language}</small>
-                <button onclick="openModal('<h3>{block.description}</h3><div class=\'code-block\'><pre><code>{block.code.replace("'", "\\'")}></code></pre></div>')">{get_text(self.language, 'interactive_elements', 'view_code_button')}</button>
+                <button onclick="openModal('<div class=\'code-block\'><pre><code>{safe_code}</code></pre></div>')">{block.language.upper()}</button>
             </li>
-            '''
+            """
         html += "</ul>"
 
         return html

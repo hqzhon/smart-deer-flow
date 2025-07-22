@@ -3,12 +3,12 @@
 
 import logging
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 
 from src.config.config_loader import get_settings
 from src.llms.llm import get_llm_by_type
 from src.llms.error_handler import safe_llm_call
-from src.utils.template import get_prompt_template
+from src.utils.template import apply_prompt_template
 from src.prose.graph.state import ProseState
 
 logger = logging.getLogger(__name__)
@@ -19,10 +19,13 @@ def prose_fix_node(state: ProseState):
     settings = get_settings()
     llm_type = getattr(settings.agent_llm_map, "prose_writer", "basic")
     model = get_llm_by_type(llm_type)
-    messages = [
-        SystemMessage(content=get_prompt_template("prose/prose_fix")),
-        HumanMessage(content=f"The existing text is: {state['content']}"),
-    ]
+    # Create a temporary state-like object with locale and content for template rendering
+    template_vars = {
+        "locale": state.get("locale", "en-US"),
+        "content": state["content"]
+    }
+    prompt_content = apply_prompt_template("prose/prose_fix", state, template_vars)
+    messages = [HumanMessage(content=prompt_content)]
 
     prose_content = safe_llm_call(
         model.invoke,

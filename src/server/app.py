@@ -705,73 +705,159 @@ async def _astream_workflow_generator(
                 stream_mode=["messages", "updates"],
                 subgraphs=True,
             ):
-                if isinstance(event_data, dict):
-                    if "__interrupt__" in event_data:
-                        yield _make_event(
-                            "interrupt",
-                            {
-                                "thread_id": thread_id,
-                                "id": event_data["__interrupt__"][0].ns[0],
-                                "role": "assistant",
-                                "content": event_data["__interrupt__"][0].value,
-                                "finish_reason": "interrupt",
-                                "options": [
-                                    {"text": "Edit plan", "value": "edit_plan"},
-                                    {"text": "Start research", "value": "accepted"},
-                                ],
-                            },
-                        )
+                # Handle updates stream - structured data from nodes
+                if stream_type == "updates":
+                    if isinstance(event_data, dict):
+                        # Handle interrupt in updates stream (for plan completion interrupts)
+                        if "__interrupt__" in event_data:
+                            yield _make_event(
+                                "interrupt",
+                                {
+                                    "thread_id": thread_id,
+                                    "id": event_data["__interrupt__"][0].ns[0],
+                                    "role": "assistant",
+                                    "content": event_data["__interrupt__"][0].value,
+                                    "finish_reason": "interrupt",
+                                    "options": [
+                                        {"text": "Edit plan", "value": "edit_plan"},
+                                        {"text": "Start research", "value": "accepted"},
+                                    ],
+                                },
+                            )
+                            continue
+
+                        # Extract node name from agent tuple
+                        node_name = agent[0].split(":")[0] if agent else "unknown"
+
+                        # Create structured event for updates
+                        # Convert agent to serializable format to avoid AIMessage serialization issues
+                        serializable_agent = str(agent) if agent else "unknown"
+
+                        # Ensure event_data is JSON serializable by converting any complex objects to strings
+                        try:
+                            json.dumps(event_data)
+                            serializable_data = event_data
+                        except (TypeError, ValueError):
+                            # If event_data contains non-serializable objects, convert to string representation
+                            serializable_data = str(event_data)
+
+                        update_event = {
+                            "thread_id": thread_id,
+                            "node": node_name,
+                            "agent": serializable_agent,
+                            "data": serializable_data,
+                            "timestamp": time.time(),
+                        }
+
+                        # Handle specific structured data types
+                        if "reflection_insights" in event_data:
+                            yield _make_event(
+                                "reflection_insights",
+                                {
+                                    "thread_id": thread_id,
+                                    "node": node_name,
+                                    "insights": event_data["reflection_insights"],
+                                },
+                            )
+
+                        if "isolation_metrics" in event_data:
+                            yield _make_event(
+                                "isolation_metrics",
+                                {
+                                    "thread_id": thread_id,
+                                    "node": node_name,
+                                    "metrics": event_data["isolation_metrics"],
+                                },
+                            )
+
+                        if "research_progress" in event_data:
+                            yield _make_event(
+                                "research_progress",
+                                {
+                                    "thread_id": thread_id,
+                                    "node": node_name,
+                                    "progress": event_data["research_progress"],
+                                },
+                            )
+
+                        # Send generic update event for any other structured data
+                        yield _make_event("node_update", update_event)
                     continue
-                message_chunk, message_metadata = cast(
-                    tuple[BaseMessage, dict[str, any]], event_data
-                )
-                # Only use name field for concurrent messages (with name field and not ToolMessage)
-                # Other messages use original agent logic
-                if (
-                    not isinstance(message_chunk, ToolMessage)
-                    and hasattr(message_chunk, "name")
-                    and message_chunk.name
-                ):
-                    message_agent = message_chunk.name
-                else:
-                    message_agent = agent[0].split(":")[0]
-                event_stream_message: dict[str, any] = {
-                    "thread_id": thread_id,
-                    "agent": message_agent,
-                    "id": message_chunk.id,
-                    "role": "assistant",
-                    "content": message_chunk.content,
-                }
-                if message_chunk.additional_kwargs.get("reasoning_content"):
-                    event_stream_message["reasoning_content"] = (
-                        message_chunk.additional_kwargs["reasoning_content"]
+
+                # Handle messages stream - existing logic
+                if stream_type == "messages":
+                    if isinstance(event_data, dict):
+                        if "__interrupt__" in event_data:
+                            yield _make_event(
+                                "interrupt",
+                                {
+                                    "thread_id": thread_id,
+                                    "id": event_data["__interrupt__"][0].ns[0],
+                                    "role": "assistant",
+                                    "content": event_data["__interrupt__"][0].value,
+                                    "finish_reason": "interrupt",
+                                    "options": [
+                                        {"text": "Edit plan", "value": "edit_plan"},
+                                        {"text": "Start research", "value": "accepted"},
+                                    ],
+                                },
+                            )
+                        continue
+
+                    message_chunk, message_metadata = cast(
+                        tuple[BaseMessage, dict[str, any]], event_data
                     )
-                if message_chunk.response_metadata.get("finish_reason"):
-                    event_stream_message["finish_reason"] = (
-                        message_chunk.response_metadata.get("finish_reason")
-                    )
-                if isinstance(message_chunk, ToolMessage):
-                    # Tool Message - Return the result of the tool call
-                    event_stream_message["tool_call_id"] = message_chunk.tool_call_id
-                    yield _make_event("tool_call_result", event_stream_message)
-                elif isinstance(message_chunk, AIMessageChunk):
-                    # AI Message - Raw message tokens
-                    if message_chunk.tool_calls:
-                        # AI Message - Tool Call
-                        event_stream_message["tool_calls"] = message_chunk.tool_calls
-                        event_stream_message["tool_call_chunks"] = (
-                            message_chunk.tool_call_chunks
-                        )
-                        yield _make_event("tool_calls", event_stream_message)
-                    elif message_chunk.tool_call_chunks:
-                        # AI Message - Tool Call Chunks
-                        event_stream_message["tool_call_chunks"] = (
-                            message_chunk.tool_call_chunks
-                        )
-                        yield _make_event("tool_call_chunks", event_stream_message)
+                    # Only use name field for concurrent messages (with name field and not ToolMessage)
+                    # Other messages use original agent logic
+                    if (
+                        not isinstance(message_chunk, ToolMessage)
+                        and hasattr(message_chunk, "name")
+                        and message_chunk.name
+                    ):
+                        message_agent = message_chunk.name
                     else:
+                        message_agent = agent[0].split(":")[0]
+                    event_stream_message: dict[str, any] = {
+                        "thread_id": thread_id,
+                        "agent": message_agent,
+                        "id": message_chunk.id,
+                        "role": "assistant",
+                        "content": message_chunk.content,
+                    }
+                    if message_chunk.additional_kwargs.get("reasoning_content"):
+                        event_stream_message["reasoning_content"] = (
+                            message_chunk.additional_kwargs["reasoning_content"]
+                        )
+                    if message_chunk.response_metadata.get("finish_reason"):
+                        event_stream_message["finish_reason"] = (
+                            message_chunk.response_metadata.get("finish_reason")
+                        )
+                    if isinstance(message_chunk, ToolMessage):
+                        # Tool Message - Return the result of the tool call
+                        event_stream_message["tool_call_id"] = (
+                            message_chunk.tool_call_id
+                        )
+                        yield _make_event("tool_call_result", event_stream_message)
+                    elif isinstance(message_chunk, AIMessageChunk):
                         # AI Message - Raw message tokens
-                        yield _make_event("message_chunk", event_stream_message)
+                        if message_chunk.tool_calls:
+                            # AI Message - Tool Call
+                            event_stream_message["tool_calls"] = (
+                                message_chunk.tool_calls
+                            )
+                            event_stream_message["tool_call_chunks"] = (
+                                message_chunk.tool_call_chunks
+                            )
+                            yield _make_event("tool_calls", event_stream_message)
+                        elif message_chunk.tool_call_chunks:
+                            # AI Message - Tool Call Chunks
+                            event_stream_message["tool_call_chunks"] = (
+                                message_chunk.tool_call_chunks
+                            )
+                            yield _make_event("tool_call_chunks", event_stream_message)
+                        else:
+                            # AI Message - Raw message tokens
+                            yield _make_event("message_chunk", event_stream_message)
             # Successfully completed, break out of retry loop
             return
         except Exception as e:
@@ -839,7 +925,6 @@ async def _astream_workflow_generator(
                             },
                         )
                     return
-
 
 
 def _make_event(event_type: str, data: dict[str, any]):

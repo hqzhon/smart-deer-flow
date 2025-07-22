@@ -36,6 +36,10 @@ from src.utils.common.json_utils import repair_json_output
 
 from .types import State
 from src.models.planner_model import Plan, Step, StepType
+from src.utils.reflection.enhanced_reflection import ReflectionResult
+from src.utils.reflection.reflection_integration import (
+    ReflectionIntegrationConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +58,10 @@ def get_configuration_from_config(config):
                 self._base = base_settings
                 self._overrides = config_overrides or {}
 
-                # Create nested attribute access for agents, content, etc.
+                # Create nested attribute access for agents, content, reflection, etc.
                 self.agents = type("agents", (), {})()
                 self.content = type("content", (), {})()
+                self.reflection = type("reflection", (), {})()
 
                 # Set agents configuration with overrides
                 if "max_search_results" in self._overrides:
@@ -114,9 +119,28 @@ def get_configuration_from_config(config):
                 self.max_reflection_loops = getattr(
                     base_settings, "max_reflection_loops", 3
                 )
-                self.reflection_model = getattr(
-                    base_settings, "reflection_model", "gpt-4"
-                )
+
+                # Set reflection configuration with override support
+                if "reflection_model" in self._overrides:
+                    self.reflection.reflection_model = self._overrides[
+                        "reflection_model"
+                    ]
+                else:
+                    reflection_model = getattr(
+                        base_settings.reflection, "reflection_model", None
+                    )
+                    if reflection_model is None:
+                        # Use reasoning model if enabled, otherwise use basic model
+                        if self.agents.enable_deep_thinking:
+                            self.reflection.reflection_model = "reasoning"
+                        else:
+                            self.reflection.reflection_model = "basic"
+                    else:
+                        self.reflection.reflection_model = reflection_model
+
+                # Also set it at the top level for backward compatibility
+                self.reflection_model = self.reflection.reflection_model
+
                 self.knowledge_gap_threshold = getattr(
                     base_settings, "knowledge_gap_threshold", 0.7
                 )
@@ -126,16 +150,14 @@ def get_configuration_from_config(config):
                 self.enable_reflection_integration = getattr(
                     base_settings, "enable_reflection_integration", True
                 )
-                
+
                 # Reflection integration configuration for initial stage skipping
-                self.skip_initial_stage_reflection = getattr(
+                self.reflection.skip_initial_stage_reflection = getattr(
                     base_settings.reflection, "skip_initial_stage_reflection", True
                 )
-                self.initial_stage_min_observations = getattr(
-                    base_settings.reflection, "initial_stage_min_observations", 2
-                )
-                self.initial_stage_min_content_length = getattr(
-                    base_settings.reflection, "initial_stage_min_content_length", 500
+                # Also set them at the top level for backward compatibility
+                self.skip_initial_stage_reflection = (
+                    self.reflection.skip_initial_stage_reflection
                 )
 
                 # Max step num configuration with override - prioritize API override
@@ -349,7 +371,12 @@ def planner_node(
             configurable, "enable_enhanced_reflection", True
         ),
         "max_reflection_loops": getattr(configurable, "max_reflection_loops", 3),
-        "reflection_model": getattr(configurable, "reflection_model", "gpt-4"),
+        "reflection_model": getattr(configurable.reflection, "reflection_model", None)
+        or (
+            "reasoning"
+            if getattr(configurable.agents, "enable_deep_thinking", False)
+            else "basic"
+        ),
         "knowledge_gap_threshold": getattr(
             configurable, "knowledge_gap_threshold", 0.7
         ),
@@ -481,6 +508,8 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             # Get current model name
             model_name = "deepseek-chat"  # Default fallback
             try:
+                from src.llms.llm import get_llm_by_type
+
                 settings = get_settings()
                 planner_llm_type = getattr(settings.agent_llm_map, "planner", "basic")
                 current_llm = get_llm_by_type(planner_llm_type)
@@ -525,6 +554,8 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                     f"Background investigation results too large ({token_result.total_tokens} tokens), "
                     f"summarizing to fit within {model_limits.safe_input_limit} token limit"
                 )
+
+                from src.llms.llm import get_llm_by_type
 
                 summarized_background = processor.summarize_content(
                     state["background_investigation_results"],
@@ -1344,36 +1375,28 @@ async def _execute_agent_step(
         completed_steps, current_step_dict, agent_name
     )
 
-    # Prepare the input for the agent with optimized context
-    agent_input = {
-        "messages": [
-            HumanMessage(
-                content=f"{context_info}\n\n# Current Task\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
-            )
-        ]
+    # Prepare the agent state with current task information
+    # This allows the agent's prompt system to properly render the template
+    agent_state = {
+        **state,  # Include all existing state
+        "current_step_title": current_step.title,
+        "current_step_description": current_step.description,
+        "context_info": context_info,
+        "completed_steps": optimized_steps,
+        "agent_name": agent_name,
+        "messages": [],  # Start with empty messages for prompt system
     }
 
-    # Add citation reminder for researcher agent
-    if agent_name == "researcher":
-        if state.get("resources"):
-            resources_info = "**The user mentioned the following resource files:**\n\n"
-            for resource in state.get("resources"):
-                resources_info += f"- {resource.title} ({resource.description})\n"
-
-            agent_input["messages"].append(
-                HumanMessage(
-                    content=resources_info
-                    + "\n\n"
-                    + "You MUST use the **local_search_tool** to retrieve the information from the resource files.",
-                )
-            )
-
-        agent_input["messages"].append(
-            HumanMessage(
-                content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
-                name="system",
-            )
-        )
+    # Add resources information for researcher agent
+    if agent_name == "researcher" and state.get("resources"):
+        resources_info = "**The user mentioned the following resource files:**\n\n"
+        for resource in state.get("resources"):
+            resources_info += f"- {resource.title} ({resource.description})\n"
+        resources_info += "\n\nYou MUST use the **local_search_tool** to retrieve the information from the resource files."
+        agent_state["resources_info"] = resources_info
+        
+        # Add citation reminder
+        agent_state["citation_reminder"] = "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"
 
     # Invoke the agent
     default_recursion_limit = 25
@@ -1399,23 +1422,16 @@ async def _execute_agent_step(
         logger.warning(f"Full traceback: {traceback.format_exc()}")
         recursion_limit = default_recursion_limit
 
-    # Use unified context manager for message optimization
-    agent_input["messages"] = context_manager.optimize_messages(
-        agent_input["messages"],
-        max_messages=20,
-        max_tokens=context_config.max_step_content_length
-        * 10,  # Conservative token limit
-    )
-
     logger.info(
-        f"Agent input (after optimization): {len(agent_input['messages'])} messages"
+        f"Agent state prepared for {agent_name} with step: {current_step.title}"
     )
 
     # Context evaluation will be handled automatically by safe_llm_call_async
+    # The agent's prompt system will handle template rendering with the agent_state
 
     result = await safe_llm_call_async(
         agent.ainvoke,
-        input=agent_input,
+        input=agent_state,
         config={"recursion_limit": recursion_limit},
         operation_name=f"{agent_name} executor",
         context=f"Execute step: {current_step.title}",
@@ -1500,18 +1516,19 @@ async def _setup_and_execute_agent_step(
 
     # Extract MCP server configuration for this agent type
     if configurable.mcp.enabled and configurable.mcp.servers:
-        for server_config in configurable.mcp.servers:
+        for server_name, server_config in enumerate(configurable.mcp.servers):
             if (
                 server_config["enabled_tools"]
                 and agent_type in server_config["add_to_agents"]
             ):
-                mcp_servers[server_name] = {
+                server_key = f"server_{server_name}"
+                mcp_servers[server_key] = {
                     k: v
                     for k, v in server_config.items()
                     if k in ("transport", "command", "args", "url", "env")
                 }
                 for tool_name in server_config["enabled_tools"]:
-                    enabled_tools[tool_name] = server_name
+                    enabled_tools[tool_name] = server_key
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
@@ -1584,7 +1601,12 @@ async def researcher_node_with_isolation(
             configurable, "enable_enhanced_reflection", True
         ),
         "max_reflection_loops": getattr(configurable, "max_reflection_loops", 3),
-        "reflection_model": getattr(configurable, "reflection_model", "gpt-4"),
+        "reflection_model": getattr(configurable.reflection, "reflection_model", None)
+        or (
+            "reasoning"
+            if getattr(configurable.agents, "enable_deep_thinking", False)
+            else "basic"
+        ),
         "knowledge_gap_threshold": getattr(
             configurable, "knowledge_gap_threshold", 0.7
         ),
@@ -1645,18 +1667,19 @@ async def researcher_node_with_isolation(
     enabled_tools = {}
 
     if configurable.mcp.enabled and configurable.mcp.servers:
-        for server_config in configurable.mcp.servers:
+        for server_name, server_config in enumerate(configurable.mcp.servers):
             if (
                 server_config["enabled_tools"]
                 and "researcher" in server_config["add_to_agents"]
             ):
-                mcp_servers[server_name] = {
+                server_key = f"server_{server_name}"
+                mcp_servers[server_key] = {
                     k: v
                     for k, v in server_config.items()
                     if k in ("transport", "command", "args", "url", "env")
                 }
                 for tool_name in server_config["enabled_tools"]:
-                    enabled_tools[tool_name] = server_name
+                    enabled_tools[tool_name] = server_key
 
     # Create and execute agent with isolation
     if mcp_servers:
@@ -1723,6 +1746,9 @@ async def researcher_node_with_isolation(
                 observations = isolation_result.update.get("observations", [])
                 messages = isolation_result.update.get("messages", [])
 
+                # Add observations to all_observations
+                all_observations.extend(observations)
+
                 # Combine findings from both sources
                 for obs in observations:
                     if isinstance(obs, dict) and "content" in obs:
@@ -1739,6 +1765,9 @@ async def researcher_node_with_isolation(
                         all_research_findings.append(msg.content)
                     else:
                         all_research_findings.append(str(msg))
+
+            # Update state with accumulated observations for reflection check
+            state["observations"] = all_observations
 
             # Extract completed steps from current plan
             current_plan = state.get("current_plan")
@@ -1783,10 +1812,62 @@ async def researcher_node_with_isolation(
                     locale=state.get("locale", "en-US"),
                 )
 
-                # Perform reflection analysis
-                reflection_result = await reflection_agent.analyze_knowledge_gaps(
-                    reflection_context
+                # Initialize ReflectionIntegrator if not already done
+                if not hasattr(state, "_reflection_integrator"):
+                    from src.utils.reflection.reflection_integration import (
+                        ReflectionIntegrator,
+                    )
+
+                    reflection_config = ReflectionIntegrationConfig(
+                        enable_reflection_integration=config.get(
+                            "enable_reflection_integration", True
+                        ),
+                        reflection_trigger_threshold=config.get(
+                            "reflection_trigger_threshold", 3
+                        ),
+                        skip_initial_stage_reflection=config.get(
+                            "skip_initial_stage_reflection", True
+                        ),
+                        enable_progressive_reflection=config.get(
+                            "enable_progressive_reflection", True
+                        ),
+                        enable_reflection_metrics=config.get(
+                            "enable_reflection_metrics", True
+                        ),
+                    )
+                    state["_reflection_integrator"] = ReflectionIntegrator(
+                        reflection_agent=reflection_agent, config=reflection_config
+                    )
+
+                reflection_integrator = state["_reflection_integrator"]
+
+                # Check if reflection should be triggered
+                should_trigger, trigger_reason, decision_factors = (
+                    reflection_integrator.should_trigger_reflection(
+                        state=state, current_step=None, agent_name="researcher"
+                    )
                 )
+
+                logger.info(
+                    f"Reflection trigger decision: {should_trigger}, reason: {trigger_reason}"
+                )
+
+                # Perform reflection analysis only if triggered
+                if should_trigger:
+                    reflection_result = await reflection_agent.analyze_knowledge_gaps(
+                        reflection_context
+                    )
+                else:
+                    # Skip reflection, create a default result indicating sufficiency
+                    reflection_result = ReflectionResult(
+                        is_sufficient=True,
+                        confidence_score=0.8,
+                        knowledge_gaps=[],
+                        follow_up_queries=[],
+                        recommendations=[f"Reflection skipped: {trigger_reason}"],
+                        reflection_insights=[],
+                        comprehensive_report=f"Reflection analysis was skipped due to: {trigger_reason}",
+                    )
 
                 logger.info(
                     f"Iteration {current_iteration}: Sufficient={reflection_result.is_sufficient}, Confidence={reflection_result.confidence_score}, Gaps={len(reflection_result.knowledge_gaps)}"
@@ -1921,30 +2002,66 @@ async def researcher_node_with_isolation(
                 locale=state.get("locale", "en-US"),
             )
 
-            final_reflection_result = await reflection_agent.analyze_knowledge_gaps(
-                final_reflection_context
+            # Check if final reflection should be triggered
+            should_trigger_final, final_trigger_reason, final_decision_factors = (
+                reflection_integrator.should_trigger_reflection(
+                    state=state, current_step=None, agent_name="researcher"
+                )
             )
+
+            logger.info(
+                f"Final reflection trigger decision: {should_trigger_final}, reason: {final_trigger_reason}"
+            )
+
+            # Perform final reflection analysis only if triggered
+            if should_trigger_final:
+                final_reflection_result = await reflection_agent.analyze_knowledge_gaps(
+                    final_reflection_context
+                )
+            else:
+                # Skip final reflection, create a default result indicating sufficiency
+                final_reflection_result = ReflectionResult(
+                    is_sufficient=True,
+                    confidence_score=0.8,
+                    knowledge_gaps=[],
+                    follow_up_queries=[],
+                    recommendations=[
+                        f"Final reflection skipped: {final_trigger_reason}"
+                    ],
+                    reflection_insights=[],
+                    comprehensive_report=f"Final reflection analysis was skipped due to: {final_trigger_reason}",
+                )
 
             # Integrate final reflection results into the isolation result
             if hasattr(isolation_result, "update") and isolation_result.update:
                 # Update observations with all accumulated findings
                 isolation_result.update["observations"] = all_observations
 
-                isolation_result.update["reflection_insights"] = {
-                    "comprehensive_report": (
-                        final_reflection_result.comprehensive_report
-                    ),
-                    "knowledge_gaps": [
-                        gap.to_dict() if hasattr(gap, "to_dict") else gap
-                        for gap in final_reflection_result.knowledge_gaps
-                    ],
-                    "is_sufficient": final_reflection_result.is_sufficient,
-                    "follow_up_queries": final_reflection_result.follow_up_queries,
-                    "confidence_score": final_reflection_result.confidence_score,
-                    "sufficiency_score": final_reflection_result.confidence_score,
-                    "iterations_completed": current_iteration,
-                    "total_research_findings": len(all_research_findings),
-                }
+                # Only send reflection_insights to frontend if research is sufficient
+                # This prevents sending incomplete or insufficient analysis results
+                if final_reflection_result.is_sufficient:
+                    isolation_result.update["reflection_insights"] = {
+                        "comprehensive_report": (
+                            final_reflection_result.comprehensive_report
+                        ),
+                        "knowledge_gaps": [
+                            gap.to_dict() if hasattr(gap, "to_dict") else gap
+                            for gap in final_reflection_result.knowledge_gaps
+                        ],
+                        "is_sufficient": final_reflection_result.is_sufficient,
+                        "follow_up_queries": final_reflection_result.follow_up_queries,
+                        "confidence_score": final_reflection_result.confidence_score,
+                        "sufficiency_score": final_reflection_result.confidence_score,
+                        "iterations_completed": current_iteration,
+                        "total_research_findings": len(all_research_findings),
+                    }
+                    logger.info(
+                        "Reflection insights sent to frontend - research is sufficient"
+                    )
+                else:
+                    logger.info(
+                        "Skipping reflection insights to frontend - research is insufficient (is_sufficient=False)"
+                    )
 
                 # If still insufficient after all iterations, add remaining follow-up suggestions
                 if (
@@ -1997,12 +2114,16 @@ async def researcher_node_with_isolation(
     if hasattr(isolation_result, "update") and isolation_result.update:
         # Add reflection helper functions as metadata instead of methods
         # This avoids Pydantic __setattr__ issues with Command objects
+        has_reflection_insights = "reflection_insights" in isolation_result.update
         reflection_helpers = {
-            "has_reflection_insights": "reflection_insights" in isolation_result.update,
+            "has_reflection_insights": has_reflection_insights,
             "is_research_sufficient": (
                 isolation_result.update.get("reflection_insights", {}).get(
-                    "is_sufficient", True
+                    "is_sufficient",
+                    False,  # Default to False when no reflection insights
                 )
+                if has_reflection_insights
+                else False  # No reflection insights means insufficient by default
             ),
             "reflection_insights": isolation_result.update.get(
                 "reflection_insights", {}

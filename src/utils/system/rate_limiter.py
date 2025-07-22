@@ -277,21 +277,16 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
             try:
                 from src.config import get_settings
 
-                config_data = get_settings().load_config()
+                settings = get_settings()
 
                 # Extract rate limiting parameters from config
-                rate_limit_config = config_data.get("rate_limiting", {})
                 config = RateLimitConfig(
-                    requests_per_minute=rate_limit_config.get(
-                        "requests_per_minute", 60
-                    ),
-                    requests_per_second=rate_limit_config.get(
-                        "requests_per_second", 10
-                    ),
-                    burst_size=rate_limit_config.get("burst_size", 5),
-                    backoff_factor=rate_limit_config.get("backoff_factor", 1.5),
-                    max_backoff=rate_limit_config.get("max_backoff", 60.0),
-                    min_interval=rate_limit_config.get("min_interval", 0.1),
+                    requests_per_minute=getattr(settings, "requests_per_minute", 60),
+                    requests_per_second=getattr(settings, "requests_per_second", 10),
+                    burst_size=getattr(settings, "burst_size", 5),
+                    backoff_factor=getattr(settings, "backoff_factor", 1.5),
+                    max_backoff=getattr(settings, "max_backoff", 60.0),
+                    min_interval=getattr(settings, "min_interval", 0.1),
                 )
             except Exception as e:
                 logger.warning(f"Failed to load rate limit config: {e}, using defaults")
@@ -301,9 +296,9 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
         try:
             from src.config import get_settings
 
-            config_data = get_settings().load_config()
-            rate_limit_config = config_data.get("rate_limiting", {})
-            if rate_limit_config.get("adaptive", True):
+            settings = get_settings()
+            adaptive = getattr(settings, "adaptive_rate_limiting", True)
+            if adaptive:
                 _global_rate_limiter = AdaptiveRateLimiter(config)
             else:
                 _global_rate_limiter = RateLimiter(config)
@@ -314,9 +309,9 @@ def get_global_rate_limiter(config: Optional[RateLimitConfig] = None) -> RateLim
         try:
             from src.config import get_settings
 
-            config_data = get_settings().load_config()
-            rate_limit_config = config_data.get("rate_limiting", {})
-            if rate_limit_config.get("adaptive", True):
+            settings = get_settings()
+            adaptive = getattr(settings, "adaptive_rate_limiting", True)
+            if adaptive:
                 _global_rate_limiter = AdaptiveRateLimiter(config)
             else:
                 _global_rate_limiter = RateLimiter(config)

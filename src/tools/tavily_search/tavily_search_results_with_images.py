@@ -117,6 +117,7 @@ class TavilySearchResultsWithImages(TavilySearchResults):  # type: ignore[overri
         self,
         query: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
+        **kwargs,
     ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
         """Use the tool."""
         # TODO: remove try/except, should be handled by BaseTool
@@ -142,6 +143,7 @@ class TavilySearchResultsWithImages(TavilySearchResults):  # type: ignore[overri
         self,
         query: str,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
+        **kwargs,
     ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
         """Use the tool asynchronously."""
         try:

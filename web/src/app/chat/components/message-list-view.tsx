@@ -48,6 +48,8 @@ import {
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
 
+import { StructuredDataBlock } from "./structured-data-block";
+
 export function MessageListView({
   className,
   onFeedback,
@@ -193,6 +195,7 @@ function MessageListItem({
                 >
                   {message?.content}
                 </Markdown>
+                <StructuredDataBlock message={message} />
               </div>
             </MessageBubble>
           </div>

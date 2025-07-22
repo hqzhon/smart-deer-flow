@@ -16,5 +16,8 @@ class ProseState(MessagesState):
     # The user custom command for the prose writer
     command: str = ""
 
+    # Locale for internationalization
+    locale: str = "en-US"
+
     # Output
     output: str = ""
