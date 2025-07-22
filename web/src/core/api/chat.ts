@@ -66,6 +66,12 @@ export async function* chatStream(
       }
       try {
         const parsedData = JSON.parse(event.data);
+        
+        // Skip events with unknown agent to prevent frontend errors
+        if (parsedData.agent === 'unknown') {
+          continue;
+        }
+        
         yield {
           type: event.event,
           data: parsedData,
@@ -147,6 +153,11 @@ async function* chatReplayStream(
       } catch (parseError) {
         console.error('Failed to parse replay event data:', data, parseError);
         // Skip invalid JSON events in replay
+        continue;
+      }
+      
+      // Skip events with unknown agent to prevent frontend errors
+      if (parsedData.agent === 'unknown') {
         continue;
       }
       

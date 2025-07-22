@@ -126,35 +126,56 @@ export async function sendMessage(
         toast(`Error: ${data.message}`);
         break; // Stop processing the stream on error
       }
-      messageId = data.id;
-      let message: Message | undefined;
-      if (type === "tool_call_result") {
-        message = findMessageByToolCallId(data.tool_call_id);
-      } else if (!existsMessage(messageId)) {
-        message = {
-          id: messageId,
-          threadId: data.thread_id,
-          agent: data.agent,
-          role: data.role,
-          content: "",
-          contentChunks: [],
-          reasoningContent: "",
-          reasoningContentChunks: [],
-          isStreaming: true,
-          interruptFeedback,
-        };
-        appendMessage(message);
+      
+      // Handle structured data events that don't have message id
+      if (type === "reflection_insights" || type === "isolation_metrics" || 
+          type === "research_progress" || type === "node_update") {
+        // For structured data events, find the most recent message to attach the data to
+        const messages = Array.from(useStore.getState().messages.values());
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage) {
+          const updatedMessage = mergeMessage(lastMessage, event);
+          updateMessage(updatedMessage);
+        }
+        continue;
       }
-      message ??= getMessage(messageId);
-      if (message) {
-        message = mergeMessage(message, event);
-        updateMessage(message);
+      
+      // Handle regular message events that have id
+      if ('id' in data) {
+        // Skip messages with unknown agent to prevent errors
+        if (data.agent === 'unknown') {
+          continue;
+        }
+        
+        messageId = data.id;
+        let message: Message | undefined;
+        if (type === "tool_call_result") {
+          message = findMessageByToolCallId(data.tool_call_id);
+        } else if (!existsMessage(messageId)) {
+          message = {
+            id: messageId,
+            threadId: data.thread_id,
+            agent: data.agent,
+            role: data.role,
+            content: "",
+            contentChunks: [],
+            reasoningContent: "",
+            reasoningContentChunks: [],
+            isStreaming: true,
+            interruptFeedback,
+          };
+          appendMessage(message);
+        }
+        message ??= getMessage(messageId);
+        if (message) {
+          message = mergeMessage(message, event);
+          updateMessage(message);
+        }
       }
     }
   } catch (error) {
     toast("An error occurred while generating the response. Please try again.");
     // Update message status.
-    const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
       const message = getMessage(messageId);
       if (message?.isStreaming) {

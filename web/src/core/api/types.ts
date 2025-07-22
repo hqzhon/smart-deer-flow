@@ -27,7 +27,7 @@ interface GenericEvent<T extends string, D extends object> {
   data: {
     id: string;
     thread_id: string;
-    agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter";
+    agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter" | "unknown";
     role: "user" | "assistant" | "tool";
     finish_reason?: "stop" | "tool_calls" | "interrupt";
   } & D;
@@ -85,10 +85,66 @@ export interface ErrorEvent {
   };
 }
 
+// Structured Data Events
+
+export interface ReflectionInsightsEvent {
+  type: 'reflection_insights'
+  data: {
+    node: string
+    insights: {
+      comprehensive_report?: string
+      knowledge_gaps?: string[]
+      follow_up_queries?: string[]
+      confidence_score?: number
+    }
+  }
+}
+
+export interface IsolationMetricsEvent {
+  type: 'isolation_metrics'
+  data: {
+    node: string
+    metrics: {
+      compression_ratio?: number
+      token_savings?: number
+      performance_impact?: number
+      memory_usage?: number
+    }
+  }
+}
+
+export interface ResearchProgressEvent {
+  type: 'research_progress'
+  data: {
+    node: string
+    progress: {
+      current_step?: string
+      completion_percentage?: number
+      estimated_time?: string
+      status?: string
+    }
+  }
+}
+
+export interface NodeUpdateEvent {
+  type: 'node_update'
+  data: {
+    node: string
+    agent: string
+    data: Record<string, unknown>
+    timestamp: number
+  }
+  metadata: Record<string, unknown>
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
   | ToolCallChunksEvent
   | ToolCallResultEvent
   | InterruptEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | ReflectionInsightsEvent
+  | IsolationMetricsEvent
+  | ResearchProgressEvent
+  | NodeUpdateEvent;
