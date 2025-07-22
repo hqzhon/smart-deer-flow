@@ -38,9 +38,9 @@ class ReflectionIntegrationConfig:
     reflection_confidence_threshold: float = 0.7
     enable_progressive_reflection: bool = True
     enable_reflection_metrics: bool = True
-    skip_initial_stage_reflection: bool = True  # Skip reflection in initial research stage
-    initial_stage_min_observations: int = 2  # Minimum observations to exit initial stage
-    initial_stage_min_content_length: int = 500  # Minimum content length to exit initial stage
+    skip_initial_stage_reflection: bool = (
+        True  # Skip reflection in initial research stage
+    )
 
 
 class ReflectionIntegrator:
@@ -109,8 +109,29 @@ class ReflectionIntegrator:
             "has_results": len(state.get("observations", [])) > 0,
         }
 
+        # Enhanced check: Only trigger if there are actual execution results
+        current_plan = state.get("current_plan")
+        logger.info(
+            f"[DEBUG] Checking if reflection should be triggered for state with {len(state.get('observations', []))} observations"
+        )
+        has_results = self._has_actual_execution_results(state, current_plan)
+        logger.info(f"[DEBUG] _has_actual_execution_results returned: {has_results}")
+        if not has_results:
+            decision_factors["trigger_reason"] = "no_execution_results"
+            logger.info(
+                "[DEBUG] Skipping reflection due to no actual execution results"
+            )
+            return (
+                False,
+                "Skipping reflection - no actual execution results found",
+                decision_factors,
+            )
+
         # Check if we're in the initial research stage - skip reflection
-        if self.config.skip_initial_stage_reflection and self._is_initial_research_stage(state, current_step):
+        if (
+            self.config.skip_initial_stage_reflection
+            and self._is_initial_research_stage(state, current_step)
+        ):
             decision_factors["trigger_reason"] = "initial_stage_skip"
             return (
                 False,
@@ -128,13 +149,24 @@ class ReflectionIntegrator:
                 decision_factors,
             )
 
+        logger.info(
+            f"[DEBUG] Progressive enabler enabled: {self.config.enable_progressive_reflection}, \
+            progressive_enabler: {self.progressive_enabler}, current_step: {current_step}"
+        )
         # Check if progressive enabler suggests reflection
-        if self.config.enable_progressive_reflection and self.progressive_enabler:
+        if (
+            self.config.enable_progressive_reflection
+            and self.progressive_enabler
+            and current_step
+        ):
             scenario_context = self._create_scenario_context(
                 state, current_step, agent_name
             )
             should_enable, reason, enabler_factors = (
                 self.progressive_enabler.should_enable_isolation(scenario_context)
+            )
+            logger.info(
+                f"[DEBUG] Progressive enabler decision: should_enable={should_enable}, reason={reason}"
             )
 
             decision_factors.update(enabler_factors)
@@ -146,9 +178,9 @@ class ReflectionIntegrator:
                     f"Progressive enabler suggests reflection: {reason}",
                     decision_factors,
                 )
-
+        
         # Check for complex research scenarios
-        if self._is_complex_research_scenario(state, current_step):
+        if current_step and self._is_complex_research_scenario(state, current_step):
             decision_factors["trigger_reason"] = "complex_scenario"
             return True, "Complex research scenario detected", decision_factors
 
@@ -384,38 +416,31 @@ class ReflectionIntegrator:
             max_reflection_loops=self.config.max_reflection_iterations,
         )
 
-    def _is_initial_research_stage(self, state: State, current_step: Optional[Step] = None) -> bool:
+    def _is_initial_research_stage(
+        self, state: State, current_step: Optional[Step] = None
+    ) -> bool:
         """Determine if we're in the initial research stage where reflection should be skipped.
-        
+
+        Only checks if we're in the first step - all other conditions have been removed.
+
         Args:
             state: Current graph state
             current_step: Current step being executed
-            
+
         Returns:
-            True if in initial research stage, False otherwise
+            True if in initial research stage (first 3 steps), False otherwise
         """
-        # Check if we have minimal observations
+        logger.info("[DEBUG] Checking if in initial research stage...")
+
+        # Only check: Ensure we're not in the very first few steps
         observations = state.get("observations", [])
-        if len(observations) < self.config.initial_stage_min_observations:
+        step_count = len(observations)
+        logger.info(f"[DEBUG] Step count: {step_count}, hardcoded minimum: 3")
+        if step_count < 1:  # Always skip reflection for first steps
+            logger.info("[DEBUG] Step count < 1 - in initial stage")
             return True
-            
-        # Check if we have no meaningful execution results
-        current_plan = state.get("current_plan")
-        if current_plan and hasattr(current_plan, "steps"):
-            executed_steps = [step for step in current_plan.steps if step.execution_res]
-            if len(executed_steps) < self.config.initial_stage_min_observations:
-                return True
-                
-        # Check if we have minimal resources found
-        resources = state.get("resources", [])
-        if len(resources) < self.config.initial_stage_min_observations:
-            return True
-            
-        # Check if total research content is minimal
-        total_content_length = sum(len(str(obs)) for obs in observations)
-        if total_content_length < self.config.initial_stage_min_content_length:
-            return True
-            
+
+        logger.info("[DEBUG] Not in initial research stage - reflection can proceed")
         return False
 
     def _is_complex_research_scenario(self, state: State, current_step: Step) -> bool:
@@ -462,6 +487,68 @@ class ReflectionIntegrator:
             return TaskComplexity.MEDIUM
         else:
             return TaskComplexity.SIMPLE
+
+    def _has_actual_execution_results(
+        self, state: State, current_plan: Optional[Plan]
+    ) -> bool:
+        """Check if there are actual execution results from completed steps.
+
+        Args:
+            state: Current graph state
+            current_plan: Current research plan
+
+        Returns:
+            True if there are actual execution results, False otherwise
+        """
+        logger.info("[DEBUG] Checking for actual execution results...")
+
+        # Check if we have observations with meaningful content
+        observations = state.get("observations", [])
+        logger.info(f"[DEBUG] Found {len(observations)} observations")
+        if not observations:
+            logger.info("[DEBUG] No observations found - returning False")
+            return False
+
+        # Check if we have executed steps with results
+        if current_plan and hasattr(current_plan, "steps"):
+            executed_steps = [step for step in current_plan.steps if step.execution_res]
+            logger.info(
+                f"[DEBUG] Found {len(executed_steps)} executed steps with results"
+            )
+            if not executed_steps:
+                logger.info("[DEBUG] No executed steps with results - returning False")
+                return False
+
+            # Check if execution results exist (no length requirement)
+            for i, step in enumerate(executed_steps):
+                logger.info(
+                    f"[DEBUG] Step {i+1}: '{step.title}' has execution result: {bool(step.execution_res)}"
+                )
+                if step.execution_res:
+                    logger.info(
+                        f"[DEBUG] Found execution result in step '{step.title}' - returning True"
+                    )
+                    return True
+        else:
+            logger.info("[DEBUG] No current plan or plan has no steps")
+
+        # Check if observations exist (no length requirement)
+        logger.info(
+            f"[DEBUG] Found {len(observations)} observations"
+        )
+
+        for i, obs in enumerate(observations[:3]):  # Log first 3 observations
+            obs_preview = str(obs)[:100] + "..." if len(str(obs)) > 100 else str(obs)
+            logger.info(
+                f"[DEBUG] Observation {i+1} preview: {obs_preview}"
+            )
+
+        if len(observations) < 1:
+            logger.info("[DEBUG] No observations found - returning False")
+            return False
+
+        logger.info("[DEBUG] Found observations - returning True")
+        return True
 
     def get_integration_metrics(self) -> Dict[str, Any]:
         """Get metrics about reflection integration performance."""
