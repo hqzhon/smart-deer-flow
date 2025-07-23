@@ -5,7 +5,7 @@ is properly applied to all LLM calls and prevents token limit errors.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from langchain_core.messages import HumanMessage, AIMessage
 
 from src.llms.error_handler import (
@@ -233,9 +233,7 @@ class TestContextManagementIntegration:
         mock_configurable.agents = Mock()
         mock_configurable.agents.max_search_results = 5
 
-        with patch(
-            "src.config.configuration.Configuration.from_runnable_config"
-        ) as mock_from_config:
+        with patch("src.graph.nodes.get_configuration_from_config") as mock_from_config:
             mock_from_config.return_value = mock_configurable
 
             with patch("src.llms.error_handler.safe_llm_call") as mock_safe_call:

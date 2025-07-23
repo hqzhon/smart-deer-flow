@@ -471,7 +471,12 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 **Planning Confidence**: {planner_reflection.confidence:.2f}
 
 **Planning Gaps Identified**:
-{chr(10).join([f"- {gap}" for gap in planner_reflection.follow_up_queries]) if planner_reflection.follow_up_queries else "- No planning gaps identified"}
+{
+                        chr(10).join([
+                            f"- {gap if isinstance(gap, str) else str(gap.get('query', gap.get('question', gap.get('description', str(gap)))) if isinstance(gap, dict) else str(gap))}"
+                            for gap in planner_reflection.follow_up_queries
+                        ]) if planner_reflection.follow_up_queries else "- No planning gaps identified"
+                    }
                     """.strip()
 
                     logger.info(
@@ -1090,7 +1095,7 @@ async def _execute_steps_parallel(
             args=(state, config, step, agent_type),
             priority=priority,
             max_retries=2,  # Allow retries for failed steps
-            timeout=300.0,  # 5 minutes timeout per step
+            timeout=500.0,  # 5 minutes timeout per step
             dependencies=task_dependencies,
         )
         parallel_tasks.append(task)
@@ -1394,9 +1399,11 @@ async def _execute_agent_step(
             resources_info += f"- {resource.title} ({resource.description})\n"
         resources_info += "\n\nYou MUST use the **local_search_tool** to retrieve the information from the resource files."
         agent_state["resources_info"] = resources_info
-        
+
         # Add citation reminder
-        agent_state["citation_reminder"] = "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"
+        agent_state["citation_reminder"] = (
+            "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"
+        )
 
     # Invoke the agent
     default_recursion_limit = 25
@@ -1543,14 +1550,18 @@ async def _setup_and_execute_agent_step(
             # Delayed import to avoid circular import
             from src.agents import create_agent
 
-            agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
+            agent = create_agent(
+                agent_type, agent_type, loaded_tools, agent_type, configurable
+            )
             return await _execute_agent_step(state, config, agent, agent_type)
     else:
         # Use default tools if no MCP servers are configured
         # Delayed import to avoid circular import
         from src.agents import create_agent
 
-        agent = create_agent(agent_type, agent_type, default_tools, agent_type)
+        agent = create_agent(
+            agent_type, agent_type, default_tools, agent_type, configurable
+        )
         return await _execute_agent_step(state, config, agent, agent_type)
 
 
@@ -1569,6 +1580,23 @@ async def researcher_node_with_isolation(
 
     logger.info("Executing researcher node with context isolation (Phase 4)")
     configurable = get_configuration_from_config(config)
+    
+    # Fix: Ensure locale from state is passed to configurable for research agent
+    # This fixes the issue where researcher.md shows empty locale in Chinese environment
+    state_locale = state.get("locale")
+    if state_locale and hasattr(configurable, '__dict__'):
+        # Add locale to configurable if it exists in state
+        configurable.locale = state_locale
+    elif state_locale:
+        # If configurable is a dict-like object, add locale
+        if hasattr(configurable, 'update'):
+            configurable.update({'locale': state_locale})
+        else:
+            # Create a new configurable dict with locale
+            import types
+            new_configurable = types.SimpleNamespace(**configurable.__dict__ if hasattr(configurable, '__dict__') else {})
+            new_configurable.locale = state_locale
+            configurable = new_configurable
 
     # Configure isolation level based on configuration
     isolation_level = getattr(configurable, "researcher_isolation_level", "moderate")
@@ -1695,7 +1723,7 @@ async def researcher_node_with_isolation(
             from src.agents import create_agent_with_managed_prompt
 
             agent = create_agent_with_managed_prompt(
-                "researcher", "researcher", loaded_tools
+                "researcher", "researcher", loaded_tools, configurable=configurable
             )
             isolation_result = (
                 await context_extension.execute_researcher_step_with_isolation(
@@ -1706,7 +1734,9 @@ async def researcher_node_with_isolation(
         # Delayed import to avoid circular import
         from src.agents import create_agent_with_managed_prompt
 
-        agent = create_agent_with_managed_prompt("researcher", "researcher", tools)
+        agent = create_agent_with_managed_prompt(
+            "researcher", "researcher", tools, configurable=configurable
+        )
         isolation_result = (
             await context_extension.execute_researcher_step_with_isolation(
                 state, config, agent, "researcher"
@@ -1818,33 +1848,32 @@ async def researcher_node_with_isolation(
                         ReflectionIntegrator,
                     )
 
-                    reflection_config = ReflectionIntegrationConfig(
-                        enable_reflection_integration=config.get(
-                            "enable_reflection_integration", True
-                        ),
-                        reflection_trigger_threshold=config.get(
-                            "reflection_trigger_threshold", 3
-                        ),
-                        skip_initial_stage_reflection=config.get(
-                            "skip_initial_stage_reflection", True
-                        ),
-                        enable_progressive_reflection=config.get(
-                            "enable_progressive_reflection", True
-                        ),
-                        enable_reflection_metrics=config.get(
-                            "enable_reflection_metrics", True
-                        ),
-                    )
+                    # 初始化简化的反射集成器
                     state["_reflection_integrator"] = ReflectionIntegrator(
-                        reflection_agent=reflection_agent, config=reflection_config
+                        reflection_agent=reflection_agent,
+                        config=ReflectionIntegrationConfig(
+                            enable_reflection_integration=True,
+                        ),
                     )
 
                 reflection_integrator = state["_reflection_integrator"]
 
+                # Create a virtual current step for reflection analysis
+                from src.models.planner_model import Step, StepType
+
+                # 创建一个虚拟的当前步骤来代表迭代研究阶段
+                virtual_step = Step(
+                    need_search=True,
+                    title=f"Iterative Research - Iteration {current_iteration}",
+                    description=f"Conducting iterative research analysis for iteration {current_iteration}",
+                    step_type=StepType.RESEARCH,
+                    execution_res=None,
+                )
+
                 # Check if reflection should be triggered
                 should_trigger, trigger_reason, decision_factors = (
                     reflection_integrator.should_trigger_reflection(
-                        state=state, current_step=None, agent_name="researcher"
+                        state=state, current_step=virtual_step, agent_name="researcher"
                     )
                 )
 
@@ -1887,6 +1916,21 @@ async def researcher_node_with_isolation(
                     break
 
                 # Execute follow-up queries
+                # Ensure follow_up_queries is a proper list before slicing
+                if not isinstance(reflection_result.follow_up_queries, list):
+                    logger.warning(
+                        f"follow_up_queries is not a list, got {type(reflection_result.follow_up_queries)}: {reflection_result.follow_up_queries}"
+                    )
+                    # Convert to list or use empty list as fallback
+                    if hasattr(reflection_result.follow_up_queries, '__iter__') and not isinstance(reflection_result.follow_up_queries, (str, bytes)):
+                        try:
+                            reflection_result.follow_up_queries = list(reflection_result.follow_up_queries)
+                        except Exception as e:
+                            logger.error(f"Failed to convert follow_up_queries to list: {e}")
+                            reflection_result.follow_up_queries = []
+                    else:
+                        reflection_result.follow_up_queries = []
+                
                 queries_to_execute = reflection_result.follow_up_queries[
                     :max_queries_per_iteration
                 ]
@@ -1896,15 +1940,39 @@ async def researcher_node_with_isolation(
 
                 for i, query in enumerate(queries_to_execute):
                     try:
+                        # Skip if query is a slice object or other invalid type
+                        if isinstance(query, slice):
+                            logger.error(f"Follow-up query {i+1} is a slice object: {query}. Skipping.")
+                            continue
+                        
+                        # Ensure query is a string
+                        if isinstance(query, dict):
+                            # Extract meaningful string from dict
+                            if "query" in query:
+                                query_str = str(query["query"])
+                            elif "question" in query:
+                                query_str = str(query["question"])
+                            elif "description" in query:
+                                query_str = str(query["description"])
+                            else:
+                                query_str = str(query)
+                        else:
+                            query_str = str(query)
+                        
+                        # Additional validation for query string
+                        if not query_str or query_str.strip() == "" or "slice(" in query_str:
+                            logger.warning(f"Follow-up query {i+1} is empty or invalid: '{query_str}'. Skipping.")
+                            continue
+
                         logger.info(
-                            f"Executing follow-up query {i+1}: {query[:100]}..."
+                            f"Executing follow-up query {i+1}: {query_str[:100]}..."
                         )
 
                         # Create a new research task for the follow-up query
                         follow_up_state = {
                             **state,
-                            "messages": [{"role": "user", "content": query}],
-                            "research_topic": query,
+                            "messages": [{"role": "user", "content": query_str}],
+                            "research_topic": query_str,
                             "is_follow_up_query": True,
                             "parent_iteration": current_iteration,
                         }
@@ -2002,10 +2070,21 @@ async def researcher_node_with_isolation(
                 locale=state.get("locale", "en-US"),
             )
 
+            # Create a virtual final step for final reflection analysis
+            final_virtual_step = Step(
+                need_search=False,
+                title="Final Iterative Research Analysis",
+                description="Final analysis of all accumulated research findings",
+                step_type=StepType.PROCESSING,
+                execution_res=None,
+            )
+
             # Check if final reflection should be triggered
             should_trigger_final, final_trigger_reason, final_decision_factors = (
                 reflection_integrator.should_trigger_reflection(
-                    state=state, current_step=None, agent_name="researcher"
+                    state=state,
+                    current_step=final_virtual_step,
+                    agent_name="researcher",
                 )
             )
 

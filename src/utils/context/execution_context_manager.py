@@ -425,7 +425,7 @@ class ExecutionContextManager:
 
         for obs in observations:
             # 使用内容哈希进行去重
-            content_hash = hashlib.md5(obs.encode()).hexdigest()
+            content_hash = hashlib.md5(str(obs).encode()).hexdigest()
             if content_hash not in seen_hashes:
                 seen_hashes.add(content_hash)
                 deduplicated.append(obs)

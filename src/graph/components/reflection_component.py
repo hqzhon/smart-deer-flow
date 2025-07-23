@@ -20,29 +20,32 @@ class ReflectionConfig:
     def __init__(
         self,
         max_reflection_loops: int = 3,
-        reflection_trigger_threshold: int = 2,
         reflection_confidence_threshold: float = 0.7,
         reflection_temperature: float = 0.7,
         enable_progressive_reflection: bool = True,
     ):
         self.max_reflection_loops = max_reflection_loops
-        self.reflection_trigger_threshold = reflection_trigger_threshold
         self.reflection_confidence_threshold = reflection_confidence_threshold
         self.reflection_temperature = reflection_temperature
         self.enable_progressive_reflection = enable_progressive_reflection
 
 
-def create_reflection_agent(tools: List, prompt_name: str = "reflection_analysis"):
+def create_reflection_agent(
+    tools: List, prompt_name: str = "reflection_analysis", configurable=None
+):
     """Create a reflection agent with the specified prompt.
 
     Args:
         tools: List of tools available to the agent.
         prompt_name: Name of the prompt to use for reflection.
+        configurable: Optional configurable object containing locale and other parameters.
 
     Returns:
         Configured reflection agent.
     """
-    return create_agent_with_managed_prompt(prompt_name, "reflection", tools)
+    return create_agent_with_managed_prompt(
+        prompt_name, "reflection", tools, configurable=configurable
+    )
 
 
 def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> str:
@@ -61,9 +64,9 @@ def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> s
     if reflection_count >= config.max_reflection_loops:
         return "end"
 
-    # Check if we have enough research steps to trigger reflection
+    # Always allow reflection to trigger (minimum threshold is 1)
     research_steps = len(state.get("research_steps", []))
-    if research_steps < config.reflection_trigger_threshold:
+    if research_steps < 1:
         return "end"
 
     # Check confidence threshold
@@ -191,7 +194,6 @@ def create_reflection_component(
 def create_reflection_loop(
     llm,
     max_loops: int = 3,
-    trigger_threshold: int = 2,
     confidence_threshold: float = 0.7,
 ) -> CompiledStateGraph:
     """Create a complete reflection loop component.
@@ -199,7 +201,6 @@ def create_reflection_loop(
     Args:
         llm: Language model instance.
         max_loops: Maximum number of reflection iterations.
-        trigger_threshold: Minimum research steps before reflection triggers.
         confidence_threshold: Confidence threshold to stop reflection.
 
     Returns:
@@ -207,7 +208,6 @@ def create_reflection_loop(
     """
     config = ReflectionConfig(
         max_reflection_loops=max_loops,
-        reflection_trigger_threshold=trigger_threshold,
         reflection_confidence_threshold=confidence_threshold,
     )
 

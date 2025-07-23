@@ -24,10 +24,15 @@ try:
         run_agent_workflow_async = workflow_module.run_agent_workflow_async
     else:
         raise ImportError("workflow.py not found")
-except Exception:
+except Exception as import_error:
     # If import fails, define a placeholder
     def run_agent_workflow_async(*args, **kwargs):
-        raise NotImplementedError(f"run_agent_workflow_async not available: {e}")
+        raise NotImplementedError(
+            f"run_agent_workflow_async not available: {import_error}"
+        )
+
+    # Store the error for later use
+    _import_error = import_error
 
 
 __all__ = [

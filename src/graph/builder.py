@@ -52,14 +52,14 @@ def continue_to_running_research_team(state: State):
         # 检查是否需要规划上下文优化
         messages = state.get("messages", [])
         plan_iterations = state.get("plan_iterations", 0)
-
+        
         # 如果消息过多且有多次规划迭代，先进行上下文优化
         if len(messages) > 10 and plan_iterations > 1:
             return "planning_context_optimizer"
         return "planner"
     if all(step.execution_res for step in current_plan.steps):
         return "planner"
-
+    
     # 找到第一个未执行的步骤并根据类型路由
     for step in current_plan.steps:
         if not step.execution_res:
@@ -70,7 +70,7 @@ def continue_to_running_research_team(state: State):
             else:
                 # 如果步骤类型未知或为None，返回planner重新规划
                 return "planner"
-
+    
     # 如果没有找到未执行的步骤，返回planner
     return "planner"
 
@@ -320,6 +320,13 @@ def enhanced_coordinator_node(
 
     logger.info("Enhanced coordinator started")
 
+    # Extract configurable from config and add to state
+    from src.graph.nodes import get_configuration_from_config
+
+    configurable = get_configuration_from_config(config)
+    if isinstance(state, dict) and configurable:
+        state["agent_configurable"] = configurable
+
     # Analyze user request and determine report type
     user_message = ""
     if state.get("messages"):
@@ -361,6 +368,13 @@ def enhanced_planner_node(
         return planner_node(state, config)
 
     logger.info("Enhanced planner started")
+
+    # Extract configurable from config and add to state
+    from src.graph.nodes import get_configuration_from_config
+
+    configurable = get_configuration_from_config(config)
+    if isinstance(state, dict) and configurable:
+        state["agent_configurable"] = configurable
 
     # Call original planner
     result = planner_node(state, config)
@@ -408,6 +422,13 @@ def enhanced_reporter_node(
         return reporter_node(state, config)
 
     logger.info("Enhanced reporter started")
+
+    # Extract configurable from config and add to state
+    from src.graph.nodes import get_configuration_from_config
+
+    configurable = get_configuration_from_config(config)
+    if isinstance(state, dict) and configurable:
+        state["agent_configurable"] = configurable
 
     # Call original reporter
     result = reporter_node(state, config)

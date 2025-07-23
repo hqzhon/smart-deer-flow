@@ -192,6 +192,7 @@ function MessageListItem({
                     message.role === "user" &&
                       "prose-invert not-dark:text-secondary dark:text-inherit",
                   )}
+                  isStreaming={message.isStreaming}
                 >
                   {message?.content}
                 </Markdown>
@@ -403,6 +404,7 @@ function ThoughtBlock({
                       isStreaming ? "prose-primary" : "opacity-80",
                     )}
                     animated={isStreaming}
+                    isStreaming={isStreaming}
                   >
                     {content}
                   </Markdown>
@@ -481,7 +483,7 @@ function PlanCard({
           <Card className="w-full">
             <CardHeader>
               <CardTitle>
-                <Markdown animated={message.isStreaming}>
+                <Markdown animated={message.isStreaming} isStreaming={message.isStreaming}>
                   {`### ${
                     plan.title !== undefined && plan.title !== ""
                       ? plan.title
@@ -491,20 +493,20 @@ function PlanCard({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Markdown className="opacity-80" animated={message.isStreaming}>
+              <Markdown className="opacity-80" animated={message.isStreaming} isStreaming={message.isStreaming}>
                 {plan.thought}
               </Markdown>
               {plan.steps && (
                 <ul className="my-2 flex list-decimal flex-col gap-4 border-l-[2px] pl-8">
                   {plan.steps.map((step, i) => (
                     <li key={`step-${i}`}>
-                      <h3 className="mb text-lg font-medium">
-                        <Markdown animated={message.isStreaming}>
+                      <h3 className="mb-2 text-lg font-medium">
+                        <Markdown animated={message.isStreaming} isStreaming={message.isStreaming}>
                           {step.title}
                         </Markdown>
                       </h3>
                       <div className="text-muted-foreground text-sm">
-                        <Markdown animated={message.isStreaming}>
+                        <Markdown animated={message.isStreaming} isStreaming={message.isStreaming}>
                           {step.description}
                         </Markdown>
                       </div>

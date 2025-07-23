@@ -19,28 +19,20 @@ from .enhanced_reflection import (
     ReflectionContext,
 )
 from ..researcher.researcher_progressive_enablement import (
-    ResearcherProgressiveEnabler,
     ScenarioContext,
     TaskComplexity,
 )
-from ..researcher.researcher_isolation_metrics import ResearcherIsolationMetrics
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ReflectionIntegrationConfig:
-    """Configuration for reflection integration"""
+    """简化的反射集成配置。"""
 
     enable_reflection_integration: bool = True
-    reflection_trigger_threshold: int = 2  # Trigger reflection after N steps
-    max_reflection_iterations: int = 3
-    reflection_confidence_threshold: float = 0.7
-    enable_progressive_reflection: bool = True
-    enable_reflection_metrics: bool = True
-    skip_initial_stage_reflection: bool = (
-        True  # Skip reflection in initial research stage
-    )
+    max_reflection_iterations: int = 2
+    reflection_timeout: int = 30
 
 
 class ReflectionIntegrator:
@@ -54,29 +46,23 @@ class ReflectionIntegrator:
     def __init__(
         self,
         reflection_agent: Optional[EnhancedReflectionAgent] = None,
-        progressive_enabler: Optional[ResearcherProgressiveEnabler] = None,
-        metrics: Optional[ResearcherIsolationMetrics] = None,
         config: Optional[ReflectionIntegrationConfig] = None,
     ):
-        """Initialize the reflection integrator.
+        """初始化简化的反射集成器。
 
         Args:
-            reflection_agent: Enhanced reflection agent instance
-            progressive_enabler: Progressive enablement component
-            metrics: Isolation metrics component
-            config: Integration configuration
+            reflection_agent: 增强反射代理实例
+            config: 集成配置
         """
         self.reflection_agent = reflection_agent or EnhancedReflectionAgent()
-        self.progressive_enabler = progressive_enabler
-        self.metrics = metrics
         self.config = config or ReflectionIntegrationConfig()
 
-        # Integration state
+        # 简化的集成状态
         self.active_reflections: Dict[str, ReflectionContext] = {}
         self.reflection_sessions: Dict[str, List[ReflectionResult]] = {}
 
         logger.info(
-            f"Initialized ReflectionIntegrator with integration_enabled={self.config.enable_reflection_integration}"
+            f"Initialized simplified ReflectionIntegrator with integration_enabled={self.config.enable_reflection_integration}"
         )
 
     def should_trigger_reflection(
@@ -86,6 +72,8 @@ class ReflectionIntegrator:
         agent_name: str = "researcher",
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """Determine if reflection should be triggered for the current state.
+
+        简化版本：主要基于步骤计数和观察结果数量来决定是否触发反射。
 
         Args:
             state: Current graph state
@@ -102,89 +90,34 @@ class ReflectionIntegrator:
                 {"integration_enabled": False},
             )
 
+        observations = state.get("observations", [])
+        step_count = len(observations)
+
         decision_factors = {
             "integration_enabled": True,
-            "step_count": len(state.get("observations", [])),
+            "step_count": step_count,
             "has_plan": state.get("current_plan") is not None,
-            "has_results": len(state.get("observations", [])) > 0,
+            "has_results": step_count > 0,
         }
 
-        # Enhanced check: Only trigger if there are actual execution results
-        current_plan = state.get("current_plan")
-        logger.info(
-            f"[DEBUG] Checking if reflection should be triggered for state with {len(state.get('observations', []))} observations"
-        )
-        has_results = self._has_actual_execution_results(state, current_plan)
-        logger.info(f"[DEBUG] _has_actual_execution_results returned: {has_results}")
-        if not has_results:
-            decision_factors["trigger_reason"] = "no_execution_results"
-            logger.info(
-                "[DEBUG] Skipping reflection due to no actual execution results"
-            )
-            return (
-                False,
-                "Skipping reflection - no actual execution results found",
-                decision_factors,
-            )
+        logger.info(f"[DEBUG] Reflection trigger check: step_count={step_count}")
 
-        # Check if we're in the initial research stage - skip reflection
-        if (
-            self.config.skip_initial_stage_reflection
-            and self._is_initial_research_stage(state, current_step)
-        ):
-            decision_factors["trigger_reason"] = "initial_stage_skip"
-            return (
-                False,
-                "Skipping reflection in initial research stage",
-                decision_factors,
-            )
-
-        # Check step count threshold
-        step_count = len(state.get("observations", []))
-        if step_count >= self.config.reflection_trigger_threshold:
-            decision_factors["trigger_reason"] = "step_count_threshold"
+        # 简化的触发条件：只要有观察结果就触发
+        if step_count > 0:
+            decision_factors["trigger_reason"] = "has_observations"
             return (
                 True,
-                f"Step count ({step_count}) exceeds threshold ({self.config.reflection_trigger_threshold})",
+                f"Step count ({step_count}) has observations for reflection",
                 decision_factors,
             )
 
-        logger.info(
-            f"[DEBUG] Progressive enabler enabled: {self.config.enable_progressive_reflection}, \
-            progressive_enabler: {self.progressive_enabler}, current_step: {current_step}"
+        # 没有观察结果
+        decision_factors["trigger_reason"] = "no_observations"
+        return (
+            False,
+            "No observations available for reflection",
+            decision_factors,
         )
-        # Check if progressive enabler suggests reflection
-        if (
-            self.config.enable_progressive_reflection
-            and self.progressive_enabler
-            and current_step
-        ):
-            scenario_context = self._create_scenario_context(
-                state, current_step, agent_name
-            )
-            should_enable, reason, enabler_factors = (
-                self.progressive_enabler.should_enable_isolation(scenario_context)
-            )
-            logger.info(
-                f"[DEBUG] Progressive enabler decision: should_enable={should_enable}, reason={reason}"
-            )
-
-            decision_factors.update(enabler_factors)
-
-            if should_enable:
-                decision_factors["trigger_reason"] = "progressive_enabler"
-                return (
-                    True,
-                    f"Progressive enabler suggests reflection: {reason}",
-                    decision_factors,
-                )
-
-        # Check for complex research scenarios
-        if current_step and self._is_complex_research_scenario(state, current_step):
-            decision_factors["trigger_reason"] = "complex_scenario"
-            return True, "Complex research scenario detected", decision_factors
-
-        return False, "No reflection trigger conditions met", decision_factors
 
     async def execute_reflection_analysis(
         self,
@@ -295,9 +228,43 @@ class ReflectionIntegrator:
         updated_steps = list(current_plan.steps) + new_steps
 
         # Update plan thought with reflection insights
-        reflection_insight = f"\n\nReflection Analysis: {', '.join(reflection_result.recommendations) if reflection_result.recommendations else 'No specific recommendations'}"
+        # Ensure recommendations are all strings before joining
+        safe_recommendations = []
+        if reflection_result.recommendations:
+            for rec in reflection_result.recommendations:
+                if isinstance(rec, str):
+                    safe_recommendations.append(rec)
+                elif isinstance(rec, dict):
+                    # Extract meaningful string from dict
+                    if "description" in rec:
+                        safe_recommendations.append(str(rec["description"]))
+                    elif "recommendation" in rec:
+                        safe_recommendations.append(str(rec["recommendation"]))
+                    elif "action" in rec:
+                        safe_recommendations.append(str(rec["action"]))
+                    else:
+                        safe_recommendations.append(str(rec))
+                else:
+                    safe_recommendations.append(str(rec))
+        
+        reflection_insight = f"\n\nReflection Analysis: {', '.join(safe_recommendations) if safe_recommendations else 'No specific recommendations'}"
         if reflection_result.knowledge_gaps:
-            reflection_insight += f"\nIdentified Knowledge Gaps: {', '.join(reflection_result.knowledge_gaps)}"
+            # Ensure knowledge_gaps are all strings before joining
+            safe_gaps = []
+            for gap in reflection_result.knowledge_gaps:
+                if isinstance(gap, str):
+                    safe_gaps.append(gap)
+                elif isinstance(gap, dict):
+                    # Extract meaningful string from dict
+                    if "description" in gap:
+                        safe_gaps.append(str(gap["description"]))
+                    elif "gap_type" in gap:
+                        safe_gaps.append(str(gap["gap_type"]))
+                    else:
+                        safe_gaps.append(str(gap))
+                else:
+                    safe_gaps.append(str(gap))
+            reflection_insight += f"\nIdentified Knowledge Gaps: {', '.join(safe_gaps)}"
 
         updated_plan = Plan(
             locale=current_plan.locale,

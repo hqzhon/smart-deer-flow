@@ -5,43 +5,37 @@ import asyncio
 import logging
 from langgraph.graph import END, START, StateGraph
 
-from src.prose.graph.prose_continue_node import prose_continue_node
-from src.prose.graph.prose_fix_node import prose_fix_node
-from src.prose.graph.prose_improve_node import prose_improve_node
-from src.prose.graph.prose_longer_node import prose_longer_node
-from src.prose.graph.prose_shorter_node import prose_shorter_node
-from src.prose.graph.prose_zap_node import prose_zap_node
+from src.prose.graph.prose_processor import _process_prose_operation, OPERATIONS
 from src.prose.graph.state import ProseState
 
 
-def optional_node(state: ProseState):
-    return state["option"]
+def route_by_option(state: ProseState) -> str:
+    """Route to the appropriate prose operation based on the option."""
+    option = state.get("option")
+    return "prose_processor" if option in OPERATIONS else END
 
 
 def build_graph():
-    """Build and return the ppt workflow graph."""
-    # build state graph
-    builder = StateGraph(ProseState)
-    builder.add_node("prose_continue", prose_continue_node)
-    builder.add_node("prose_improve", prose_improve_node)
-    builder.add_node("prose_shorter", prose_shorter_node)
-    builder.add_node("prose_longer", prose_longer_node)
-    builder.add_node("prose_fix", prose_fix_node)
-    builder.add_node("prose_zap", prose_zap_node)
-    builder.add_conditional_edges(
+    """Build and return the simplified prose workflow graph."""
+    graph = StateGraph(ProseState)
+
+    # Single processor node for all operations
+    graph.add_node("prose_processor", _process_prose_operation)
+
+    # Add conditional routing from START
+    graph.add_conditional_edges(
         START,
-        optional_node,
+        route_by_option,
         {
-            "continue": "prose_continue",
-            "improve": "prose_improve",
-            "shorter": "prose_shorter",
-            "longer": "prose_longer",
-            "fix": "prose_fix",
-            "zap": "prose_zap",
+            "prose_processor": "prose_processor",
+            END: END,
         },
-        END,
     )
-    return builder.compile()
+
+    # Add edge from processor to END
+    graph.add_edge("prose_processor", END)
+
+    return graph.compile()
 
 
 async def _test_workflow():

@@ -27,13 +27,16 @@ class DebateConfig:
         self.consensus_threshold = consensus_threshold
 
 
-def create_debater_agent(tools: List, role: str, prompt_name: str = None):
+def create_debater_agent(
+    tools: List, role: str, prompt_name: str = None, configurable=None
+):
     """Create a debater agent with specific role and prompt.
 
     Args:
         tools: List of tools available to the agent.
         role: Role of the debater (e.g., "optimist", "pessimist", "neutral").
         prompt_name: Name of the prompt to use. Auto-generated if None.
+        configurable: Optional configurable object containing locale and other parameters.
 
     Returns:
         Configured debater agent.
@@ -41,7 +44,9 @@ def create_debater_agent(tools: List, role: str, prompt_name: str = None):
     if prompt_name is None:
         prompt_name = f"debater_{role}"
 
-    return create_agent_with_managed_prompt(prompt_name, "debater", tools)
+    return create_agent_with_managed_prompt(
+        prompt_name, "debater", tools, configurable=configurable
+    )
 
 
 def prepare_debate_context(state: AgentState, config: DebateConfig) -> Dict[str, Any]:
@@ -178,7 +183,10 @@ def should_continue_debate(state: AgentState, config: DebateConfig) -> str:
 
 
 def create_debate_component(
-    llm, config: Optional[DebateConfig] = None, roles: Optional[List[str]] = None
+    llm,
+    config: Optional[DebateConfig] = None,
+    roles: Optional[List[str]] = None,
+    configurable=None,
 ) -> CompiledStateGraph:
     """Create a debate component as a reusable sub-graph.
 
@@ -186,6 +194,7 @@ def create_debate_component(
         llm: Language model instance for debaters.
         config: Debate configuration. Uses defaults if not provided.
         roles: List of debater roles. Auto-generated if not provided.
+        configurable: Optional configurable object containing locale and other parameters.
 
     Returns:
         Compiled debate sub-graph.
@@ -202,7 +211,8 @@ def create_debate_component(
 
     # Create debater agents
     debaters = [
-        create_debater_agent(llm, role) for role in roles[: config.num_debaters]
+        create_debater_agent(llm, role, configurable=configurable)
+        for role in roles[: config.num_debaters]
     ]
 
     # Create the graph

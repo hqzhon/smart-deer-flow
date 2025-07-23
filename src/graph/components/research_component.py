@@ -3,6 +3,7 @@ Research component for modular graph architecture.
 Provides reusable research workflow that can be integrated into larger systems.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
@@ -30,17 +31,22 @@ class ResearchConfig:
         self.summary_type = summary_type
 
 
-def create_research_agent(tools: List, prompt_name: str = "researcher"):
+def create_research_agent(
+    tools: List, prompt_name: str = "researcher", configurable=None
+):
     """Create a research agent with the specified prompt.
 
     Args:
         tools: List of tools available to the agent.
         prompt_name: Name of the prompt to use for research.
+        configurable: Optional configurable object containing locale and other parameters.
 
     Returns:
         Configured research agent.
     """
-    return create_agent_with_managed_prompt(prompt_name, "researcher", tools)
+    return create_agent_with_managed_prompt(
+        prompt_name, "researcher", tools, configurable=configurable
+    )
 
 
 def create_research_tools() -> List:
@@ -244,9 +250,6 @@ def create_research_component(
     if config is None:
         config = ResearchConfig()
 
-    # Create research agent
-    research_agent = create_research_agent(llm, prompt_name)
-
     # Create research tools
     tools = create_research_tools()
 
@@ -255,6 +258,13 @@ def create_research_component(
 
     # Add research node
     def research_node(state: AgentState) -> Dict[str, Any]:
+        # Get configurable from state, or create one with locale
+        configurable = state.get("agent_configurable")
+        if not configurable:
+            locale = state.get("locale", "en-US")
+            configurable = {"locale": locale}
+
+        research_agent = create_research_agent(tools, prompt_name, configurable)
         return research_step(state, research_agent, tools, config)
 
     workflow.add_node("research", research_node)
@@ -329,8 +339,5 @@ def integrate_research(
 
     return main_graph
 
-
-# Import logging
-import logging
 
 logger = logging.getLogger(__name__)

@@ -102,7 +102,7 @@ reflection:
   enable_enhanced_reflection: true               # Enable enhanced reflection capabilities
   max_reflection_loops: 3                        # Maximum reflection iterations
   reflection_temperature: 0.7                    # Temperature for reflection model
-  reflection_trigger_threshold: 2                # Threshold for triggering reflection
+
   reflection_confidence_threshold: 0.7           # Confidence threshold for reflection decisions
   enable_reflection_integration: true            # Integrate reflection results into main workflow
   enable_progressive_reflection: true            # Enable progressive reflection improvement

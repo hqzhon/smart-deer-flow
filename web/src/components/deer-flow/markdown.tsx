@@ -28,6 +28,7 @@ export function Markdown({
   enableCopy,
   animated = false,
   checkLinkCredibility = false,
+  isStreaming = false,
   ...props
 }: ReactMarkdownOptions & {
   className?: string;
@@ -35,6 +36,7 @@ export function Markdown({
   style?: React.CSSProperties;
   animated?: boolean;
   checkLinkCredibility?: boolean;
+  isStreaming?: boolean;
 }) {
   const components: ReactMarkdownOptions["components"] = useMemo(() => {
     return {
@@ -59,6 +61,7 @@ export function Markdown({
             <Mermaid
               chart={chartContent}
               className="my-4"
+              isStreaming={isStreaming}
             />
           );
         }
@@ -70,7 +73,7 @@ export function Markdown({
         );
       },
     };
-  }, [checkLinkCredibility]);
+  }, [checkLinkCredibility, isStreaming]);
 
   const rehypePlugins = useMemo(() => {
     if (animated) {

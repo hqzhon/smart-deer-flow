@@ -114,10 +114,6 @@ class ConfigLoader:
             ],
             "DEER_MAX_REFLECTION_LOOPS": ["reflection", "max_reflection_loops"],
             "DEER_REFLECTION_TEMPERATURE": ["reflection", "reflection_temperature"],
-            "DEER_REFLECTION_TRIGGER_THRESHOLD": [
-                "reflection",
-                "reflection_trigger_threshold",
-            ],
             "DEER_REFLECTION_CONFIDENCE_THRESHOLD": [
                 "reflection",
                 "reflection_confidence_threshold",

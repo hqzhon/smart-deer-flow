@@ -74,6 +74,9 @@ class State(MessagesState):
     background_investigation_results: str = None
     enable_collaboration: bool = True
     collaboration_systems: dict = None
+    agent_configurable: Optional[Any] = (
+        None  # Store configurable object for research components
+    )
 
     # Modular Reflection State
     reflection: ReflectionState = Field(default_factory=ReflectionState)

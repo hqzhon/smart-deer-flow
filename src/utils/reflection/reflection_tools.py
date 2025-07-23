@@ -414,6 +414,7 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
             result = ReflectionResult(
                 is_sufficient=data.get("is_sufficient", False),
                 confidence_score=data.get("confidence_score"),
+                comprehensive_report=data.get("comprehensive_report", ""),
                 knowledge_gaps=data.get("knowledge_gaps", []),
                 follow_up_queries=data.get("follow_up_queries", []),
                 quality_assessment=data.get("quality_assessment", {}),

@@ -9,9 +9,10 @@ interface MermaidProps {
   chart: string;
   className?: string;
   id?: string;
+  isStreaming?: boolean;
 }
 
-export function Mermaid({ chart, className, id }: MermaidProps) {
+export function Mermaid({ chart, className, id, isStreaming = false }: MermaidProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -44,7 +45,15 @@ export function Mermaid({ chart, className, id }: MermaidProps) {
 
   useEffect(() => {
     const renderChart = async () => {
-      if (!isInitialized || !chart.trim()) return;
+      // Don't render during streaming to avoid syntax errors from incomplete charts
+      if (!isInitialized || !chart.trim() || isStreaming) {
+        if (isStreaming) {
+          // Clear any previous error when streaming starts
+          setError("");
+          setSvg("");
+        }
+        return;
+      }
       
       try {
         setError("");
@@ -66,7 +75,7 @@ export function Mermaid({ chart, className, id }: MermaidProps) {
     };
 
     renderChart();
-  }, [chart, isInitialized]);
+  }, [chart, isInitialized, isStreaming]);
 
   if (error) {
     return (
@@ -79,6 +88,21 @@ export function Mermaid({ chart, className, id }: MermaidProps) {
           </summary>
           <pre className="mt-2 whitespace-pre-wrap text-xs text-red-600">{chart}</pre>
         </details>
+      </div>
+    );
+  }
+
+  // Show loading state during streaming
+  if (isStreaming || (!svg && chart.trim())) {
+    return (
+      <div className={cn(
+        "mermaid-diagram flex items-center justify-center rounded border bg-white p-8 dark:bg-gray-900",
+        className
+      )}>
+        <div className="flex items-center space-x-2 text-muted-foreground">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span className="text-sm">Preparing diagram...</span>
+        </div>
       </div>
     );
   }

@@ -9,7 +9,13 @@ from src.config.config_loader import get_settings
 
 
 # Create agents using configured LLM types
-def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template: str):
+def create_agent(
+    agent_name: str,
+    agent_type: str,
+    tools: list,
+    prompt_template: str,
+    configurable=None,
+):
     """Factory function to create agents with consistent configuration."""
     # Use delayed import to avoid circular import
     from src.llms.llm import get_llm_by_type
@@ -20,16 +26,23 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     # Get LLM type for the agent from configuration
     llm_type = getattr(agent_llm_config, agent_type, "basic")
 
+    def prompt_func(state):
+        # Try to get configurable from state if not provided
+        current_configurable = configurable
+        if current_configurable is None and hasattr(state, "configurable"):
+            current_configurable = state.configurable
+        return apply_prompt_template(prompt_template, state, current_configurable)
+
     return create_react_agent(
         name=agent_name,
         model=get_llm_by_type(llm_type),
         tools=tools,
-        prompt=lambda state: apply_prompt_template(prompt_template, state),
+        prompt=prompt_func,
     )
 
 
 def create_agent_with_managed_prompt(
-    agent_name: str, agent_type: str, tools: list, settings=None
+    agent_name: str, agent_type: str, tools: list, settings=None, configurable=None
 ):
     """Factory function to create agents using PromptManager for prompt retrieval.
 
@@ -41,6 +54,7 @@ def create_agent_with_managed_prompt(
         agent_type: Type of the agent (used for LLM selection)
         tools: List of tools for the agent
         settings: Optional settings object (will use get_settings() if not provided)
+        configurable: Optional configurable object containing locale and other parameters
 
     Returns:
         Configured agent with managed prompt
@@ -68,10 +82,14 @@ def create_agent_with_managed_prompt(
             # Get prompt content from PromptManager
             prompt_content = prompt_manager.get_prompt(prompt_name)
             # Apply template using existing template system
-            return apply_prompt_template_content(prompt_content, state)
+            return apply_prompt_template_content(prompt_content, state, configurable)
         except KeyError:
             # Fallback to original behavior if prompt not found
-            return apply_prompt_template(prompt_name, state)
+            # Try to get configurable from state if not provided
+            current_configurable = configurable
+            if current_configurable is None and hasattr(state, "configurable"):
+                current_configurable = state.configurable
+            return apply_prompt_template(prompt_name, state, current_configurable)
 
     return create_react_agent(
         name=agent_name,
@@ -81,7 +99,9 @@ def create_agent_with_managed_prompt(
     )
 
 
-def apply_prompt_template_content(prompt_content: str, state) -> list:
+def apply_prompt_template_content(
+    prompt_content: str, state, configurable=None
+) -> list:
     """Apply template variables to prompt content and return formatted messages.
 
     This is a simplified version of apply_prompt_template that works with
@@ -90,6 +110,7 @@ def apply_prompt_template_content(prompt_content: str, state) -> list:
     Args:
         prompt_content: The prompt content string
         state: Current agent state containing variables to substitute
+        configurable: Optional configurable object containing locale and other parameters
 
     Returns:
         List of messages with the system prompt as the first message
@@ -154,6 +175,18 @@ def apply_prompt_template_content(prompt_content: str, state) -> list:
         "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
         **{k: v for k, v in state.items() if k != "messages"},
     }
+
+    # Add configurable variables
+    if configurable:
+        import dataclasses
+
+        # Handle different types of configurable objects
+        if hasattr(configurable, "model_dump"):  # Pydantic model
+            state_vars.update(configurable.model_dump())
+        elif hasattr(configurable, "__dict__"):  # Regular class instance
+            state_vars.update(configurable.__dict__)
+        elif dataclasses.is_dataclass(configurable):  # Dataclass instance
+            state_vars.update(dataclasses.asdict(configurable))
 
     try:
         # Use Jinja2 for template rendering

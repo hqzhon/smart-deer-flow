@@ -96,7 +96,7 @@ class ReflectionSettings(BaseModel):
     enable_enhanced_reflection: bool = True
     max_reflection_loops: int = Field(default=3, ge=1)
     reflection_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    reflection_trigger_threshold: int = Field(default=2, ge=1)
+
     reflection_confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     enable_reflection_integration: bool = True
     enable_progressive_reflection: bool = True
@@ -186,7 +186,7 @@ class ConnectionPoolConfig(BaseModel):
     max_connections: int = 50
     initial_connections: int = 10
     connection_timeout: float = 30.0
-    idle_timeout: float = 300.0
+    idle_timeout: float = 500.0
     max_retries: int = 3
 
 
@@ -242,7 +242,7 @@ class ParallelExecutionConfig(BaseModel):
     queue_size: int = 1000
     priority_levels: int = 3
     load_balancing: bool = True
-    worker_timeout: float = 300.0
+    worker_timeout: float = 500.0
     health_check_interval: float = 30.0
 
 

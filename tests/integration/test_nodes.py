@@ -50,7 +50,7 @@ def mock_config():
 @pytest.fixture
 def patch_config_from_runnable_config(mock_configurable):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable,
     ):
         yield
@@ -166,7 +166,7 @@ def mock_configurable_planner():
 @pytest.fixture
 def patch_config_from_runnable_config_planner(mock_configurable_planner):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable_planner,
     ):
         yield
@@ -214,9 +214,11 @@ def test_planner_node_basic_has_enough_context(
 ):
     # AGENT_LLM_MAP["planner"] == "basic" and not thinking mode
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "basic"}),
+        patch("src.graph.nodes.get_settings"),
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        pass
+
         mock_llm = MagicMock()
         mock_llm.with_structured_output.return_value = mock_llm
         mock_response = MagicMock()
@@ -249,9 +251,13 @@ def test_planner_node_basic_not_enough_context(
         "locale": "en-US",
     }
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.planner = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.with_structured_output.return_value = mock_llm
         mock_response = MagicMock()
@@ -278,9 +284,13 @@ def test_planner_node_stream_mode_has_enough_context(
 ):
     # AGENT_LLM_MAP["planner"] != "basic"
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "other"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.planner = "other"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         # Simulate streaming chunks
         chunk = MagicMock()
@@ -312,9 +322,13 @@ def test_planner_node_stream_mode_not_enough_context(
         "locale": "en-US",
     }
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "other"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.planner = "other"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         chunk = MagicMock()
         chunk.content = json.dumps(plan)
@@ -333,9 +347,13 @@ def test_planner_node_plan_iterations_exceeded(mock_state_planner):
     state = dict(mock_state_planner)
     state["plan_iterations"] = 5
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type", return_value=MagicMock()),
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.planner = "basic"
+        mock_get_settings.return_value = mock_settings
+
         result = planner_node(state, MagicMock())
         assert isinstance(result, Command)
         assert result.goto == "reporter"
@@ -344,13 +362,16 @@ def test_planner_node_plan_iterations_exceeded(mock_state_planner):
 def test_planner_node_json_decode_error_first_iteration(mock_state_planner):
     # Simulate JSONDecodeError on first iteration
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "basic"}),
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
         patch(
             "src.graph.nodes.json.loads",
             side_effect=json.JSONDecodeError("err", "doc", 0),
         ),
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.planner = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.with_structured_output.return_value = mock_llm
         mock_response = MagicMock()
@@ -368,7 +389,7 @@ def test_planner_node_json_decode_error_second_iteration(mock_state_planner):
     state = dict(mock_state_planner)
     state["plan_iterations"] = 1
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"planner": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
         patch(
             "src.graph.nodes.json.loads",
@@ -522,7 +543,7 @@ def mock_configurable_coordinator():
 @pytest.fixture
 def patch_config_from_runnable_config_coordinator(mock_configurable_coordinator):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable_coordinator,
     ):
         yield
@@ -564,9 +585,13 @@ def test_coordinator_node_no_tool_calls(
 ):
     # No tool calls, should goto __end__
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.coordinator = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.bind_tools.return_value = mock_llm
         mock_llm.invoke.return_value = make_mock_llm_response([])
@@ -588,9 +613,17 @@ def test_coordinator_node_with_tool_calls_planner(
     # tool_calls present, should goto planner
     tool_calls = [{"name": "handoff_to_planner", "args": {}}]
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.coordinator = "basic"
+        mock_get_settings.return_value = mock_settings
+
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.coordinator = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.bind_tools.return_value = mock_llm
         mock_llm.invoke.return_value = make_mock_llm_response(tool_calls)
@@ -614,9 +647,13 @@ def test_coordinator_node_with_tool_calls_background_investigator(
     state["enable_background_investigation"] = True
     tool_calls = [{"name": "handoff_to_planner", "args": {}}]
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.coordinator = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.bind_tools.return_value = mock_llm
         mock_llm.invoke.return_value = make_mock_llm_response(tool_calls)
@@ -642,10 +679,7 @@ def test_coordinator_node_with_tool_calls_locale_override(
             "args": {"locale": "zh-CN", "research_topic": "test topic"},
         }
     ]
-    with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
-        patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
-    ):
+    with (patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,):
         mock_llm = MagicMock()
         mock_llm.bind_tools.return_value = mock_llm
         mock_llm.invoke.return_value = make_mock_llm_response(tool_calls)
@@ -668,9 +702,13 @@ def test_coordinator_node_tool_calls_exception_handling(
 ):
     # tool_calls raises exception in processing
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"coordinator": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.coordinator = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.bind_tools.return_value = mock_llm
 
@@ -723,7 +761,7 @@ def mock_configurable_reporter():
 @pytest.fixture
 def patch_config_from_runnable_config_reporter(mock_configurable_reporter):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable_reporter,
     ):
         yield
@@ -766,9 +804,13 @@ def test_reporter_node_basic(
 ):
     # Patch get_llm_by_type and AGENT_LLM_MAP
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"reporter": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.reporter = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = make_mock_llm_response_reporter(
             "Final Report Content"
@@ -793,9 +835,13 @@ def test_reporter_node_with_observations(
     patch_logger_reporter,
 ):
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"reporter": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.reporter = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = make_mock_llm_response_reporter(
             "Report with Observations"
@@ -826,9 +872,13 @@ def test_reporter_node_locale_default(
         "observations": [],
     }
     with (
-        patch("src.graph.nodes.AGENT_LLM_MAP", {"reporter": "basic"}),
+        patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
     ):
+        mock_settings = MagicMock()
+        mock_settings.agent_llm_map.reporter = "basic"
+        mock_get_settings.return_value = mock_settings
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = make_mock_llm_response_reporter(
             "Default Locale Report"
@@ -1034,22 +1084,7 @@ async def test_execute_agent_step_recursion_limit_env_negative(
         )
 
 
-@pytest.fixture
-def mock_state_with_steps(mock_step, mock_completed_step):
-    # Simulate a plan with one completed and one unexecuted step
-    Plan = MagicMock()
-    Plan.steps = [mock_completed_step, mock_step]
-    return {
-        "current_plan": Plan,
-        "observations": ["obs1"],
-        "locale": "en-US",
-        "resources": [],
-    }
-
-
-@pytest.fixture
-def mock_config():
-    return MagicMock()
+# Removed duplicate fixtures - already defined earlier in the file
 
 
 @pytest.fixture
@@ -1082,7 +1117,7 @@ def mock_configurable_without_mcp():
 @pytest.fixture
 def patch_config_from_runnable_config_with_mcp(mock_configurable_with_mcp):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable_with_mcp,
     ):
         yield
@@ -1091,7 +1126,7 @@ def patch_config_from_runnable_config_with_mcp(mock_configurable_with_mcp):
 @pytest.fixture
 def patch_config_from_runnable_config_without_mcp(mock_configurable_without_mcp):
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=mock_configurable_without_mcp,
     ):
         yield
@@ -1223,7 +1258,7 @@ async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
     configurable.mcp.enabled = True
     configurable.mcp.servers = [mcp_settings["servers"]["server1"]]
     with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
+        "src.graph.nodes.get_configuration_from_config",
         return_value=configurable,
     ):
         default_tools = [MagicMock(name="default_tool")]
@@ -1298,25 +1333,7 @@ def mock_state_without_resources():
     return {"other": "value"}
 
 
-@pytest.fixture
-def mock_config():
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_configurable():
-    mock = MagicMock()
-    mock.max_search_results = 7
-    return mock
-
-
-@pytest.fixture
-def patch_config_from_runnable_config(mock_configurable):
-    with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
-        return_value=mock_configurable,
-    ):
-        yield
+# Removed duplicate fixtures - they are already defined at the top of the file
 
 
 @pytest.fixture

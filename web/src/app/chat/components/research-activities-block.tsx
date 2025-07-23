@@ -76,7 +76,7 @@ function ActivityMessage({ messageId }: { messageId: string }) {
     if (AgentConfigManager.shouldDisplayInActivity(message.agent)) {
       return (
         <div className="px-4 py-2">
-          <Markdown animated checkLinkCredibility>
+          <Markdown animated checkLinkCredibility isStreaming={message.isStreaming}>
             {message.content}
           </Markdown>
         </div>

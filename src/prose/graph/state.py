@@ -1,23 +1,20 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-from langgraph.graph import MessagesState
+from typing import Optional
+
+from src.graph.types import MessagesState
 
 
 class ProseState(MessagesState):
-    """State for the prose generation."""
+    """Minimal state for prose generation workflow."""
 
-    # The content of the prose
-    content: str = ""
+    # Input fields
+    content: str = ""  # Text content to process
+    option: str = ""  # Operation: continue, improve, fix, longer, shorter, zap
+    command: Optional[str] = None  # Command for zap operation
+    locale: str = "en-US"  # Language locale
 
-    # Prose writer option: continue, improve, shorter, longer, fix, zap
-    option: str = ""
-
-    # The user custom command for the prose writer
-    command: str = ""
-
-    # Locale for internationalization
-    locale: str = "en-US"
-
-    # Output
-    output: str = ""
+    # Output fields
+    prose_content: Optional[str] = None  # Main output
+    output: Optional[str] = None  # Alternative output for zap

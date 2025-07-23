@@ -103,18 +103,83 @@ class ReflectionResult(BaseModel):
 
         result = []
         for item in v:
+            # Skip slice objects and other invalid types
+            if isinstance(item, slice):
+                logger.warning(f"Skipping slice object in knowledge_gaps: {item}")
+                continue
+            
             if isinstance(item, str):
-                result.append(item)
+                if item.strip() and "slice(" not in item and not item.startswith("<"):
+                    result.append(item)
+                else:
+                    logger.warning(f"Skipping invalid string in knowledge_gaps: '{item}'")
             elif isinstance(item, dict):
                 # Extract description or convert dict to string
                 if "description" in item:
-                    result.append(item["description"])
+                    desc_str = str(item["description"])
+                    if desc_str.strip() and "slice(" not in desc_str:
+                        result.append(desc_str)
                 elif "gap_type" in item:
-                    result.append(item["gap_type"])
+                    gap_str = str(item["gap_type"])
+                    if gap_str.strip() and "slice(" not in gap_str:
+                        result.append(gap_str)
                 else:
-                    result.append(str(item))
+                    item_str = str(item)
+                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                        result.append(item_str)
             else:
-                result.append(str(item))
+                item_str = str(item)
+                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    result.append(item_str)
+                else:
+                    logger.warning(f"Skipping invalid item in knowledge_gaps: '{item_str}'")
+        return result
+
+    @field_validator("follow_up_queries", mode="before")
+    @classmethod
+    def validate_follow_up_queries(cls, v):
+        """Ensure follow_up_queries is always a list of strings."""
+        if not v:
+            return []
+
+        result = []
+        for item in v:
+            # Skip slice objects and other invalid types
+            if isinstance(item, slice):
+                logger.warning(f"Skipping slice object in follow_up_queries: {item}")
+                continue
+            
+            if isinstance(item, str):
+                # Validate string content
+                if item.strip() and "slice(" not in item and not item.startswith("<"):
+                    result.append(item)
+                else:
+                    logger.warning(f"Skipping invalid string in follow_up_queries: '{item}'")
+            elif isinstance(item, dict):
+                # Extract meaningful string representation from dictionary
+                if "query" in item:
+                    query_str = str(item["query"])
+                    if query_str.strip() and "slice(" not in query_str:
+                        result.append(query_str)
+                elif "description" in item:
+                    desc_str = str(item["description"])
+                    if desc_str.strip() and "slice(" not in desc_str:
+                        result.append(desc_str)
+                elif "gap_type" in item:
+                    gap_str = str(item["gap_type"])
+                    if gap_str.strip() and "slice(" not in gap_str:
+                        result.append(gap_str)
+                else:
+                    item_str = str(item)
+                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                        result.append(item_str)
+            else:
+                # Convert other types to string with validation
+                item_str = str(item)
+                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    result.append(item_str)
+                else:
+                    logger.warning(f"Skipping invalid item in follow_up_queries: '{item_str}'")
         return result
 
     @field_validator("recommendations", mode="before")
@@ -126,18 +191,36 @@ class ReflectionResult(BaseModel):
 
         result = []
         for item in v:
+            # Skip slice objects and other invalid types
+            if isinstance(item, slice):
+                logger.warning(f"Skipping slice object in recommendations: {item}")
+                continue
+            
             if isinstance(item, str):
-                result.append(item)
+                if item.strip() and "slice(" not in item and not item.startswith("<"):
+                    result.append(item)
+                else:
+                    logger.warning(f"Skipping invalid string in recommendations: '{item}'")
             elif isinstance(item, dict):
                 # Extract relevant field or convert to string
                 if "recommendation" in item:
-                    result.append(item["recommendation"])
+                    rec_str = str(item["recommendation"])
+                    if rec_str.strip() and "slice(" not in rec_str:
+                        result.append(rec_str)
                 elif "description" in item:
-                    result.append(item["description"])
+                    desc_str = str(item["description"])
+                    if desc_str.strip() and "slice(" not in desc_str:
+                        result.append(desc_str)
                 else:
-                    result.append(str(item))
+                    item_str = str(item)
+                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                        result.append(item_str)
             else:
-                result.append(str(item))
+                item_str = str(item)
+                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    result.append(item_str)
+                else:
+                    logger.warning(f"Skipping invalid item in recommendations: '{item_str}'")
         return result
 
 
@@ -391,7 +474,25 @@ class EnhancedReflectionAgent:
 
             try:
                 result = json.loads(response.content)
-                follow_up_queries = result.get("follow_up_queries", [])
+                raw_queries = result.get("follow_up_queries", [])
+
+                # Ensure all queries are strings
+                follow_up_queries = []
+                for query in raw_queries:
+                    if isinstance(query, str):
+                        follow_up_queries.append(query)
+                    elif isinstance(query, dict):
+                        # Extract meaningful string from dict
+                        if "query" in query:
+                            follow_up_queries.append(str(query["query"]))
+                        elif "question" in query:
+                            follow_up_queries.append(str(query["question"]))
+                        elif "description" in query:
+                            follow_up_queries.append(str(query["description"]))
+                        else:
+                            follow_up_queries.append(str(query))
+                    else:
+                        follow_up_queries.append(str(query))
 
                 # Log parsed results
                 logger.info(f"Generated {len(follow_up_queries)} follow-up queries")
@@ -463,11 +564,23 @@ class EnhancedReflectionAgent:
                 f"Enhanced reflection confirms sufficiency (confidence: {reflection_result.confidence_score:.2f})"
             )
         if not is_sufficient:
-            gaps_text = (
-                ", ".join(reflection_result.knowledge_gaps)
-                if reflection_result.knowledge_gaps
-                else "general research gaps"
-            )
+            # Ensure knowledge_gaps are all strings before joining
+            safe_gaps = []
+            for gap in reflection_result.knowledge_gaps or []:
+                if isinstance(gap, str):
+                    safe_gaps.append(gap)
+                elif isinstance(gap, dict):
+                    # Extract meaningful string from dict
+                    if "description" in gap:
+                        safe_gaps.append(str(gap["description"]))
+                    elif "gap_type" in gap:
+                        safe_gaps.append(str(gap["gap_type"]))
+                    else:
+                        safe_gaps.append(str(gap))
+                else:
+                    safe_gaps.append(str(gap))
+
+            gaps_text = ", ".join(safe_gaps) if safe_gaps else "general research gaps"
             reasoning_parts.append(f"Knowledge gaps identified: {gaps_text}")
 
         reasoning = "; ".join(reasoning_parts)
@@ -500,7 +613,7 @@ class EnhancedReflectionAgent:
         # Prepare execution results summary with length limits to prevent truncation
         max_results_length = 2000  # Limit to prevent overly long prompts
         if context.execution_results:
-            combined_results = "\n\n---\n\n".join(context.execution_results)
+            combined_results = "\n\n---\n\n".join(str(res) for res in context.execution_results)
             if len(combined_results) > max_results_length:
                 # Truncate and add note
                 truncated_results = combined_results[:max_results_length]
@@ -564,7 +677,7 @@ class EnhancedReflectionAgent:
         # Prepare observations summary with length limits
         max_obs_length = 1000
         if context.observations:
-            combined_obs = chr(10).join(context.observations)
+            combined_obs = "\n".join(str(obs) for obs in context.observations)
             if len(combined_obs) > max_obs_length:
                 truncated_obs = combined_obs[:max_obs_length]
                 truncation_note = (
@@ -688,7 +801,10 @@ class EnhancedReflectionAgent:
                 report_content = report_match.group(1)
                 try:
                     # Handle unicode escapes
-                    report_content = report_content.encode().decode("unicode_escape")
+                    if isinstance(report_content, str):
+                        report_content = report_content.encode().decode(
+                            "unicode_escape"
+                        )
                 except:
                     pass
                 extracted_data["comprehensive_report"] = report_content
@@ -721,19 +837,72 @@ class EnhancedReflectionAgent:
                 array_match = re.search(array_pattern, raw_content, re.DOTALL)
                 if array_match:
                     array_content = array_match.group(2)
-                    # Simple extraction of quoted strings
-                    items = re.findall(r'"([^"]*(?:\\.[^"]*)*?)"', array_content)
+                    # Try to extract both simple strings and complex objects
+                    items = []
+
+                    # First try to extract simple quoted strings
+                    string_items = re.findall(r'"([^"]*(?:\\.[^"]*)*?)"', array_content)
+                    if string_items:
+                        items.extend(string_items)
+                    else:
+                        # If no simple strings found, try to extract objects and convert them
+                        object_pattern = r"\{[^{}]*\}"
+                        object_matches = re.findall(object_pattern, array_content)
+                        for obj_str in object_matches:
+                            try:
+                                import json
+
+                                obj = json.loads(obj_str)
+                                if isinstance(obj, dict):
+                                    # Extract meaningful string from object
+                                    if "description" in obj:
+                                        items.append(str(obj["description"]))
+                                    elif "gap_type" in obj:
+                                        items.append(str(obj["gap_type"]))
+                                    else:
+                                        items.append(str(obj))
+                                else:
+                                    items.append(str(obj))
+                            except:
+                                # If JSON parsing fails, just use the string representation
+                                items.append(str(obj_str))
+
                     if items:
-                        # Decode unicode escapes
+                        # Decode unicode escapes and ensure all items are strings
                         decoded_items = []
                         for item in items:
                             try:
-                                decoded_items.append(
-                                    item.encode().decode("unicode_escape")
-                                )
-                            except:
-                                decoded_items.append(item)
-                        extracted_data[field] = decoded_items
+                                # Skip slice objects and other invalid types
+                                if isinstance(item, slice):
+                                    logger.warning(f"Skipping slice object in {field}: {item}")
+                                    continue
+                                
+                                if isinstance(item, str):
+                                    decoded_item = item.encode().decode("unicode_escape")
+                                    # Additional validation for decoded string
+                                    if decoded_item and decoded_item.strip() and "slice(" not in decoded_item:
+                                        decoded_items.append(decoded_item)
+                                    else:
+                                        logger.warning(f"Skipping invalid decoded item in {field}: '{decoded_item}'")
+                                else:
+                                    str_item = str(item)
+                                    # Validate string representation
+                                    if str_item and str_item.strip() and "slice(" not in str_item and not str_item.startswith("<"):
+                                        decoded_items.append(str_item)
+                                    else:
+                                        logger.warning(f"Skipping invalid item in {field}: '{str_item}'")
+                            except Exception as e:
+                                logger.warning(f"Error processing item in {field}: {e}")
+                                # Only add if it's a valid string
+                                if isinstance(item, str) and item.strip() and "slice(" not in item:
+                                    decoded_items.append(item)
+                        
+                        # Only set the field if we have valid items
+                        if decoded_items:
+                            extracted_data[field] = decoded_items
+                        else:
+                            logger.warning(f"No valid items found for {field}, using empty list")
+                            extracted_data[field] = []
 
             logger.info(
                 f"Extracted partial data from truncated response: is_sufficient={extracted_data['is_sufficient']}, report_length={len(extracted_data['comprehensive_report'])}, gaps={len(extracted_data['knowledge_gaps'])}"
