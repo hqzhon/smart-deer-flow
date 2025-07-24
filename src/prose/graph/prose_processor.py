@@ -5,7 +5,6 @@ import logging
 from typing import Dict, Any
 from src.prose.graph.state import ProseState
 
-
 # Operation definitions
 OPERATIONS = {
     "continue": "continues existing text based on context",

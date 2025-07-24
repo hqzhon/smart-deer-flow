@@ -380,9 +380,9 @@ class InteractiveElementGenerator:
                     list_regions.append(
                         {
                             "start_line": current_list_start,
-                            "end_line": current_list_start
-                            + len(current_list_lines)
-                            - 1,
+                            "end_line": (
+                                current_list_start + len(current_list_lines) - 1
+                            ),
                             "content": list_content,
                             "links": re.findall(
                                 r"\[(.*?)\]\((https?://.*?)\)", list_content

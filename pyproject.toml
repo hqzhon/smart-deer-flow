@@ -55,6 +55,7 @@ test = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v"
+asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",

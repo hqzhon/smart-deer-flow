@@ -21,7 +21,8 @@ from src.utils.reflection.enhanced_reflection import (
     ReflectionResult,
     ReflectionContext,
 )
-from src.utils.reflection.enhanced_reflection import ReflectionConfig
+
+# ReflectionConfig removed - using unified ReflectionSettings from src.config.models
 
 # from src.config.configuration import Configuration  # Removed - using new config system
 
@@ -42,13 +43,14 @@ class TestReflectionIntegration:
     @pytest.fixture
     def reflection_config(self):
         """Create reflection configuration."""
-        return ReflectionConfig(
-            enable_enhanced_reflection=True,
-            max_reflection_loops=2,
-            reflection_model="gpt-4",
-            knowledge_gap_threshold=0.6,
-            sufficiency_threshold=0.7,
-        )
+        # Using dictionary instead of ReflectionConfig class
+        return {
+            "enable_enhanced_reflection": True,
+            "max_reflection_loops": 2,
+            "reflection_model": "gpt-4",
+            "knowledge_gap_threshold": 0.6,
+            "sufficiency_threshold": 0.7,
+        }
 
     @pytest.fixture
     def mock_metrics(self):
@@ -70,14 +72,16 @@ class TestReflectionIntegration:
     def reflection_agent(self, config, reflection_config, mock_metrics):
         """Create reflection agent instance."""
         # Set reflection configuration on the main config
-        config.enable_enhanced_reflection = reflection_config.enable_enhanced_reflection
-        config.max_reflection_loops = reflection_config.max_reflection_loops
-        config.reflection_model = reflection_config.reflection_model
-        config.reflection_temperature = getattr(
-            reflection_config, "reflection_temperature", 0.7
+        config.enable_enhanced_reflection = reflection_config[
+            "enable_enhanced_reflection"
+        ]
+        config.max_reflection_loops = reflection_config["max_reflection_loops"]
+        config.reflection_model = reflection_config["reflection_model"]
+        config.reflection_temperature = reflection_config.get(
+            "reflection_temperature", 0.7
         )
-        config.reflection_confidence_threshold = getattr(
-            reflection_config, "knowledge_gap_threshold", 0.6
+        config.reflection_confidence_threshold = reflection_config.get(
+            "knowledge_gap_threshold", 0.6
         )
 
         return EnhancedReflectionAgent(config=config)
@@ -86,54 +90,69 @@ class TestReflectionIntegration:
     def researcher_node(self, config, mock_metrics, reflection_agent):
         """Create researcher node with reflection integration."""
         # Create a mock node object that simulates the researcher_node_with_isolation function behavior
-        from unittest.mock import Mock
+        from unittest.mock import Mock, AsyncMock
 
         node = Mock()
         node.reflection_agent = reflection_agent
         node.config = config
         node.metrics = mock_metrics
 
-        # Add methods that the tests expect
+        # Add methods that the tests expect using AsyncMock
         async def research_with_reflection(query):
+            # Call the actual _perform_research method to ensure it gets tracked
+            await node._perform_research(query)
             return {
                 "initial_findings": "Mock research findings",
                 "reflection_analysis": (
-                    reflection_agent.analyze_knowledge_gaps.return_value
+                    await reflection_agent.analyze_knowledge_gaps(
+                        ReflectionContext(
+                            research_topic=query.get("query", str(query)),
+                            completed_steps=[],
+                            execution_results=[]
+                        )
+                    )
                 ),
                 "follow_up_research": [],
                 "final_findings": "Mock final findings",
             }
 
-        async def _perform_research(query):
-            return {
+        node.research_with_reflection = research_with_reflection
+        node._perform_research = AsyncMock(
+            return_value={
                 "findings": "Mock research findings",
                 "sources": ["mock_source.com"],
                 "confidence": 0.8,
             }
-
-        node.research_with_reflection = research_with_reflection
-        node._perform_research = _perform_research
+        )
         return node
 
     @pytest.fixture
     def planner_node(self, config, mock_metrics, reflection_agent):
         """Create planner node with reflection integration."""
         # Create a mock node object that simulates the planner_node function behavior
-        from unittest.mock import Mock
+        from unittest.mock import Mock, AsyncMock
 
         node = Mock()
         node.reflection_agent = reflection_agent
         node.config = config
         node.metrics = mock_metrics
 
-        # Add methods that the tests expect
+        # Add methods that the tests expect using AsyncMock
         async def plan_with_reflection(query):
+            # Call the actual _generate_research_plan method to ensure it gets tracked
+            await node._generate_research_plan(query)
             return {
                 "initial_plan": {
                     "research_steps": [{"step": 1, "action": "Mock planning step"}]
                 },
                 "reflection_analysis": (
-                    reflection_agent.analyze_knowledge_gaps.return_value
+                    await reflection_agent.analyze_knowledge_gaps(
+                        ReflectionContext(
+                            research_topic=query.get("query", str(query)),
+                            completed_steps=[],
+                            execution_results=[]
+                        )
+                    )
                 ),
                 "enhanced_plan": {
                     "research_steps": [
@@ -143,15 +162,14 @@ class TestReflectionIntegration:
                 },
             }
 
-        async def _generate_research_plan(query):
-            return {
+        node.plan_with_reflection = plan_with_reflection
+        node._generate_research_plan = AsyncMock(
+            return_value={
                 "research_steps": [{"step": 1, "action": "Mock planning step"}],
                 "estimated_time": 30,
                 "confidence": 0.7,
             }
-
-        node.plan_with_reflection = plan_with_reflection
-        node._generate_research_plan = _generate_research_plan
+        )
         return node
 
     @pytest.fixture
@@ -543,12 +561,6 @@ class TestReflectionIntegration:
     ):
         """Test how different reflection configurations affect integration behavior."""
         # Test with strict reflection configuration
-        ReflectionConfig(
-            enable_enhanced_reflection=True,
-            knowledge_gap_threshold=0.9,
-            sufficiency_threshold=0.95,
-            max_reflection_loops=1,
-        )
 
         strict_agent = EnhancedReflectionAgent(config=config)
         from unittest.mock import Mock, AsyncMock
@@ -578,12 +590,6 @@ class TestReflectionIntegration:
         strict_researcher.research_with_reflection = strict_research_with_reflection
 
         # Test with lenient reflection configuration
-        ReflectionConfig(
-            enable_enhanced_reflection=True,
-            knowledge_gap_threshold=0.3,
-            sufficiency_threshold=0.5,
-            max_reflection_loops=3,
-        )
 
         lenient_agent = EnhancedReflectionAgent(config=config)
         lenient_researcher = Mock()
@@ -675,6 +681,16 @@ class TestReflectionIntegration:
 class TestReflectionSystemIntegration:
     """Test reflection system integration with existing components."""
 
+    @pytest.fixture
+    def config(self):
+        """Create test configuration."""
+        config = Mock()
+        config.enable_enhanced_reflection = True
+        config.max_reflection_loops = 3
+        config.reflection_temperature = 0.7
+        config.reflection_confidence_threshold = 0.7
+        return config
+
     @pytest.mark.asyncio
     async def test_backward_compatibility(self, config):
         """Test that reflection integration doesn't break existing functionality."""
@@ -699,8 +715,7 @@ class TestReflectionSystemIntegration:
         """Test proper initialization of reflection system components."""
         from unittest.mock import Mock
 
-        Mock()
-        ReflectionConfig()
+        # ReflectionConfig() removed - using unified config system
 
         # Initialize reflection agent
         reflection_agent = EnhancedReflectionAgent(config=config)
@@ -720,8 +735,7 @@ class TestReflectionSystemIntegration:
     @pytest.mark.asyncio
     async def test_reflection_system_cleanup(self, config):
         """Test proper cleanup of reflection system resources."""
-        Mock()
-        ReflectionConfig(enable_reflection_caching=True)
+        # ReflectionConfig(enable_reflection_caching=True) removed - using unified config system
 
         reflection_agent = EnhancedReflectionAgent(config=config)
 

@@ -99,16 +99,67 @@ research:
 # Reflection Configuration
 # Controls the reflection and self-improvement capabilities
 reflection:
-  enable_enhanced_reflection: true               # Enable enhanced reflection capabilities
-  max_reflection_loops: 3                        # Maximum reflection iterations
-  reflection_temperature: 0.7                    # Temperature for reflection model
-
-  reflection_confidence_threshold: 0.7           # Confidence threshold for reflection decisions
-  enable_reflection_integration: true            # Integrate reflection results into main workflow
-  enable_progressive_reflection: true            # Enable progressive reflection improvement
+  # Core reflection control
+  enable_enhanced_reflection: true               # Enable enhanced reflection system
+  max_reflection_loops: 3                        # Maximum reflection loops per task
+  max_total_reflections: 10                      # Maximum total reflections per session
+  reflection_temperature: 0.3                    # Temperature for reflection model
+  
+  # Threshold settings
+  reflection_confidence_threshold: 0.8           # Confidence threshold for reflection
+  knowledge_gap_threshold: 0.3                   # Knowledge gap threshold
+  sufficiency_threshold: 0.7                     # Content sufficiency threshold
+  
+  # Integration settings
+  enable_reflection_integration: true            # Enable reflection integration with research flow
+  enable_progressive_reflection: true            # Enable progressive reflection across iterations
   enable_reflection_metrics: true                # Enable reflection performance metrics
-  skip_initial_stage_reflection: true            # Skip reflection in initial research stage
+  skip_initial_stage_reflection: false           # Skip reflection in initial research stage
+  
+  # Follow-up query control
+  disable_followup_reflection: false             # Disable reflection for follow-up queries
+  merge_followup_results: true                   # Merge follow-up query results intelligently
+  
+  # Session management
+  enable_global_counter: true                    # Enable global reflection counter across sessions
+  reset_counter_on_new_task: true                # Reset reflection counter for new tasks
 
+# Follow-up Result Merger Configuration
+# Controls intelligent merging of follow-up query results
+followup_merger:
+  # Basic merging parameters
+  similarity_threshold: 0.8                      # Similarity threshold for content merging
+  min_content_length: 50                         # Minimum content length to consider for merging
+  max_merged_results: 10                         # Maximum number of merged results to return
+  
+  # Feature toggles
+  enable_semantic_grouping: true                 # Enable semantic grouping of similar content
+  enable_smart_merging: true                     # Enable intelligent content merging
+  enable_deduplication: true                     # Enable content deduplication
+  enable_quality_filtering: true                 # Enable quality-based filtering
+  
+  # Quality assessment parameters
+  quality_threshold: 0.6                         # Minimum quality threshold for content
+  confidence_weight: 0.4                         # Weight for confidence in quality assessment
+  relevance_weight: 0.4                          # Weight for relevance in quality assessment
+  content_quality_weight: 0.2                    # Weight for content quality in assessment
+  
+  # Merging strategy parameters
+  max_sentences_per_result: 5                    # Maximum sentences per merged result
+  max_key_points: 8                              # Maximum key points to extract
+  preserve_source_info: true                     # Preserve source information in merged results
+  
+  # Performance optimization
+  enable_similarity_cache: true                  # Enable similarity calculation caching
+  max_cache_size: 1000                           # Maximum cache size for similarity calculations
+  
+  # Preset configuration selection
+  active_preset: "balanced"                      # Active preset: conservative, aggressive, performance, quality, balanced
+  enable_runtime_switching: true                 # Allow runtime configuration switching
+  
+  # Logging and debugging
+  enable_detailed_logging: false                 # Enable detailed merge operation logging
+  log_merge_statistics: true                     # Log merge statistics and performance metrics
 
 # Iterative Research Configuration
 # Controls follow-up research and iterative improvement

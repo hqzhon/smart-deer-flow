@@ -4,7 +4,7 @@
 from typing import Dict, List, Optional
 import re
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MCPServerMetadataRequest(BaseModel):
@@ -32,7 +32,8 @@ class MCPServerMetadataRequest(BaseModel):
         le=300,
     )
 
-    @validator("command")
+    @field_validator("command")
+    @classmethod
     def validate_command(cls, v):
         if v is not None:
             # Check for command injection patterns
@@ -57,7 +58,8 @@ class MCPServerMetadataRequest(BaseModel):
                 raise ValueError("Command contains invalid characters")
         return v
 
-    @validator("args")
+    @field_validator("args")
+    @classmethod
     def validate_args(cls, v):
         if v is not None:
             if len(v) > 50:  # Limit number of arguments
@@ -72,7 +74,8 @@ class MCPServerMetadataRequest(BaseModel):
                         raise ValueError("Potentially unsafe argument detected")
         return v
 
-    @validator("url")
+    @field_validator("url")
+    @classmethod
     def validate_url(cls, v):
         if v is not None:
             # Check for valid URL format
@@ -90,7 +93,8 @@ class MCPServerMetadataRequest(BaseModel):
                 raise ValueError("Invalid URL format")
         return v
 
-    @validator("env")
+    @field_validator("env")
+    @classmethod
     def validate_env(cls, v):
         if v is not None:
             if len(v) > 100:  # Limit number of environment variables

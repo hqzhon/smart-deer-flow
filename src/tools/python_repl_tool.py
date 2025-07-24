@@ -244,7 +244,6 @@ class DataAnalysisTool(BaseTool):
         """
         try:
             import pandas as pd
-            import numpy as np
 
             # Convert data to DataFrame
             if isinstance(data[0], dict):

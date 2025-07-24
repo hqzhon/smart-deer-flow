@@ -3,7 +3,7 @@
 
 import abc
 import re
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Chunk:
@@ -60,7 +60,8 @@ class Resource(BaseModel):
         "", description="The description of the resource", max_length=2000
     )
 
-    @validator("uri")
+    @field_validator("uri")
+    @classmethod
     def validate_uri(cls, v):
         if not v.strip():
             raise ValueError("URI cannot be empty")
@@ -78,7 +79,8 @@ class Resource(BaseModel):
                 raise ValueError("Potentially unsafe content in URI")
         return v
 
-    @validator("title")
+    @field_validator("title")
+    @classmethod
     def validate_title(cls, v):
         if not v.strip():
             raise ValueError("Title cannot be empty")
@@ -93,7 +95,8 @@ class Resource(BaseModel):
                 raise ValueError("Potentially unsafe content in title")
         return v
 
-    @validator("description")
+    @field_validator("description")
+    @classmethod
     def validate_description(cls, v):
         if v:
             # Check for suspicious patterns

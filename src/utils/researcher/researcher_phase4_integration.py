@@ -824,35 +824,6 @@ class ResearcherPhase4System:
             "report_timestamp": datetime.now().isoformat(),
         }
 
-    def enable_auto_optimization(self):
-        """Enable automatic optimization"""
-        self.auto_optimization_enabled = True
-        logger.info("Auto-optimization enabled")
-
-    def disable_auto_optimization(self):
-        """Disable automatic optimization"""
-        self.auto_optimization_enabled = False
-        self.config_optimizer.disable_auto_tuning()
-        logger.info("Auto-optimization disabled")
-
-    def force_optimization(self) -> Dict[str, Any]:
-        """Force immediate optimization regardless of cooldown"""
-        dashboard_data = self.metrics_system.get_real_time_dashboard()
-        current_metrics = dashboard_data.get("current_metrics", {})
-
-        # Force configuration optimization
-        optimization_result = self.config_optimizer.auto_tune_configuration(
-            current_metrics
-        )
-
-        # Force progressive enabler optimization
-        self.progressive_enabler.optimize_thresholds()
-
-        self.last_optimization_time = time.time()
-
-        logger.info("Forced optimization completed")
-        return optimization_result
-
     def add_status_change_callback(self, callback: Callable[[SystemStatus], None]):
         """Add callback for system status changes"""
         self.status_change_callbacks.append(callback)

@@ -13,6 +13,9 @@ from src.prompt_enhancer.graph.state import PromptEnhancerState
 
 logger = logging.getLogger(__name__)
 
+# For backward compatibility with tests
+AGENT_LLM_MAP = {"prompt_enhancer": "basic"}
+
 
 def prompt_enhancer_node(state: PromptEnhancerState):
     """Node that enhances user prompts using AI analysis."""

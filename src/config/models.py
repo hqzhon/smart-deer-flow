@@ -3,7 +3,7 @@ Pydantic-based configuration models for unified configuration management.
 """
 
 from typing import Dict, List, Optional, Any, Literal, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 
@@ -91,24 +91,162 @@ class ResearchSettings(BaseModel):
 
 
 class ReflectionSettings(BaseModel):
-    """Reflection configuration settings."""
+    """Reflection system configuration settings."""
 
-    enable_enhanced_reflection: bool = True
-    max_reflection_loops: int = Field(default=3, ge=1)
-    reflection_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    # Core reflection control
+    enable_enhanced_reflection: bool = Field(
+        default=True, description="Enable enhanced reflection system"
+    )
+    max_reflection_loops: int = Field(
+        default=3, ge=1, le=10, description="Maximum reflection loops per task"
+    )
+    max_total_reflections: int = Field(
+        default=10, ge=1, le=50, description="Maximum total reflections per session"
+    )
+    reflection_temperature: float = Field(
+        default=0.3, ge=0.0, le=2.0, description="Temperature for reflection model"
+    )
 
-    reflection_confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    enable_reflection_integration: bool = True
-    enable_progressive_reflection: bool = True
-    enable_reflection_metrics: bool = True
+    # Threshold settings
+    reflection_confidence_threshold: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Confidence threshold for reflection"
+    )
+    knowledge_gap_threshold: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="Knowledge gap threshold"
+    )
+    sufficiency_threshold: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Content sufficiency threshold"
+    )
+
+    # Integration settings
+    enable_reflection_integration: bool = Field(
+        default=True, description="Enable reflection integration with research flow"
+    )
+    enable_progressive_reflection: bool = Field(
+        default=True, description="Enable progressive reflection across iterations"
+    )
+    enable_reflection_metrics: bool = Field(
+        default=True, description="Enable reflection performance metrics"
+    )
     skip_initial_stage_reflection: bool = Field(
-        default=True, description="Skip reflection in initial research stage"
+        default=False, description="Skip reflection in initial research stage"
     )
 
-    reflection_model: Optional[str] = Field(
-        default=None,
-        description="Model to use for reflection analysis. If None, uses basic model or reasoning model if enabled",
+    # Follow-up query control
+    disable_followup_reflection: bool = Field(
+        default=False, description="Disable reflection for follow-up queries"
     )
+    merge_followup_results: bool = Field(
+        default=True, description="Merge follow-up query results intelligently"
+    )
+
+    # Session management
+    enable_global_counter: bool = Field(
+        default=True, description="Enable global reflection counter across sessions"
+    )
+    reset_counter_on_new_task: bool = Field(
+        default=True, description="Reset reflection counter for new tasks"
+    )
+
+
+class FollowUpMergerSettings(BaseModel):
+    """Follow-up查询结果合并配置设置"""
+
+    # 基础合并参数
+    similarity_threshold: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="内容相似度阈值"
+    )
+    min_content_length: int = Field(
+        default=50, ge=10, description="最小内容长度"
+    )
+    max_merged_results: int = Field(
+        default=20, ge=1, le=100, description="最大合并结果数量"
+    )
+
+    # 功能开关
+    enable_semantic_grouping: bool = Field(
+        default=True, description="启用语义分组"
+    )
+    enable_intelligent_merging: bool = Field(
+        default=True, description="启用智能合并"
+    )
+    enable_deduplication: bool = Field(
+        default=True, description="启用去重功能"
+    )
+    enable_quality_filtering: bool = Field(
+        default=True, description="启用质量过滤"
+    )
+
+    # 质量评估参数
+    quality_threshold: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="内容质量阈值"
+    )
+    confidence_weight: float = Field(
+        default=0.4, ge=0.0, le=1.0, description="置信度权重"
+    )
+    relevance_weight: float = Field(
+        default=0.4, ge=0.0, le=1.0, description="相关性权重"
+    )
+    content_quality_weight: float = Field(
+        default=0.2, ge=0.0, le=1.0, description="内容质量权重"
+    )
+
+    # 合并策略参数
+    max_sentences_per_result: int = Field(
+        default=10, ge=1, le=50, description="每个结果最大句子数"
+    )
+    max_key_points: int = Field(
+        default=3, ge=1, le=10, description="最大关键点数"
+    )
+    preserve_source_info: bool = Field(
+        default=True, description="保留源信息"
+    )
+
+    # 性能优化参数
+    enable_similarity_cache: bool = Field(
+        default=True, description="启用相似度缓存"
+    )
+    max_cache_size: int = Field(
+        default=1000, ge=100, le=10000, description="最大缓存大小"
+    )
+
+    # 预设配置选择
+    active_config_preset: str = Field(
+        default="default", description="当前激活的配置预设"
+    )
+    enable_config_switching: bool = Field(
+        default=True, description="允许运行时切换配置"
+    )
+
+    # 日志和调试
+    enable_detailed_logging: bool = Field(
+        default=False, description="启用详细日志"
+    )
+    log_merge_statistics: bool = Field(
+        default=True, description="记录合并统计信息"
+    )
+
+    @field_validator('confidence_weight', 'relevance_weight', 'content_quality_weight')
+    @classmethod
+    def validate_weights(cls, v, info):
+        """验证权重值"""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"权重值必须在0.0到1.0之间，当前值: {v}")
+        return v
+
+    def model_post_init(self, __context) -> None:
+        """模型初始化后验证"""
+        # 验证权重总和
+        total_weight = self.confidence_weight + self.relevance_weight + self.content_quality_weight
+        if abs(total_weight - 1.0) > 0.01:  # 允许小的浮点误差
+            import warnings
+            warnings.warn(
+                f"权重总和应该接近1.0，当前总和: {total_weight:.3f}",
+                UserWarning
+            )
+
+
+
 
 
 class IterativeResearchSettings(BaseModel):
@@ -309,6 +447,8 @@ class AppSettings(BaseSettings):
     agents: AgentSettings = Field(default_factory=AgentSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
     reflection: ReflectionSettings = Field(default_factory=ReflectionSettings)
+    followup_merger: FollowUpMergerSettings = Field(default_factory=FollowUpMergerSettings)
+
     iterative_research: IterativeResearchSettings = Field(
         default_factory=IterativeResearchSettings
     )
@@ -334,7 +474,8 @@ class AppSettings(BaseSettings):
         env_nested_delimiter="__",
     )
 
-    @validator("model_token_limits", pre=True)
+    @field_validator("model_token_limits", mode="before")
+    @classmethod
     def validate_token_limits(cls, v):
         """Validate model token limits format."""
         if isinstance(v, dict):
@@ -356,6 +497,12 @@ class AppSettings(BaseSettings):
     def get_reflection_config(self) -> ReflectionSettings:
         """Get reflection-specific configuration."""
         return self.reflection
+
+    def get_followup_merger_config(self) -> FollowUpMergerSettings:
+        """Get follow-up merger configuration."""
+        return self.followup_merger
+
+
 
     def get_content_config(self) -> ContentSettings:
         """Get content-specific configuration."""

@@ -352,9 +352,3 @@ def get_tool_schemas() -> List[Dict[str, Any]]:
     """
     registry = get_tool_registry()
     return registry.get_all_schemas()
-
-
-# Import logging for the module
-import logging
-
-logger = logging.getLogger(__name__)

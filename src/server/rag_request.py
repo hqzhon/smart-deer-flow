@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import re
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.rag.retriever import Resource
 
@@ -24,7 +24,8 @@ class RAGResourceRequest(BaseModel):
         max_length=1000,
     )
 
-    @validator("query")
+    @field_validator("query")
+    @classmethod
     def validate_query(cls, v):
         if v is not None:
             # Check for suspicious patterns

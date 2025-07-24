@@ -8,7 +8,6 @@ providing seamless integration with ResearcherContextExtension and other Phase 3
 
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
 
 from langchain_core.runnables import RunnableConfig
 from src.graph.types import State
@@ -26,13 +25,7 @@ from ..researcher.researcher_progressive_enablement import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ReflectionIntegrationConfig:
-    """简化的反射集成配置。"""
-
-    enable_reflection_integration: bool = True
-    max_reflection_iterations: int = 2
-    reflection_timeout: int = 30
+# ReflectionIntegrationConfig removed - using unified ReflectionSettings from src.config.models
 
 
 class ReflectionIntegrator:
@@ -46,7 +39,9 @@ class ReflectionIntegrator:
     def __init__(
         self,
         reflection_agent: Optional[EnhancedReflectionAgent] = None,
-        config: Optional[ReflectionIntegrationConfig] = None,
+        config: Optional[
+            dict
+        ] = None,  # ReflectionIntegrationConfig removed - using dict
     ):
         """初始化简化的反射集成器。
 
@@ -55,14 +50,35 @@ class ReflectionIntegrator:
             config: 集成配置
         """
         self.reflection_agent = reflection_agent or EnhancedReflectionAgent()
-        self.config = config or ReflectionIntegrationConfig()
+        # Use unified configuration system or fallback to simple config dict
+        if config is None:
+            try:
+                from src.config.config_loader import get_settings
+                app_settings = get_settings()
+                reflection_config = app_settings.get_reflection_config()
+                self.config = {
+                    "enable_reflection_integration": reflection_config.enable_reflection_integration,
+                    "max_reflection_iterations": reflection_config.max_reflection_loops,
+                    "reflection_timeout": 30.0,  # Not in new config, use default
+                    "enable_reflection_metrics": reflection_config.enable_reflection_metrics,
+                }
+            except ImportError:
+                # Fallback to default config
+                self.config = {
+                    "enable_reflection_integration": True,
+                    "max_reflection_iterations": 3,
+                    "reflection_timeout": 30.0,
+                    "enable_reflection_metrics": False,
+                }
+        else:
+            self.config = config
 
         # 简化的集成状态
         self.active_reflections: Dict[str, ReflectionContext] = {}
         self.reflection_sessions: Dict[str, List[ReflectionResult]] = {}
 
         logger.info(
-            f"Initialized simplified ReflectionIntegrator with integration_enabled={self.config.enable_reflection_integration}"
+            f"Initialized simplified ReflectionIntegrator with integration_enabled={self.config.get('enable_reflection_integration', True)}"
         )
 
     def should_trigger_reflection(
@@ -83,7 +99,7 @@ class ReflectionIntegrator:
         Returns:
             Tuple of (should_trigger, reason, decision_factors)
         """
-        if not self.config.enable_reflection_integration:
+        if not self.config.get("enable_reflection_integration", True):
             return (
                 False,
                 "Reflection integration disabled",
@@ -92,32 +108,39 @@ class ReflectionIntegrator:
 
         observations = state.get("observations", [])
         step_count = len(observations)
+        current_plan = state.get("current_plan")
 
         decision_factors = {
             "integration_enabled": True,
             "step_count": step_count,
-            "has_plan": state.get("current_plan") is not None,
+            "has_plan": current_plan is not None,
             "has_results": step_count > 0,
         }
 
         logger.info(f"[DEBUG] Reflection trigger check: step_count={step_count}")
 
-        # 简化的触发条件：只要有观察结果就触发
-        if step_count > 0:
-            decision_factors["trigger_reason"] = "has_observations"
+        # 检查是否有实际的执行结果
+        has_actual_results = self._has_actual_execution_results(state, current_plan)
+        decision_factors["has_actual_results"] = has_actual_results
+
+        # 只有在有实际执行结果时才触发反射
+        if step_count > 0 and has_actual_results:
+            decision_factors["trigger_reason"] = "has_meaningful_observations"
             return (
                 True,
-                f"Step count ({step_count}) has observations for reflection",
+                f"Step count ({step_count}) has meaningful observations for reflection",
                 decision_factors,
             )
 
-        # 没有观察结果
-        decision_factors["trigger_reason"] = "no_observations"
-        return (
-            False,
-            "No observations available for reflection",
-            decision_factors,
-        )
+        # 没有足够的观察结果或执行结果
+        if step_count == 0:
+            decision_factors["trigger_reason"] = "no_observations"
+            reason = "No observations available for reflection"
+        else:
+            decision_factors["trigger_reason"] = "no_meaningful_results"
+            reason = "No meaningful execution results available for reflection"
+
+        return (False, reason, decision_factors)
 
     async def execute_reflection_analysis(
         self,
@@ -144,7 +167,7 @@ class ReflectionIntegrator:
         self.active_reflections[session_id] = context
 
         # Start metrics tracking if enabled
-        if self.config.enable_reflection_metrics and self.metrics:
+        if self.config.get("enable_reflection_metrics", False) and self.metrics:
             self.metrics.start_isolation_session(
                 session_id=f"reflection_{session_id}",
                 task_complexity=self._assess_task_complexity(context).value,
@@ -154,7 +177,8 @@ class ReflectionIntegrator:
         try:
             # Execute reflection analysis
             reflection_result = await self.reflection_agent.analyze_knowledge_gaps(
-                context=context, runnable_config=runnable_config
+                context=context,
+                runnable_config=runnable_config,
             )
 
             # Store reflection result
@@ -163,7 +187,7 @@ class ReflectionIntegrator:
             self.reflection_sessions[session_id].append(reflection_result)
 
             # Update metrics
-            if self.config.enable_reflection_metrics and self.metrics:
+            if self.config.get("enable_reflection_metrics", False) and self.metrics:
                 self.metrics.update_session_context(
                     session_id=f"reflection_{session_id}",
                     original_size=len(str(state)),
@@ -182,7 +206,7 @@ class ReflectionIntegrator:
             logger.error(f"Error in reflection analysis for session {session_id}: {e}")
 
             # End metrics session with error
-            if self.config.enable_reflection_metrics and self.metrics:
+            if self.config.get("enable_reflection_metrics", False) and self.metrics:
                 self.metrics.end_isolation_session(
                     session_id=f"reflection_{session_id}",
                     success=False,
@@ -246,7 +270,7 @@ class ReflectionIntegrator:
                         safe_recommendations.append(str(rec))
                 else:
                     safe_recommendations.append(str(rec))
-        
+
         reflection_insight = f"\n\nReflection Analysis: {', '.join(safe_recommendations) if safe_recommendations else 'No specific recommendations'}"
         if reflection_result.knowledge_gaps:
             # Ensure knowledge_gaps are all strings before joining
@@ -315,7 +339,7 @@ class ReflectionIntegrator:
             del self.active_reflections[session_id]
 
         # Finalize metrics
-        if self.config.enable_reflection_metrics and self.metrics:
+        if self.config.get("enable_reflection_metrics", False) and self.metrics:
             self.metrics.end_isolation_session(
                 session_id=f"reflection_{session_id}",
                 success=success,
@@ -469,49 +493,53 @@ class ReflectionIntegrator:
         """
         logger.info("[DEBUG] Checking for actual execution results...")
 
-        # Check if we have observations with meaningful content
-        observations = state.get("observations", [])
-        logger.info(f"[DEBUG] Found {len(observations)} observations")
-        if not observations:
-            logger.info("[DEBUG] No observations found - returning False")
-            return False
-
-        # Check if we have executed steps with results
+        # First check if we have a plan with executed steps
         if current_plan and hasattr(current_plan, "steps"):
             executed_steps = [step for step in current_plan.steps if step.execution_res]
             logger.info(
                 f"[DEBUG] Found {len(executed_steps)} executed steps with results"
             )
-            if not executed_steps:
-                logger.info("[DEBUG] No executed steps with results - returning False")
-                return False
-
-            # Check if execution results exist (no length requirement)
-            for i, step in enumerate(executed_steps):
-                logger.info(
-                    f"[DEBUG] Step {i+1}: '{step.title}' has execution result: {bool(step.execution_res)}"
-                )
-                if step.execution_res:
-                    logger.info(
-                        f"[DEBUG] Found execution result in step '{step.title}' - returning True"
-                    )
-                    return True
+            if executed_steps:
+                # Check if execution results have meaningful content
+                for i, step in enumerate(executed_steps):
+                    if step.execution_res and str(step.execution_res).strip():
+                        logger.info(
+                            f"[DEBUG] Found meaningful execution result in step '{step.title}' - returning True"
+                        )
+                        return True
+                logger.info("[DEBUG] Executed steps have empty execution results")
+            else:
+                logger.info("[DEBUG] No executed steps with results found")
         else:
             logger.info("[DEBUG] No current plan or plan has no steps")
 
-        # Check if observations exist (no length requirement)
+        # Check if observations contain meaningful research results
+        observations = state.get("observations", [])
         logger.info(f"[DEBUG] Found {len(observations)} observations")
 
-        for i, obs in enumerate(observations[:3]):  # Log first 3 observations
-            obs_preview = str(obs)[:100] + "..." if len(str(obs)) > 100 else str(obs)
-            logger.info(f"[DEBUG] Observation {i+1} preview: {obs_preview}")
-
-        if len(observations) < 1:
+        if not observations:
             logger.info("[DEBUG] No observations found - returning False")
             return False
 
-        logger.info("[DEBUG] Found observations - returning True")
-        return True
+        # Check if observations contain actual research content (not just empty or placeholder data)
+        meaningful_observations = 0
+        for i, obs in enumerate(observations[:3]):  # Check first 3 observations
+            obs_str = str(obs).strip()
+            obs_preview = obs_str[:100] + "..." if len(obs_str) > 100 else obs_str
+            logger.info(f"[DEBUG] Observation {i+1} preview: {obs_preview}")
+
+            # Check if observation has meaningful content (not empty, not just whitespace)
+            if obs_str and len(obs_str) > 10:  # Require at least some content
+                meaningful_observations += 1
+
+        if meaningful_observations > 0:
+            logger.info(
+                f"[DEBUG] Found {meaningful_observations} meaningful observations - returning True"
+            )
+            return True
+        else:
+            logger.info("[DEBUG] No meaningful observations found - returning False")
+            return False
 
     def get_integration_metrics(self) -> Dict[str, Any]:
         """Get metrics about reflection integration performance."""

@@ -4,7 +4,7 @@
 from typing import List, Optional, Union
 import re
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.rag.retriever import Resource
 from src.models.report_style import ReportStyle
@@ -23,7 +23,8 @@ class ContentItem(BaseModel):
         None, description="The image URL if type is 'image'", max_length=2048
     )
 
-    @validator("image_url")
+    @field_validator("image_url")
+    @classmethod
     def validate_image_url(cls, v):
         if v is not None:
             # Check for valid URL format
@@ -52,7 +53,8 @@ class ContentItem(BaseModel):
                     raise ValueError("Potentially unsafe URL scheme")
         return v
 
-    @validator("text")
+    @field_validator("text")
+    @classmethod
     def validate_text_content(cls, v):
         if v is not None:
             # Check for suspicious patterns
@@ -81,7 +83,8 @@ class ChatMessage(BaseModel):
         description="The content of the message, either a string or a list of content items",
     )
 
-    @validator("content")
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v):
         if isinstance(v, str):
             if len(v) > 100000:  # 100KB limit for string content
@@ -158,25 +161,29 @@ class ChatRequest(BaseModel):
         le=10,
     )
 
-    @validator("messages")
+    @field_validator("messages")
+    @classmethod
     def validate_messages(cls, v):
         if v and len(v) > 1000:  # Limit number of messages
             raise ValueError("Too many messages in conversation history")
         return v
 
-    @validator("resources")
+    @field_validator("resources")
+    @classmethod
     def validate_resources(cls, v):
         if v and len(v) > 100:  # Limit number of resources
             raise ValueError("Too many resources specified")
         return v
 
-    @validator("thread_id")
+    @field_validator("thread_id")
+    @classmethod
     def validate_thread_id(cls, v):
         if v and not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError("Thread ID contains invalid characters")
         return v
 
-    @validator("interrupt_feedback")
+    @field_validator("interrupt_feedback")
+    @classmethod
     def validate_interrupt_feedback(cls, v):
         if v is not None:
             # Check for suspicious patterns
@@ -220,7 +227,8 @@ class TTSRequest(BaseModel):
         "unitTson", description="Frontend type", max_length=50
     )
 
-    @validator("text")
+    @field_validator("text")
+    @classmethod
     def validate_text(cls, v):
         if not v.strip():
             raise ValueError("Text cannot be empty")
@@ -241,7 +249,8 @@ class GeneratePodcastRequest(BaseModel):
         ..., description="The content of the podcast", max_length=100000
     )
 
-    @validator("content")
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v):
         if not v.strip():
             raise ValueError("Content cannot be empty")
@@ -260,7 +269,8 @@ class GeneratePodcastRequest(BaseModel):
 class GeneratePPTRequest(BaseModel):
     content: str = Field(..., description="The content of the ppt", max_length=100000)
 
-    @validator("content")
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v):
         if not v.strip():
             raise ValueError("Content cannot be empty")
@@ -285,7 +295,8 @@ class GenerateProseRequest(BaseModel):
         "", description="The user custom command of the prose writer", max_length=1000
     )
 
-    @validator("prompt")
+    @field_validator("prompt")
+    @classmethod
     def validate_prompt(cls, v):
         if not v.strip():
             raise ValueError("Prompt cannot be empty")
@@ -300,13 +311,15 @@ class GenerateProseRequest(BaseModel):
                 raise ValueError("Potentially unsafe content in prompt")
         return v
 
-    @validator("option")
+    @field_validator("option")
+    @classmethod
     def validate_option(cls, v):
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError("Option contains invalid characters")
         return v
 
-    @validator("command")
+    @field_validator("command")
+    @classmethod
     def validate_command(cls, v):
         if v:
             # Check for suspicious patterns
@@ -334,7 +347,8 @@ class EnhancePromptRequest(BaseModel):
         pattern=r"^(academic|business|casual|technical)$",
     )
 
-    @validator("prompt")
+    @field_validator("prompt")
+    @classmethod
     def validate_prompt(cls, v):
         if not v.strip():
             raise ValueError("Prompt cannot be empty")
@@ -349,7 +363,8 @@ class EnhancePromptRequest(BaseModel):
                 raise ValueError("Potentially unsafe content in prompt")
         return v
 
-    @validator("context")
+    @field_validator("context")
+    @classmethod
     def validate_context(cls, v):
         if v:
             # Check for suspicious patterns

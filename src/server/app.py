@@ -5,6 +5,7 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
 import asyncio
 from typing import Annotated, List, cast, Dict, Any
@@ -55,13 +56,11 @@ from src.server.rag_request import (
 )
 from src.server.config_request import ConfigResponse
 from src.llms.llm import get_configured_llm_models
-from src.tools import VolcengineTTS
+from src.tools.tts import VolcengineTTS
 
 logger = logging.getLogger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
-
-import threading
 
 # Global variables for advanced optimization with thread safety
 
@@ -786,24 +785,6 @@ async def _astream_workflow_generator(
 
                 # Handle messages stream - existing logic
                 if stream_type == "messages":
-                    if isinstance(event_data, dict):
-                        if "__interrupt__" in event_data:
-                            yield _make_event(
-                                "interrupt",
-                                {
-                                    "thread_id": thread_id,
-                                    "id": event_data["__interrupt__"][0].ns[0],
-                                    "role": "assistant",
-                                    "content": event_data["__interrupt__"][0].value,
-                                    "finish_reason": "interrupt",
-                                    "options": [
-                                        {"text": "Edit plan", "value": "edit_plan"},
-                                        {"text": "Start research", "value": "accepted"},
-                                    ],
-                                },
-                            )
-                        continue
-
                     message_chunk, message_metadata = cast(
                         tuple[BaseMessage, dict[str, any]], event_data
                     )

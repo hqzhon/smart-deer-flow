@@ -16,14 +16,14 @@ from langgraph.types import Command, interrupt
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 # Delayed import to avoid circular import
-# from src.agents import create_agent, create_agent_with_managed_prompt
+from src.agents import create_agent, create_agent_with_managed_prompt
 from src.tools.search import LoggedTavilySearch
 from src.tools import (
     crawl_tool,
-    get_web_search_tool,
-    get_retriever_tool,
     python_repl_tool,
 )
+from src.tools.search import get_web_search_tool
+from src.tools.retriever import get_retriever_tool
 
 from src.config.config_loader import get_settings
 from src.config.models import SearchEngine
@@ -37,9 +37,8 @@ from src.utils.common.json_utils import repair_json_output
 from .types import State
 from src.models.planner_model import Plan, Step, StepType
 from src.utils.reflection.enhanced_reflection import ReflectionResult
-from src.utils.reflection.reflection_integration import (
-    ReflectionIntegrationConfig,
-)
+
+# ReflectionIntegrationConfig removed - using unified ReflectionSettings from src.config.models
 
 logger = logging.getLogger(__name__)
 
@@ -371,11 +370,13 @@ def planner_node(
             configurable, "enable_enhanced_reflection", True
         ),
         "max_reflection_loops": getattr(configurable, "max_reflection_loops", 3),
-        "reflection_model": getattr(configurable.reflection, "reflection_model", None)
-        or (
-            "reasoning"
-            if getattr(configurable.agents, "enable_deep_thinking", False)
-            else "basic"
+        "reflection_model": (
+            getattr(configurable.reflection, "reflection_model", None)
+            or (
+                "reasoning"
+                if getattr(configurable.agents, "enable_deep_thinking", False)
+                else "basic"
+            )
         ),
         "knowledge_gap_threshold": getattr(
             configurable, "knowledge_gap_threshold", 0.7
@@ -392,16 +393,11 @@ def planner_node(
         try:
             from src.utils.reflection.enhanced_reflection import (
                 EnhancedReflectionAgent,
-                ReflectionConfig,
+                # ReflectionConfig removed - using unified ReflectionSettings from src.config.models
             )
 
-            ReflectionConfig(
-                enable_enhanced_reflection=True,
-                max_reflection_loops=reflection_config["max_reflection_loops"],
-                reflection_model=reflection_config["reflection_model"],
-                knowledge_gap_threshold=reflection_config["knowledge_gap_threshold"],
-                sufficiency_threshold=reflection_config["sufficiency_threshold"],
-            )
+            # ReflectionConfig removed - using unified config system
+            # reflection_agent_config = {...}
 
             reflection_agent = EnhancedReflectionAgent(config=configurable)
 
@@ -1461,8 +1457,7 @@ async def _execute_agent_step(
     )
     optimized_observations = context_manager.manage_observations_advanced(
         observations + [new_observation],
-        max_observations=context_config.max_observations_length,
-        compression_threshold=context_config.max_step_content_length,
+        optimization_level="standard"
     )
 
     # Create updated step with execution result (immutable pattern)
@@ -1580,21 +1575,24 @@ async def researcher_node_with_isolation(
 
     logger.info("Executing researcher node with context isolation (Phase 4)")
     configurable = get_configuration_from_config(config)
-    
+
     # Fix: Ensure locale from state is passed to configurable for research agent
     # This fixes the issue where researcher.md shows empty locale in Chinese environment
     state_locale = state.get("locale")
-    if state_locale and hasattr(configurable, '__dict__'):
+    if state_locale and hasattr(configurable, "__dict__"):
         # Add locale to configurable if it exists in state
         configurable.locale = state_locale
     elif state_locale:
         # If configurable is a dict-like object, add locale
-        if hasattr(configurable, 'update'):
-            configurable.update({'locale': state_locale})
+        if hasattr(configurable, "update"):
+            configurable.update({"locale": state_locale})
         else:
             # Create a new configurable dict with locale
             import types
-            new_configurable = types.SimpleNamespace(**configurable.__dict__ if hasattr(configurable, '__dict__') else {})
+
+            new_configurable = types.SimpleNamespace(
+                **configurable.__dict__ if hasattr(configurable, "__dict__") else {}
+            )
             new_configurable.locale = state_locale
             configurable = new_configurable
 
@@ -1629,11 +1627,13 @@ async def researcher_node_with_isolation(
             configurable, "enable_enhanced_reflection", True
         ),
         "max_reflection_loops": getattr(configurable, "max_reflection_loops", 3),
-        "reflection_model": getattr(configurable.reflection, "reflection_model", None)
-        or (
-            "reasoning"
-            if getattr(configurable.agents, "enable_deep_thinking", False)
-            else "basic"
+        "reflection_model": (
+            getattr(configurable.reflection, "reflection_model", None)
+            or (
+                "reasoning"
+                if getattr(configurable.agents, "enable_deep_thinking", False)
+                else "basic"
+            )
         ),
         "knowledge_gap_threshold": getattr(
             configurable, "knowledge_gap_threshold", 0.7
@@ -1658,16 +1658,11 @@ async def researcher_node_with_isolation(
         try:
             from src.utils.reflection.enhanced_reflection import (
                 EnhancedReflectionAgent,
-                ReflectionConfig,
+                # ReflectionConfig removed - using unified ReflectionSettings from src.config.models
             )
 
-            reflection_agent_config = ReflectionConfig(
-                enable_enhanced_reflection=True,
-                max_reflection_loops=reflection_config["max_reflection_loops"],
-                reflection_model=reflection_config["reflection_model"],
-                knowledge_gap_threshold=reflection_config["knowledge_gap_threshold"],
-                sufficiency_threshold=reflection_config["sufficiency_threshold"],
-            )
+            # ReflectionConfig removed - using unified config system
+            # reflection_agent_config = {...}
 
             reflection_agent = EnhancedReflectionAgent(config=configurable)
 
@@ -1851,9 +1846,9 @@ async def researcher_node_with_isolation(
                     # 初始化简化的反射集成器
                     state["_reflection_integrator"] = ReflectionIntegrator(
                         reflection_agent=reflection_agent,
-                        config=ReflectionIntegrationConfig(
-                            enable_reflection_integration=True,
-                        ),
+                        config={
+                            "enable_reflection_integration": True,
+                        },
                     )
 
                 reflection_integrator = state["_reflection_integrator"]
@@ -1884,7 +1879,8 @@ async def researcher_node_with_isolation(
                 # Perform reflection analysis only if triggered
                 if should_trigger:
                     reflection_result = await reflection_agent.analyze_knowledge_gaps(
-                        reflection_context
+                        reflection_context,
+                        runnable_config=config,
                     )
                 else:
                     # Skip reflection, create a default result indicating sufficiency
@@ -1922,15 +1918,23 @@ async def researcher_node_with_isolation(
                         f"follow_up_queries is not a list, got {type(reflection_result.follow_up_queries)}: {reflection_result.follow_up_queries}"
                     )
                     # Convert to list or use empty list as fallback
-                    if hasattr(reflection_result.follow_up_queries, '__iter__') and not isinstance(reflection_result.follow_up_queries, (str, bytes)):
+                    if hasattr(
+                        reflection_result.follow_up_queries, "__iter__"
+                    ) and not isinstance(
+                        reflection_result.follow_up_queries, (str, bytes)
+                    ):
                         try:
-                            reflection_result.follow_up_queries = list(reflection_result.follow_up_queries)
+                            reflection_result.follow_up_queries = list(
+                                reflection_result.follow_up_queries
+                            )
                         except Exception as e:
-                            logger.error(f"Failed to convert follow_up_queries to list: {e}")
+                            logger.error(
+                                f"Failed to convert follow_up_queries to list: {e}"
+                            )
                             reflection_result.follow_up_queries = []
                     else:
                         reflection_result.follow_up_queries = []
-                
+
                 queries_to_execute = reflection_result.follow_up_queries[
                     :max_queries_per_iteration
                 ]
@@ -1942,9 +1946,9 @@ async def researcher_node_with_isolation(
                     try:
                         # Skip if query is a slice object or other invalid type
                         if isinstance(query, slice):
-                            logger.error(f"Follow-up query {i+1} is a slice object: {query}. Skipping.")
+                            logger.warning(f"Follow-up query {i+1} skipped: {query}")
                             continue
-                        
+
                         # Ensure query is a string
                         if isinstance(query, dict):
                             # Extract meaningful string from dict
@@ -1958,10 +1962,16 @@ async def researcher_node_with_isolation(
                                 query_str = str(query)
                         else:
                             query_str = str(query)
-                        
+
                         # Additional validation for query string
-                        if not query_str or query_str.strip() == "" or "slice(" in query_str:
-                            logger.warning(f"Follow-up query {i+1} is empty or invalid: '{query_str}'. Skipping.")
+                        if (
+                            not query_str
+                            or query_str.strip() == ""
+                            or "slice(" in query_str
+                        ):
+                            logger.warning(
+                                f"Follow-up query {i+1} is empty or invalid: '{query_str}'. Skipping."
+                            )
                             continue
 
                         logger.info(
@@ -1994,24 +2004,42 @@ async def researcher_node_with_isolation(
                                 "messages", []
                             )
 
-                            # Add follow-up findings to accumulated research
+                            # Collect follow-up results for intelligent merging
+                            current_iteration_results = []
+
+                            # Process observations
                             for obs in follow_up_observations:
                                 if isinstance(obs, dict) and "content" in obs:
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {obs['content']}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": obs["content"],
+                                            "source": f"follow_up_{current_iteration}_{i+1}_obs",
+                                            "type": "observation",
+                                            "metadata": obs,
+                                        }
                                     )
                                     all_observations.append(obs)
                                 elif isinstance(obs, str):
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {obs}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": obs,
+                                            "source": f"follow_up_{current_iteration}_{i+1}_obs",
+                                            "type": "observation",
+                                            "metadata": {},
+                                        }
                                     )
                                     all_observations.append(
                                         {"content": obs, "type": "follow_up_research"}
                                     )
                                 else:
                                     content = str(obs)
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {content}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": content,
+                                            "source": f"follow_up_{current_iteration}_{i+1}_obs",
+                                            "type": "observation",
+                                            "metadata": {},
+                                        }
                                     )
                                     all_observations.append(
                                         {
@@ -2020,19 +2048,40 @@ async def researcher_node_with_isolation(
                                         }
                                     )
 
+                            # Process messages
                             for msg in follow_up_messages:
                                 if isinstance(msg, dict) and "content" in msg:
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {msg['content']}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": msg["content"],
+                                            "source": f"follow_up_{current_iteration}_{i+1}_msg",
+                                            "type": "message",
+                                            "metadata": msg,
+                                        }
                                     )
                                 elif hasattr(msg, "content"):
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {msg.content}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": msg.content,
+                                            "source": f"follow_up_{current_iteration}_{i+1}_msg",
+                                            "type": "message",
+                                            "metadata": {"original_msg": str(msg)},
+                                        }
                                     )
                                 else:
-                                    all_research_findings.append(
-                                        f"[Follow-up {current_iteration}.{i+1}] {str(msg)}"
+                                    current_iteration_results.append(
+                                        {
+                                            "content": str(msg),
+                                            "source": f"follow_up_{current_iteration}_{i+1}_msg",
+                                            "type": "message",
+                                            "metadata": {},
+                                        }
                                     )
+
+                            # Store results for later intelligent merging
+                            if not hasattr(locals(), "iteration_results"):
+                                iteration_results = []
+                            iteration_results.extend(current_iteration_results)
 
                         logger.info(f"Follow-up query {i+1} completed successfully")
 
@@ -2045,6 +2094,51 @@ async def researcher_node_with_isolation(
                     except Exception as follow_up_error:
                         logger.error(f"Follow-up query {i+1} failed: {follow_up_error}")
                         continue
+
+                # Apply intelligent merging after each iteration
+                if "iteration_results" in locals() and iteration_results:
+                    try:
+                        from src.utils.common.follow_up_result_merger import (
+                            FollowUpResultMerger,
+                        )
+
+                        # Initialize merger (will use unified configuration system internally)
+                        config = None  # Let merger handle configuration loading
+
+                        # Initialize merger with configuration
+                        merger = FollowUpResultMerger(config=config)
+
+                        # Merge results intelligently
+                        merged_findings, merged_observations, merge_stats = (
+                            merger.merge_follow_up_results(
+                                iteration_results,
+                                all_research_findings,  # Pass existing findings for deduplication
+                            )
+                        )
+
+                        # Add merged results to accumulated findings
+                        all_research_findings.extend(merged_findings)
+                        all_observations.extend(merged_observations)
+
+                        # Log merge statistics and performance info
+                        logger.info(
+                            f"Follow-up iteration {current_iteration} merge statistics: {merge_stats}"
+                        )
+                        perf_stats = merger.get_performance_stats()
+                        logger.debug(f"Merger performance stats: {perf_stats}")
+
+                        # Clear iteration results for next iteration
+                        iteration_results = []
+
+                    except Exception as merge_error:
+                        logger.error(
+                            f"Failed to merge follow-up results for iteration {current_iteration}: {merge_error}"
+                        )
+                        # Fallback to simple concatenation
+                        for result in iteration_results:
+                            all_research_findings.append(
+                                f"[Follow-up {current_iteration}] {result['content']}"
+                            )
 
                 # Add a small delay between iterations to prevent rate limiting
                 import asyncio
@@ -2095,7 +2189,8 @@ async def researcher_node_with_isolation(
             # Perform final reflection analysis only if triggered
             if should_trigger_final:
                 final_reflection_result = await reflection_agent.analyze_knowledge_gaps(
-                    final_reflection_context
+                    final_reflection_context,
+                    runnable_config=config,
                 )
             else:
                 # Skip final reflection, create a default result indicating sufficiency
@@ -2116,31 +2211,26 @@ async def researcher_node_with_isolation(
                 # Update observations with all accumulated findings
                 isolation_result.update["observations"] = all_observations
 
-                # Only send reflection_insights to frontend if research is sufficient
-                # This prevents sending incomplete or insufficient analysis results
-                if final_reflection_result.is_sufficient:
-                    isolation_result.update["reflection_insights"] = {
-                        "comprehensive_report": (
-                            final_reflection_result.comprehensive_report
-                        ),
-                        "knowledge_gaps": [
-                            gap.to_dict() if hasattr(gap, "to_dict") else gap
-                            for gap in final_reflection_result.knowledge_gaps
-                        ],
-                        "is_sufficient": final_reflection_result.is_sufficient,
-                        "follow_up_queries": final_reflection_result.follow_up_queries,
-                        "confidence_score": final_reflection_result.confidence_score,
-                        "sufficiency_score": final_reflection_result.confidence_score,
-                        "iterations_completed": current_iteration,
-                        "total_research_findings": len(all_research_findings),
-                    }
-                    logger.info(
-                        "Reflection insights sent to frontend - research is sufficient"
-                    )
-                else:
-                    logger.info(
-                        "Skipping reflection insights to frontend - research is insufficient (is_sufficient=False)"
-                    )
+                # Always send reflection_insights to frontend
+                # knowledge_gaps and follow_up_queries are core reflection content
+                isolation_result.update["reflection_insights"] = {
+                    "comprehensive_report": (
+                        final_reflection_result.comprehensive_report
+                    ),
+                    "knowledge_gaps": [
+                        gap.to_dict() if hasattr(gap, "to_dict") else gap
+                        for gap in final_reflection_result.knowledge_gaps
+                    ],
+                    "is_sufficient": final_reflection_result.is_sufficient,
+                    "follow_up_queries": final_reflection_result.follow_up_queries,
+                    "confidence_score": final_reflection_result.confidence_score,
+                    "sufficiency_score": final_reflection_result.confidence_score,
+                    "iterations_completed": current_iteration,
+                    "total_research_findings": len(all_research_findings),
+                }
+                logger.info(
+                    f"Reflection insights sent to frontend - is_sufficient: {final_reflection_result.is_sufficient}"
+                )
 
                 # If still insufficient after all iterations, add remaining follow-up suggestions
                 if (
@@ -2470,3 +2560,23 @@ async def planning_context_optimizer_node(
             logger.error(f"Fallback optimization also failed: {fallback_error}")
             # Final fallback: use original messages directly
             return Command(goto="planner")
+
+
+# Export all node functions for testing and external use
+__all__ = [
+    "get_configuration_from_config",
+    "background_investigation_node",
+    "planner_node",
+    "human_feedback_node",
+    "coordinator_node",
+    "reporter_node",
+    "researcher_node",
+    "researcher_node_with_isolation",
+    "context_optimizer_node",
+    "planning_context_optimizer_node",
+    "_execute_agent_step",
+    "_setup_and_execute_agent_step",
+    "create_agent",
+    "create_agent_with_managed_prompt",
+    "handoff_to_planner",
+]

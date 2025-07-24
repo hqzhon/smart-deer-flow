@@ -957,7 +957,7 @@ _global_context_evaluator: Optional[ContextStateEvaluator] = None
 
 
 def get_global_context_evaluator(
-    config: Optional["Configuration"] = None,
+    config: Optional[Any] = None,
 ) -> ContextStateEvaluator:
     """Get or create global context evaluator instance"""
     global _global_context_evaluator

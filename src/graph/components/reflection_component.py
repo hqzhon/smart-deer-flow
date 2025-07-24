@@ -4,7 +4,7 @@ Provides a reusable reflection loop that can be integrated into larger workflows
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
@@ -14,20 +14,7 @@ from src.agents.agents import create_agent_with_managed_prompt
 logger = logging.getLogger(__name__)
 
 
-class ReflectionConfig:
-    """Configuration for the reflection component."""
-
-    def __init__(
-        self,
-        max_reflection_loops: int = 3,
-        reflection_confidence_threshold: float = 0.7,
-        reflection_temperature: float = 0.7,
-        enable_progressive_reflection: bool = True,
-    ):
-        self.max_reflection_loops = max_reflection_loops
-        self.reflection_confidence_threshold = reflection_confidence_threshold
-        self.reflection_temperature = reflection_temperature
-        self.enable_progressive_reflection = enable_progressive_reflection
+# ReflectionConfig removed - using unified ReflectionSettings from src.config.models
 
 
 def create_reflection_agent(
@@ -48,12 +35,15 @@ def create_reflection_agent(
     )
 
 
-def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> str:
+def should_continue_reflection(
+    state: AgentState, max_loops: int = 3, confidence_threshold: float = 0.7
+) -> str:
     """Determine if reflection should continue.
 
     Args:
         state: Current agent state.
-        config: Reflection configuration.
+        max_loops: Maximum number of reflection loops.
+        confidence_threshold: Confidence threshold to stop reflection.
 
     Returns:
         "continue" or "end" based on reflection criteria.
@@ -61,7 +51,7 @@ def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> s
     reflection_count = state.get("reflection_count", 0)
     logger.info(f"Current reflection count: {reflection_count}")
     # Check if we've reached max loops
-    if reflection_count >= config.max_reflection_loops:
+    if reflection_count >= max_loops:
         return "end"
 
     # Always allow reflection to trigger (minimum threshold is 1)
@@ -71,7 +61,7 @@ def should_continue_reflection(state: AgentState, config: ReflectionConfig) -> s
 
     # Check confidence threshold
     confidence = state.get("confidence", 0.0)
-    if confidence >= config.reflection_confidence_threshold:
+    if confidence >= confidence_threshold:
         return "end"
 
     return "continue"
@@ -152,22 +142,21 @@ def reflection_node(state: AgentState, reflection_agent) -> Dict[str, Any]:
 
 def create_reflection_component(
     llm,
-    config: Optional[ReflectionConfig] = None,
+    max_loops: int = 3,
+    confidence_threshold: float = 0.7,
     prompt_name: str = "reflection_analysis",
 ) -> CompiledStateGraph:
     """Create a reflection component as a reusable sub-graph.
 
     Args:
         llm: Language model instance for reflection.
-        config: Reflection configuration. Uses defaults if not provided.
+        max_loops: Maximum number of reflection loops.
+        confidence_threshold: Confidence threshold to stop reflection.
         prompt_name: Name of the prompt to use for reflection.
 
     Returns:
         Compiled reflection sub-graph.
     """
-    if config is None:
-        config = ReflectionConfig()
-
     # Create reflection agent
     reflection_agent = create_reflection_agent(llm, prompt_name)
 
@@ -182,7 +171,7 @@ def create_reflection_component(
 
     # Conditional edge based on reflection criteria
     def reflection_condition(state: AgentState) -> str:
-        return should_continue_reflection(state, config)
+        return should_continue_reflection(state, max_loops, confidence_threshold)
 
     workflow.add_conditional_edges(
         "reflect", reflection_condition, {"continue": "reflect", "end": END}
@@ -206,12 +195,7 @@ def create_reflection_loop(
     Returns:
         Compiled reflection loop graph.
     """
-    config = ReflectionConfig(
-        max_reflection_loops=max_loops,
-        reflection_confidence_threshold=confidence_threshold,
-    )
-
-    return create_reflection_component(llm, config)
+    return create_reflection_component(llm, max_loops, confidence_threshold)
 
 
 def integrate_reflection(

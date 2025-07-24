@@ -9,7 +9,7 @@ from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.rag import Document, Retriever, Resource, build_retriever
@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class RetrieverInput(BaseModel):
     keywords: str = Field(description="search keywords to look up", max_length=1000)
 
-    @validator("keywords")
+    @field_validator("keywords")
+    @classmethod
     def validate_keywords(cls, v):
         if not v.strip():
             raise ValueError("Keywords cannot be empty")

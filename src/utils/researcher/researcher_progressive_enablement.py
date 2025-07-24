@@ -297,7 +297,9 @@ class ResearcherProgressiveEnabler:
 
                 # Use analyze_knowledge_gaps for full reflection analysis
                 reflection_result = asyncio.run(
-                    self.reflection_agent.analyze_knowledge_gaps(reflection_context)
+                    self.reflection_agent.analyze_knowledge_gaps(
+                        reflection_context
+                    )
                 )
                 decision_factors["reflection_insights"] = {
                     "is_sufficient": reflection_result.is_sufficient,

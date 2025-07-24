@@ -16,13 +16,87 @@ This package has been reorganized into submodules for better maintainability:
 For backward compatibility, all modules are still available at the top level.
 """
 
-# Import all submodules for backward compatibility
-from .context import *
-from .researcher import *
-from .performance import *
-from .tokens import *
-from .system import *
-from .common import *
+# Import specific modules for backward compatibility
+try:
+    from .context import (
+        AdvancedContextManager,
+        ContextPriority,
+        CompressionStrategy,
+        ExecutionContextManager,
+        ContextConfig,
+        ContextEvaluator,
+    )
+except ImportError:
+    pass
+
+try:
+    from .researcher import (
+        ResearcherContextIsolator,
+        ResearcherContextConfig,
+        ResearcherContextExtension,
+        ResearcherConfigOptimizerPhase4,
+        ResearcherIsolationMetrics,
+        ResearcherIsolationMetricsPhase4,
+        ResearcherPhase4Integration,
+        ResearcherProgressiveEnablement,
+        ResearcherProgressiveEnablementPhase4,
+    )
+except ImportError:
+    pass
+
+try:
+    from .performance import (
+        PerformanceOptimizer,
+        TaskPriority,
+        ParallelTask,
+        ParallelExecutor,
+        WorkflowOptimizer,
+        HierarchicalMemoryManager,
+        CacheLevel,
+        EvictionPolicy,
+    )
+    from . import performance
+    # Make parallel_executor available as a submodule
+    from .performance import parallel_executor
+except ImportError:
+    pass
+
+try:
+    from .tokens import (
+        TokenManager,
+        TokenValidationResult,
+        TokenCounter,
+        ContentProcessor,
+        EnhancedMessageExtractor,
+    )
+except ImportError:
+    pass
+
+try:
+    from .system import (
+        HealthCheck,
+        HealthStatus,
+        HealthReport,
+        SystemMetrics,
+        RateLimiter,
+        ErrorRecovery,
+        CallbackSafety,
+        DependencyInjection,
+    )
+except ImportError:
+    pass
+
+try:
+    from .common import (
+        safe_background_task,
+        retry_with_backoff,
+        JsonUtils,
+        get_logger,
+        EventType,
+        SearchResultFilter,
+    )
+except ImportError:
+    pass
 
 # Re-export commonly used classes and functions
 __all__ = [
@@ -52,6 +126,8 @@ __all__ = [
     "HierarchicalMemoryManager",
     "CacheLevel",
     "EvictionPolicy",
+    "parallel_executor",
+    "performance",
     # Token and content management
     "TokenManager",
     "TokenValidationResult",

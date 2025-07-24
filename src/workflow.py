@@ -366,7 +366,9 @@ async def run_agent_workflow_async(
     initial_state = {
         # Runtime Variables
         "messages": [{"role": "user", "content": user_input}],
-        "locale": locale,  # 使用传入的locale参数，确保首次researcher报告有正确的多语言设置
+        "locale": (
+            locale
+        ),  # 使用传入的locale参数，确保首次researcher报告有正确的多语言设置
         "auto_accepted_plan": True,
         "enable_background_research": enable_background_research,
         "enable_collaboration": (

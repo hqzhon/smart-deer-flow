@@ -19,22 +19,17 @@ __all__ = [
     "ArticleExtractorTool",
     "PythonREPLTool",
     "DataAnalysisTool",
+    # Legacy compatibility exports
+    "crawl_tool",
+    "python_repl_tool",
+    "get_retriever_tool",
+    "get_web_search_tool",
+    "VolcengineTTS",
 ]
 
-# Legacy compatibility - maintain old interface
+# Legacy compatibility imports are available through their respective modules
 from .crawl import crawl_tool
 from .python_repl import python_repl_tool
 from .retriever import get_retriever_tool
 from .search import get_web_search_tool
 from .tts import VolcengineTTS
-
-# Export legacy functions for backward compatibility
-__all__.extend(
-    [
-        "crawl_tool",
-        "python_repl_tool",
-        "get_web_search_tool",
-        "get_retriever_tool",
-        "VolcengineTTS",
-    ]
-)

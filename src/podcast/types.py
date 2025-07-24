@@ -4,14 +4,15 @@
 from typing import Literal
 import re
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScriptLine(BaseModel):
     speaker: Literal["male", "female"] = Field(default="male")
     paragraph: str = Field(default="", max_length=5000)
 
-    @validator("paragraph")
+    @field_validator("paragraph")
+    @classmethod
     def validate_paragraph(cls, v):
         if v:
             # Check for suspicious patterns
@@ -30,7 +31,8 @@ class Script(BaseModel):
     locale: Literal["en", "zh"] = Field(default="en")
     lines: list[ScriptLine] = Field(default=[])
 
-    @validator("lines")
+    @field_validator("lines")
+    @classmethod
     def validate_lines(cls, v):
         if len(v) > 1000:  # Limit number of script lines
             raise ValueError("Too many script lines")

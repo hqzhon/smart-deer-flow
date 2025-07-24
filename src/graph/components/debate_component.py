@@ -3,12 +3,15 @@ Debate component for modular graph architecture.
 Provides multi-agent debate functionality for critical analysis.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 
 from src.graph.types import State as AgentState
 from src.agents.agents import create_agent_with_managed_prompt
+
+logger = logging.getLogger(__name__)
 
 
 class DebateConfig:

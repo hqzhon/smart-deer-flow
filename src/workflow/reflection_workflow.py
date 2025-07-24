@@ -385,7 +385,9 @@ class ReflectionWorkflow:
 
         # Analyze knowledge gaps
         knowledge_gaps = await self.reflection_agent.analyze_knowledge_gaps(
-            reflection_context
+            reflection_context,
+            reflection_type="workflow_context",
+            session_id=self.workflow_context.get("session_id", "workflow_session"),
         )
 
         return {
@@ -506,7 +508,9 @@ class ReflectionWorkflow:
             logger.debug(f"Reflection context: {reflection_context}")
 
             reflection_insights = await self.reflection_agent.analyze_knowledge_gaps(
-                reflection_context
+                reflection_context,
+                reflection_type="workflow_stage",
+                session_id=self.workflow_context.get("session_id", "workflow_session"),
             )
 
             # Log reflection insights

@@ -9,9 +9,6 @@ from enum import Enum
 try:
     from .performance_optimizer import (
         AdvancedParallelExecutor,
-        optimize_report_generation_workflow,
-        get_global_advanced_executor,
-        shutdown_global_executor,
     )
 except ImportError:
     # Provide basic implementation if performance optimizer is not available
