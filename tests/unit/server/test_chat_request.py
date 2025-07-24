@@ -54,8 +54,8 @@ def test_chat_request_defaults():
     assert req.debug is False
     assert req.thread_id == "__default__"
     assert req.max_plan_iterations == 1
-    assert req.max_step_num == 3
-    assert req.max_search_results == 3
+    assert req.max_step_num == 2
+    assert req.max_search_results == 2
     assert req.auto_accepted_plan is False
     assert req.interrupt_feedback is None
     assert req.mcp_settings is None

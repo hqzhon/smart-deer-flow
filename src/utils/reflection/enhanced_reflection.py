@@ -36,7 +36,7 @@ class ReflectionConfig(BaseModel):
     enable_enhanced_reflection: bool = Field(
         default=True, description="Enable enhanced reflection"
     )
-    max_reflection_loops: int = Field(default=3, description="Maximum reflection loops")
+    max_reflection_loops: int = Field(default=1, description="Maximum reflection loops")
     reflection_model: Optional[str] = Field(
         default=None, description="Model for reflection"
     )
@@ -237,7 +237,7 @@ class ReflectionContext:
     total_steps: int = 0
     current_step_index: int = 0
     locale: str = "en-US"
-    max_reflection_loops: int = 3
+    max_reflection_loops: int = 1
     current_reflection_loop: int = 0
 
 
@@ -278,7 +278,7 @@ class EnhancedReflectionAgent:
         self.metrics = {}
 
         # Reflection configuration
-        self.max_reflection_loops = getattr(self.config, "max_reflection_loops", 3)
+        self.max_reflection_loops = getattr(self.config, "max_reflection_loops", 1)
         self.reflection_model_name = getattr(self.config, "reflection_model", None)
         self.reflection_model = (
             None  # Will be initialized lazily via _get_reflection_model

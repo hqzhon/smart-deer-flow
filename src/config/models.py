@@ -69,8 +69,8 @@ class AgentSettings(BaseModel):
     """Agent configuration settings."""
 
     max_plan_iterations: int = Field(default=1, ge=1)
-    max_step_num: int = Field(default=3, ge=1)
-    max_search_results: int = Field(default=3, ge=1)
+    max_step_num: int = Field(default=2, ge=1)
+    max_search_results: int = Field(default=2, ge=1)
     enable_deep_thinking: bool = False
     enable_parallel_execution: bool = True
     max_parallel_tasks: int = Field(default=3, ge=1)
@@ -98,10 +98,10 @@ class ReflectionSettings(BaseModel):
         default=True, description="Enable enhanced reflection system"
     )
     max_reflection_loops: int = Field(
-        default=3, ge=1, le=10, description="Maximum reflection loops per task"
+        default=1, ge=1, le=10, description="Maximum reflection loops per task"
     )
     max_total_reflections: int = Field(
-        default=10, ge=1, le=50, description="Maximum total reflections per session"
+        default=3, ge=1, le=50, description="Maximum total reflections per session"
     )
     reflection_temperature: float = Field(
         default=0.3, ge=0.0, le=2.0, description="Temperature for reflection model"
@@ -196,7 +196,7 @@ class FollowUpMergerSettings(BaseModel):
         default=10, ge=1, le=50, description="每个结果最大句子数"
     )
     max_key_points: int = Field(
-        default=3, ge=1, le=10, description="最大关键点数"
+        default=2, ge=1, le=10, description="最大关键点数"
     )
     preserve_source_info: bool = Field(
         default=True, description="保留源信息"
@@ -252,10 +252,10 @@ class FollowUpMergerSettings(BaseModel):
 class IterativeResearchSettings(BaseModel):
     """Iterative research configuration settings."""
 
-    max_follow_up_iterations: int = Field(default=3, ge=1)
+    max_follow_up_iterations: int = Field(default=1, ge=1)
     sufficiency_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     enable_iterative_research: bool = True
-    max_queries_per_iteration: int = Field(default=3, ge=1)
+    max_queries_per_iteration: int = Field(default=2, ge=1)
     follow_up_delay_seconds: float = Field(default=1.0, ge=0.0)
 
 

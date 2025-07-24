@@ -16,7 +16,7 @@ class ReflectionStats:
     iteration_reflections: int = 0
     final_reflections: int = 0
     follow_up_reflections: int = 0
-    max_allowed: int = 3
+    max_allowed: int = 1
     start_time: float = 0.0
 
     def __post_init__(self):
@@ -47,10 +47,10 @@ class ReflectionManager:
                 self.max_reflections = reflection_config.max_reflection_loops
                 self.config = reflection_config
             except ImportError:
-                self.max_reflections = 3
+                self.max_reflections = 1
                 self.config = None
         else:
-            self.max_reflections = max_reflections or 3
+            self.max_reflections = max_reflections or 1
             self.config = config
             
         self._session_stats: Dict[str, ReflectionStats] = {}

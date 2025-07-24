@@ -311,9 +311,9 @@ async def run_agent_workflow_async(
         # Determine effective max_step_num for caching
         cache_max_step_num = max_step_num
         if cache_max_step_num is None and settings is not None:
-            cache_max_step_num = getattr(settings.agents, "max_step_num", 3)
+            cache_max_step_num = getattr(settings.agents, "max_step_num", 2)
         if cache_max_step_num is None:
-            cache_max_step_num = 3
+            cache_max_step_num = 2
 
         if enable_advanced_optimization:
             # Use hierarchical memory for advanced caching
@@ -405,9 +405,9 @@ async def run_agent_workflow_async(
     # Determine max_step_num value
     effective_max_step_num = max_step_num
     if effective_max_step_num is None and settings is not None:
-        effective_max_step_num = getattr(settings.agents, "max_step_num", 3)
+        effective_max_step_num = getattr(settings.agents, "max_step_num", 2)
     if effective_max_step_num is None:
-        effective_max_step_num = 3
+        effective_max_step_num = 2
 
     config = {
         "configurable": {

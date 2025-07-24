@@ -77,8 +77,8 @@ report_style: "academic"                         # Options: academic, business, 
 # Controls the behavior of AI agents in the research process
 agents:
   max_plan_iterations: 1                         # Maximum planning iterations per task
-  max_step_num: 3                                # Maximum steps per agent execution
-  max_search_results: 3                          # Maximum search results to process
+  max_step_num: 2                                # Maximum steps per agent execution
+  max_search_results: 2                          # Maximum search results to process
   enable_deep_thinking: false                    # Enable deep thinking mode for complex tasks
   enable_parallel_execution: true                # Enable parallel agent execution
   max_parallel_tasks: 3                          # Maximum concurrent parallel tasks
@@ -101,8 +101,8 @@ research:
 reflection:
   # Core reflection control
   enable_enhanced_reflection: true               # Enable enhanced reflection system
-  max_reflection_loops: 3                        # Maximum reflection loops per task
-  max_total_reflections: 10                      # Maximum total reflections per session
+  max_reflection_loops: 1                        # Maximum reflection loops per task
+  max_total_reflections: 3                       # Maximum total reflections per session
   reflection_temperature: 0.3                    # Temperature for reflection model
   
   # Threshold settings
@@ -164,7 +164,7 @@ followup_merger:
 # Iterative Research Configuration
 # Controls follow-up research and iterative improvement
 iterative_research:
-  max_follow_up_iterations: 3                    # Maximum follow-up research iterations
+  max_follow_up_iterations: 1                    # Maximum follow-up research iterations
   sufficiency_threshold: 0.7                     # Threshold for research sufficiency (0.0-1.0)
   enable_iterative_research: true                # Enable iterative research capabilities
   max_queries_per_iteration: 3                   # Maximum queries per iteration

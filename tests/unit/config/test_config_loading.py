@@ -45,7 +45,7 @@ class TestConfigLoading:
         settings = self.config_loader.load_configuration()
         config_data = settings.model_dump()
         agents_config = config_data.get("agents", {})
-        max_search_results = agents_config.get("max_search_results", 3)
+        max_search_results = agents_config.get("max_search_results", 2)
 
         assert isinstance(max_search_results, int)
         assert max_search_results > 0
@@ -106,7 +106,7 @@ class TestConfigLoading:
 
         # Test default search results
         agents_config = config_data.get("agents", {})
-        max_search_results = agents_config.get("max_search_results", 3)
+        max_search_results = agents_config.get("max_search_results", 2)
         assert max_search_results >= 1  # Should be at least 1
 
         # Test llm config structure

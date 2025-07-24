@@ -18,7 +18,7 @@ class ResearchConfig:
 
     def __init__(
         self,
-        max_search_results: int = 3,
+        max_search_results: int = 2,
         max_research_steps: int = 5,
         enable_smart_filtering: bool = True,
         enable_content_summarization: bool = True,
