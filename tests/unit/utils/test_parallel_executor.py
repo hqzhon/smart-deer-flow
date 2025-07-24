@@ -229,13 +229,15 @@ class TestParallelExecutor:
 class TestCreateParallelExecutor:
     """Test create_parallel_executor function"""
 
-    @patch("src.utils.parallel_executor.get_global_rate_limiter")
-    @patch("src.config.config_loader.config_loader.load_config")
+    @patch("src.utils.performance.parallel_executor.get_global_rate_limiter")
+    @patch("src.config.get_settings")
     def test_create_parallel_executor_default(
-        self, mock_load_config, mock_rate_limiter
+        self, mock_get_settings, mock_rate_limiter
     ):
         """Test creating executor with default settings"""
-        mock_load_config.return_value = {"max_parallel_tasks": 5}
+        mock_settings = Mock()
+        mock_settings.agents.max_parallel_tasks = 5
+        mock_get_settings.return_value = mock_settings
         mock_limiter = Mock()
         mock_rate_limiter.return_value = mock_limiter
 
@@ -245,7 +247,7 @@ class TestCreateParallelExecutor:
         assert executor.rate_limiter == mock_limiter
         assert isinstance(executor.shared_context, SharedTaskContext)
 
-    @patch("src.utils.parallel_executor.get_global_rate_limiter")
+    @patch("src.utils.performance.parallel_executor.get_global_rate_limiter")
     def test_create_parallel_executor_with_shared_context(self, mock_rate_limiter):
         """Test creating executor with custom shared context"""
         mock_limiter = Mock()
@@ -260,13 +262,13 @@ class TestCreateParallelExecutor:
         assert executor.shared_context == custom_context
         assert executor.shared_context.max_cache_size == 50
 
-    @patch("src.utils.parallel_executor.get_global_rate_limiter")
-    @patch("src.config.config_loader.config_loader.load_config")
+    @patch("src.utils.performance.parallel_executor.get_global_rate_limiter")
+    @patch("src.config.get_settings")
     def test_create_parallel_executor_config_error(
-        self, mock_load_config, mock_rate_limiter
+        self, mock_get_settings, mock_rate_limiter
     ):
         """Test creating executor when config loading fails"""
-        mock_load_config.side_effect = Exception("Config error")
+        mock_get_settings.side_effect = Exception("Config error")
         mock_limiter = Mock()
         mock_rate_limiter.return_value = mock_limiter
 
@@ -286,7 +288,7 @@ class TestParallelTaskIntegration:
         shared_context = SharedTaskContext()
 
         with patch(
-            "src.utils.parallel_executor.get_global_rate_limiter"
+            "src.utils.performance.parallel_executor.get_global_rate_limiter"
         ) as mock_rate_limiter:
             mock_limiter = Mock()
             mock_limiter.acquire = AsyncMock()
