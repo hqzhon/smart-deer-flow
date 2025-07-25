@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import os
 import time
 from typing import Dict, Any, Optional, List
 from src.graph.builder import build_graph
@@ -409,6 +410,28 @@ async def run_agent_workflow_async(
     if effective_max_step_num is None:
         effective_max_step_num = 2
 
+    # Get recursion limit from environment variable
+    default_recursion_limit = 10
+    try:
+        env_value_str = os.getenv("AGENT_RECURSION_LIMIT", str(default_recursion_limit))
+        parsed_limit = int(env_value_str)
+        if parsed_limit > 0:
+            recursion_limit = parsed_limit
+            logger.info(f"Workflow recursion limit set to: {recursion_limit}")
+        else:
+            logger.warning(
+                f"AGENT_RECURSION_LIMIT value '{env_value_str}' (parsed as {parsed_limit}) is not positive. "
+                f"Using default value {default_recursion_limit}."
+            )
+            recursion_limit = default_recursion_limit
+    except ValueError:
+        raw_env_value = os.getenv("AGENT_RECURSION_LIMIT")
+        logger.warning(
+            f"Invalid AGENT_RECURSION_LIMIT value: '{raw_env_value}'. "
+            f"Using default value {default_recursion_limit}."
+        )
+        recursion_limit = default_recursion_limit
+
     config = {
         "configurable": {
             "thread_id": thread_id or "default",
@@ -430,7 +453,7 @@ async def run_agent_workflow_async(
                 }
             },
         },
-        "recursion_limit": 100,
+        "recursion_limit": recursion_limit,
     }
     last_message_cnt = 0
     final_state = None

@@ -448,7 +448,7 @@ class ResearcherContextExtension:
             Agent execution result
         """
         # Get recursion limit from environment
-        default_recursion_limit = 25
+        default_recursion_limit = 10
         try:
             env_value_str = os.getenv(
                 "AGENT_RECURSION_LIMIT", str(default_recursion_limit)

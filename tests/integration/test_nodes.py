@@ -1147,7 +1147,7 @@ async def test_execute_agent_step_recursion_limit_env_invalid(
         result = await _execute_agent_step(mock_state_with_steps, MagicMock(), mock_agent, "coder")
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
-            "Invalid AGENT_RECURSION_LIMIT value: 'notanint'. Using default value 25."
+            "Invalid AGENT_RECURSION_LIMIT value: 'notanint'. Using default value 10."
         )
 
 
@@ -1169,7 +1169,7 @@ async def test_execute_agent_step_recursion_limit_env_negative(
         result = await _execute_agent_step(mock_state_with_steps, MagicMock(), mock_agent, "coder")
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
-            "AGENT_RECURSION_LIMIT value '-5' (parsed as -5) is not positive. Using default value 25."
+            "AGENT_RECURSION_LIMIT value '-5' (parsed as -5) is not positive. Using default value 10."
         )
 
 
