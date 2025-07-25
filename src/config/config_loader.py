@@ -220,6 +220,8 @@ class ConfigLoader:
             "DEER_RESEARCHER_LLM": ["agent_llm_map", "researcher"],
             "DEER_CODER_LLM": ["agent_llm_map", "coder"],
             "DEER_REPORTER_LLM": ["agent_llm_map", "reporter"],
+            # Agent recursion limit
+            "AGENT_RECURSION_LIMIT": ["agents", "recursion_limit"],
         }
 
         for env_var, config_key in env_mappings.items():
