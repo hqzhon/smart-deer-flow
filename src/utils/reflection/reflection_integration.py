@@ -54,13 +54,18 @@ class ReflectionIntegrator:
         if config is None:
             try:
                 from src.config.config_loader import get_settings
+
                 app_settings = get_settings()
                 reflection_config = app_settings.get_reflection_config()
                 self.config = {
-                    "enable_reflection_integration": reflection_config.enable_reflection_integration,
+                    "enable_reflection_integration": (
+                        reflection_config.enable_reflection_integration
+                    ),
                     "max_reflection_iterations": reflection_config.max_reflection_loops,
                     "reflection_timeout": 30.0,  # Not in new config, use default
-                    "enable_reflection_metrics": reflection_config.enable_reflection_metrics,
+                    "enable_reflection_metrics": (
+                        reflection_config.enable_reflection_metrics
+                    ),
                 }
             except ImportError:
                 # Fallback to default config

@@ -202,8 +202,8 @@ class ConfigurationOptimizer:
 
         # High-performance profile
         profiles["high_performance"] = ConfigProfile(
-            name="高性能",
-            description="优化性能，适合高负载场景",
+            name="High Performance",
+            description="Optimize performance for high-load scenarios",
             target_scenario="high_load",
             config_values={
                 "isolation.max_concurrent_sessions": 12,
@@ -222,8 +222,8 @@ class ConfigurationOptimizer:
 
         # Low-latency profile
         profiles["low_latency"] = ConfigProfile(
-            name="低延迟",
-            description="优化响应时间，适合交互式场景",
+            name="Low Latency",
+            description="Optimize response time for interactive scenarios",
             target_scenario="low_latency",
             config_values={
                 "isolation.max_local_context_size": 4000,
@@ -242,8 +242,8 @@ class ConfigurationOptimizer:
 
         # Memory-efficient profile
         profiles["memory_efficient"] = ConfigProfile(
-            name="内存优化",
-            description="最小化内存使用，适合资源受限环境",
+            name="Memory Optimized",
+            description="Minimize memory usage for resource-constrained environments",
             target_scenario="memory_constrained",
             config_values={
                 "isolation.max_local_context_size": 2000,
@@ -262,8 +262,8 @@ class ConfigurationOptimizer:
 
         # Balanced profile (default)
         profiles["balanced"] = ConfigProfile(
-            name="平衡",
-            description="平衡性能和资源使用，适合大多数场景",
+            name="Balanced",
+            description="Balance performance and resource usage for most scenarios",
             target_scenario="general",
             config_values={
                 "isolation.max_local_context_size": 8000,
@@ -312,7 +312,7 @@ class ConfigurationOptimizer:
                         "success_rate_threshold", 0.8
                     ),
                     recommended_value=max(0.6, avg_success_rate - 0.1),
-                    reason=f"当前成功率 {avg_success_rate:.1%} 低于阈值，建议降低要求",
+                    reason=f"Current success rate {avg_success_rate:.1%} is below threshold, suggest lowering requirements",
                     confidence=0.8,
                     impact_estimate="medium",
                     priority=7,
@@ -336,7 +336,7 @@ class ConfigurationOptimizer:
                     parameter=ConfigParameter.MAX_CONCURRENT_SESSIONS,
                     current_value=current_sessions,
                     recommended_value=recommended_sessions,
-                    reason=f"性能开销 {avg_overhead:.1%} 过高，建议减少并发会话",
+                    reason=f"Performance overhead {avg_overhead:.1%} is too high, suggest reducing concurrent sessions",
                     confidence=0.9,
                     impact_estimate="high",
                     priority=8,
@@ -360,7 +360,7 @@ class ConfigurationOptimizer:
                     parameter=ConfigParameter.TOKEN_BUDGET,
                     current_value=current_budget,
                     recommended_value=recommended_budget,
-                    reason=f"压缩比 {avg_compression:.1%} 较差，建议增加token预算",
+                    reason=f"Compression ratio {avg_compression:.1%} is poor, suggest increasing token budget",
                     confidence=0.7,
                     impact_estimate="medium",
                     priority=5,
@@ -384,7 +384,7 @@ class ConfigurationOptimizer:
                     parameter=ConfigParameter.MEMORY_CLEANUP_INTERVAL,
                     current_value=current_cleanup,
                     recommended_value=recommended_cleanup,
-                    reason=f"资源利用率 {avg_utilization:.1%} 过高，建议增加清理频率",
+                    reason=f"Resource utilization {avg_utilization:.1%} is too high, suggest increasing cleanup frequency",
                     confidence=0.8,
                     impact_estimate="medium",
                     priority=6,
@@ -546,11 +546,11 @@ class ConfigurationOptimizer:
 
         # Check if auto-tuning should be enabled
         if not self.auto_tuning_enabled and len(self.performance_history) >= 50:
-            recommendations.append("建议启用自动调优功能以优化性能")
+            recommendations.append("Consider enabling auto-tuning feature to optimize performance")
 
         # Check optimization history
         if len(self.optimization_history) == 0:
-            recommendations.append("尚未进行任何配置优化，建议运行性能分析")
+            recommendations.append("No configuration optimization performed yet, recommend running performance analysis")
 
         # Check configuration age
         config_path = Path(self.config_file)
@@ -558,7 +558,7 @@ class ConfigurationOptimizer:
             config_age_days = (time.time() - config_path.stat().st_mtime) / 86400
             if config_age_days > 30:
                 recommendations.append(
-                    f"配置文件已 {config_age_days:.0f} 天未更新，建议检查是否需要优化"
+                    f"Configuration file has not been updated for {config_age_days:.0f} days, recommend checking if optimization is needed"
                 )
 
         return recommendations

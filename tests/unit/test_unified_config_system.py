@@ -9,7 +9,6 @@
 import unittest
 import tempfile
 import os
-from pathlib import Path
 
 
 class TestUnifiedConfigSystem(unittest.TestCase):
@@ -58,17 +57,16 @@ followup_merger:
 
     def test_config_loading(self):
         """测试配置加载"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(self.test_config_content)
             config_path = f.name
 
         try:
-            from src.config.config_loader import ConfigLoader
             from src.config.models import AppSettings
             import yaml
 
             # 直接加载配置文件
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
             app_settings = AppSettings(**config)
 
@@ -77,15 +75,21 @@ followup_merger:
             self.assertTrue(reflection_config.enable_reflection_integration)
             self.assertEqual(reflection_config.max_reflection_loops, 5)
             self.assertTrue(reflection_config.enable_reflection_metrics)
-            self.assertEqual(reflection_config.reflection_confidence_threshold, 0.8)  # 使用默认值
-            self.assertFalse(reflection_config.disable_followup_reflection)  # 使用实际存在的属性
+            self.assertEqual(
+                reflection_config.reflection_confidence_threshold, 0.8
+            )  # 使用默认值
+            self.assertFalse(
+                reflection_config.disable_followup_reflection
+            )  # 使用实际存在的属性
             self.assertEqual(reflection_config.max_total_reflections, 10)  # 使用默认值
             self.assertTrue(reflection_config.enable_global_counter)
             self.assertTrue(reflection_config.reset_counter_on_new_task)
 
             # 验证Follow-up合并器配置
             merger_config = app_settings.get_followup_merger_config()
-            self.assertEqual(merger_config.similarity_threshold, 0.75)  # 从配置文件加载的值
+            self.assertEqual(
+                merger_config.similarity_threshold, 0.75
+            )  # 从配置文件加载的值
             self.assertEqual(merger_config.min_content_length, 50)
             self.assertEqual(merger_config.max_merged_results, 15)
             self.assertTrue(merger_config.enable_semantic_grouping)
@@ -114,13 +118,13 @@ followup_merger:
         """测试反射管理器与统一配置系统的集成"""
         try:
             from src.utils.reflection.reflection_manager import ReflectionManager
-            
+
             # 创建反射管理器（应该自动加载配置）
             manager = ReflectionManager()
-            
+
             # 验证配置是否正确加载
             self.assertIsNotNone(manager.config)
-            
+
         except ImportError as e:
             self.skipTest(f"Reflection manager not available: {e}")
 
@@ -128,13 +132,13 @@ followup_merger:
         """测试Follow-up合并器与统一配置系统的集成"""
         try:
             from src.utils.common.follow_up_result_merger import FollowUpResultMerger
-            
+
             # 创建合并器（应该自动加载配置）
             merger = FollowUpResultMerger()
-            
+
             # 验证配置是否正确加载
             self.assertIsNotNone(merger.config)
-            
+
         except ImportError as e:
             self.skipTest(f"Follow-up merger not available: {e}")
 
@@ -142,27 +146,27 @@ followup_merger:
         """测试反射集成器与统一配置系统的集成"""
         try:
             from src.utils.reflection.reflection_integration import ReflectionIntegrator
-            
+
             # 创建反射集成器（应该自动加载配置）
             integrator = ReflectionIntegrator()
-            
+
             # 验证配置是否正确加载
             self.assertIsNotNone(integrator.config)
             self.assertIsInstance(integrator.config, dict)
-            
+
         except ImportError as e:
             self.skipTest(f"Reflection integrator not available: {e}")
 
     def test_default_config_fallback(self):
         """测试默认配置回退机制"""
         from src.config.models import ReflectionSettings, FollowUpMergerSettings
-        
+
         # 测试反射设置默认值
         reflection_settings = ReflectionSettings()
         self.assertTrue(reflection_settings.enable_reflection_integration)
         self.assertEqual(reflection_settings.max_reflection_loops, 3)
         self.assertTrue(reflection_settings.enable_reflection_metrics)  # 默认值是True
-        
+
         # 测试Follow-up合并器设置默认值
         merger_settings = FollowUpMergerSettings()
         self.assertEqual(merger_settings.similarity_threshold, 0.7)

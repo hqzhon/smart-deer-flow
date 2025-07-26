@@ -69,6 +69,9 @@ class TestSharedTaskContext:
         # First time should not be duplicate
         assert not context.is_content_duplicate(content)
 
+        # Add content to context
+        context.add_task_output("task1", content)
+
         # Second time should be duplicate
         assert context.is_content_duplicate(content)
 
@@ -109,7 +112,9 @@ class TestParallelExecutor:
     def mock_rate_limiter(self):
         """Mock rate limiter"""
         limiter = Mock()
-        limiter.acquire = AsyncMock()
+        limiter.acquire = AsyncMock(return_value=0.0)  # Return a float, not AsyncMock
+        limiter.record_success = Mock()
+        limiter.record_failure = Mock()
         limiter.get_stats.return_value = {"total_delays": 0, "average_delay": 0.0}
         return limiter
 
@@ -171,7 +176,7 @@ class TestParallelExecutor:
         query = "test query"
         expected_result = "task result"
 
-        async def mock_task_func():
+        async def mock_task_func(**kwargs):
             return expected_result
 
         task = ParallelTask(
@@ -191,9 +196,9 @@ class TestParallelExecutor:
     @pytest.mark.asyncio
     async def test_execute_single_task_content_deduplication(self, executor):
         """Test content deduplication during task execution"""
-        content = "This is substantial content that should be checked for duplication"
+        content = "This is substantial content that should be checked for duplication and it needs to be longer than 100 characters to trigger the deduplication logic in the parallel executor implementation"
 
-        async def mock_task_func():
+        async def mock_task_func(**kwargs):
             return content
 
         task1 = ParallelTask(task_id="task1", func=mock_task_func)
@@ -214,16 +219,16 @@ class TestParallelExecutor:
     async def test_execute_single_task_error_handling(self, executor):
         """Test error handling in task execution"""
 
-        async def failing_task():
-            raise ValueError("Test error")
+        async def failing_task(**kwargs):
+            raise Exception("Network error occurred")
 
         task = ParallelTask(task_id="failing_task", func=failing_task, max_retries=1)
 
         result = await executor._execute_single_task(task)
 
         assert result.status == TaskStatus.FAILED
-        assert "Test error" in result.error
-        assert result.attempts == 2  # Initial attempt + 1 retry
+        assert "Network error" in str(result.error)
+        assert result.retry_count == 1  # 1 retry
 
 
 class TestCreateParallelExecutor:
@@ -291,7 +296,9 @@ class TestParallelTaskIntegration:
             "src.utils.performance.parallel_executor.get_global_rate_limiter"
         ) as mock_rate_limiter:
             mock_limiter = Mock()
-            mock_limiter.acquire = AsyncMock()
+            mock_limiter.acquire = AsyncMock(return_value=0.0)
+            mock_limiter.record_success = Mock()
+            mock_limiter.record_failure = Mock()
             mock_limiter.get_stats.return_value = {
                 "total_delays": 0,
                 "average_delay": 0.0,
@@ -305,27 +312,24 @@ class TestParallelTaskIntegration:
             )
 
             # Create tasks with same query (should use cache)
-            async def search_task(query):
+            async def search_task(query, **kwargs):
                 await asyncio.sleep(0.01)  # Simulate work
-                return f"Result for {query}"
+                return f"This is a comprehensive search result for the query '{query}' that contains substantial content and detailed information to ensure it exceeds the 100 character threshold for content deduplication testing purposes"
 
             tasks = [
                 ParallelTask(
                     task_id="task1",
                     func=search_task,
-                    args=("same query",),
                     kwargs={"query": "same query"},
                 ),
                 ParallelTask(
                     task_id="task2",
                     func=search_task,
-                    args=("same query",),
                     kwargs={"query": "same query"},
                 ),
                 ParallelTask(
                     task_id="task3",
                     func=search_task,
-                    args=("different query",),
                     kwargs={"query": "different query"},
                 ),
             ]

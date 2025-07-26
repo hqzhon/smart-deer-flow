@@ -103,13 +103,11 @@ class TestReflectionIntegration:
             await node._perform_research(query)
             return {
                 "initial_findings": "Mock research findings",
-                "reflection_analysis": (
-                    await reflection_agent.analyze_knowledge_gaps(
-                        ReflectionContext(
-                            research_topic=query.get("query", str(query)),
-                            completed_steps=[],
-                            execution_results=[]
-                        )
+                "reflection_analysis": await reflection_agent.analyze_knowledge_gaps(
+                    ReflectionContext(
+                        research_topic=query.get("query", str(query)),
+                        completed_steps=[],
+                        execution_results=[],
                     )
                 ),
                 "follow_up_research": [],
@@ -145,13 +143,11 @@ class TestReflectionIntegration:
                 "initial_plan": {
                     "research_steps": [{"step": 1, "action": "Mock planning step"}]
                 },
-                "reflection_analysis": (
-                    await reflection_agent.analyze_knowledge_gaps(
-                        ReflectionContext(
-                            research_topic=query.get("query", str(query)),
-                            completed_steps=[],
-                            execution_results=[]
-                        )
+                "reflection_analysis": await reflection_agent.analyze_knowledge_gaps(
+                    ReflectionContext(
+                        research_topic=query.get("query", str(query)),
+                        completed_steps=[],
+                        execution_results=[],
                     )
                 ),
                 "enhanced_plan": {

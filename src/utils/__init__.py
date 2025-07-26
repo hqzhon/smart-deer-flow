@@ -56,6 +56,7 @@ try:
         EvictionPolicy,
     )
     from . import performance
+
     # Make parallel_executor available as a submodule
     from .performance import parallel_executor
 except ImportError:

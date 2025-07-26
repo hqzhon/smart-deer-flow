@@ -429,31 +429,31 @@ class AdvancedResearcherProgressiveEnabler(BaseEnabler):
 
         if isolation_score >= threshold:
             explanation = (
-                f"启用隔离 (评分: {isolation_score:.1f} >= 阈值: {threshold:.1f})"
+                f"Enable isolation (score: {isolation_score:.1f} >= threshold: {threshold:.1f})"
             )
         else:
             explanation = (
-                f"不启用隔离 (评分: {isolation_score:.1f} < 阈值: {threshold:.1f})"
+                f"Disable isolation (score: {isolation_score:.1f} < threshold: {threshold:.1f})"
             )
 
         # Add key contributing factors
         key_factors = []
         if scenario.step_count >= self.dynamic_thresholds["step_count"].current_value:
-            key_factors.append(f"步骤数量高({scenario.step_count})")
+            key_factors.append(f"High step count({scenario.step_count})")
         if (
             scenario.context_size
             >= self.dynamic_thresholds["context_size"].current_value
         ):
-            key_factors.append(f"上下文大({scenario.context_size})")
+            key_factors.append(f"Large context({scenario.context_size})")
         if features.query_complexity_score >= 0.5:
-            key_factors.append(f"查询复杂({features.query_complexity_score:.1f})")
+            key_factors.append(f"Complex query({features.query_complexity_score:.1f})")
         if features.task_urgency_score >= 0.7:
-            key_factors.append("任务紧急")
+            key_factors.append("Urgent task")
 
         if key_factors:
-            explanation += f" - 关键因素: {', '.join(key_factors)}"
+            explanation += f" - Key factors: {', '.join(key_factors)}"
 
-        explanation += f" (置信度: {confidence.confidence_score:.1f})"
+        explanation += f" (Confidence: {confidence.confidence_score:.1f})"
 
         return explanation
 

@@ -156,26 +156,16 @@ class FollowUpMergerSettings(BaseModel):
     similarity_threshold: float = Field(
         default=0.7, ge=0.0, le=1.0, description="内容相似度阈值"
     )
-    min_content_length: int = Field(
-        default=50, ge=10, description="最小内容长度"
-    )
+    min_content_length: int = Field(default=50, ge=10, description="最小内容长度")
     max_merged_results: int = Field(
         default=20, ge=1, le=100, description="最大合并结果数量"
     )
 
     # 功能开关
-    enable_semantic_grouping: bool = Field(
-        default=True, description="启用语义分组"
-    )
-    enable_intelligent_merging: bool = Field(
-        default=True, description="启用智能合并"
-    )
-    enable_deduplication: bool = Field(
-        default=True, description="启用去重功能"
-    )
-    enable_quality_filtering: bool = Field(
-        default=True, description="启用质量过滤"
-    )
+    enable_semantic_grouping: bool = Field(default=True, description="启用语义分组")
+    enable_intelligent_merging: bool = Field(default=True, description="启用智能合并")
+    enable_deduplication: bool = Field(default=True, description="启用去重功能")
+    enable_quality_filtering: bool = Field(default=True, description="启用质量过滤")
 
     # 质量评估参数
     quality_threshold: float = Field(
@@ -195,17 +185,11 @@ class FollowUpMergerSettings(BaseModel):
     max_sentences_per_result: int = Field(
         default=10, ge=1, le=50, description="每个结果最大句子数"
     )
-    max_key_points: int = Field(
-        default=2, ge=1, le=10, description="最大关键点数"
-    )
-    preserve_source_info: bool = Field(
-        default=True, description="保留源信息"
-    )
+    max_key_points: int = Field(default=2, ge=1, le=10, description="最大关键点数")
+    preserve_source_info: bool = Field(default=True, description="保留源信息")
 
     # 性能优化参数
-    enable_similarity_cache: bool = Field(
-        default=True, description="启用相似度缓存"
-    )
+    enable_similarity_cache: bool = Field(default=True, description="启用相似度缓存")
     max_cache_size: int = Field(
         default=1000, ge=100, le=10000, description="最大缓存大小"
     )
@@ -219,14 +203,10 @@ class FollowUpMergerSettings(BaseModel):
     )
 
     # 日志和调试
-    enable_detailed_logging: bool = Field(
-        default=False, description="启用详细日志"
-    )
-    log_merge_statistics: bool = Field(
-        default=True, description="记录合并统计信息"
-    )
+    enable_detailed_logging: bool = Field(default=False, description="启用详细日志")
+    log_merge_statistics: bool = Field(default=True, description="记录合并统计信息")
 
-    @field_validator('confidence_weight', 'relevance_weight', 'content_quality_weight')
+    @field_validator("confidence_weight", "relevance_weight", "content_quality_weight")
     @classmethod
     def validate_weights(cls, v, info):
         """验证权重值"""
@@ -237,16 +217,15 @@ class FollowUpMergerSettings(BaseModel):
     def model_post_init(self, __context) -> None:
         """模型初始化后验证"""
         # 验证权重总和
-        total_weight = self.confidence_weight + self.relevance_weight + self.content_quality_weight
+        total_weight = (
+            self.confidence_weight + self.relevance_weight + self.content_quality_weight
+        )
         if abs(total_weight - 1.0) > 0.01:  # 允许小的浮点误差
             import warnings
+
             warnings.warn(
-                f"权重总和应该接近1.0，当前总和: {total_weight:.3f}",
-                UserWarning
+                f"权重总和应该接近1.0，当前总和: {total_weight:.3f}", UserWarning
             )
-
-
-
 
 
 class IterativeResearchSettings(BaseModel):
@@ -447,7 +426,9 @@ class AppSettings(BaseSettings):
     agents: AgentSettings = Field(default_factory=AgentSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
     reflection: ReflectionSettings = Field(default_factory=ReflectionSettings)
-    followup_merger: FollowUpMergerSettings = Field(default_factory=FollowUpMergerSettings)
+    followup_merger: FollowUpMergerSettings = Field(
+        default_factory=FollowUpMergerSettings
+    )
 
     iterative_research: IterativeResearchSettings = Field(
         default_factory=IterativeResearchSettings
@@ -501,8 +482,6 @@ class AppSettings(BaseSettings):
     def get_followup_merger_config(self) -> FollowUpMergerSettings:
         """Get follow-up merger configuration."""
         return self.followup_merger
-
-
 
     def get_content_config(self) -> ContentSettings:
         """Get content-specific configuration."""

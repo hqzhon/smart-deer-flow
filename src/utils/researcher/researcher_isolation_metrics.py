@@ -582,26 +582,26 @@ class ResearcherIsolationMetrics:
         recommendations = []
 
         if self.isolation_sessions < 10:
-            recommendations.append("收集更多数据以获得更准确的性能分析")
+            recommendations.append("Collect more data for more accurate performance analysis")
             return recommendations
 
         # Analyze performance
         if self.context_compression_ratio > 0.8:
-            recommendations.append("考虑使用更激进的隔离级别以提高压缩效果")
+            recommendations.append("Consider using more aggressive isolation levels to improve compression")
 
         if self.performance_overhead > 0.1:
-            recommendations.append("性能开销较高，考虑优化隔离算法或降低隔离级别")
+            recommendations.append("High performance overhead, consider optimizing isolation algorithm or reducing isolation level")
 
         if self.token_savings_estimated / self.isolation_sessions < 500:
-            recommendations.append("Token节省效果不明显，建议调整隔离阈值")
+            recommendations.append("Token savings effect is not significant, suggest adjusting isolation threshold")
 
         # Analyze recent success rate
         recent_success_rate = self._get_recent_success_rate()
         if recent_success_rate < 0.9:
-            recommendations.append("最近成功率较低，建议检查隔离配置和错误日志")
+            recommendations.append("Recent success rate is low, suggest checking isolation configuration and error logs")
 
         if not recommendations:
-            recommendations.append("隔离系统运行良好，继续监控性能指标")
+            recommendations.append("Isolation system is running well, continue monitoring performance metrics")
 
         return recommendations
 
