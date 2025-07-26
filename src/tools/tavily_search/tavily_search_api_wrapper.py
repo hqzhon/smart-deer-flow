@@ -98,6 +98,9 @@ class EnhancedTavilySearchAPIWrapper(OriginalTavilySearchAPIWrapper):
                 "content": result["content"],
                 "score": result["score"],
             }
+            # Include raw_content if available
+            if "raw_content" in result:
+                clean_result["raw_content"] = result["raw_content"]
             clean_results.append(clean_result)
         images = raw_results["images"]
         for image in images:

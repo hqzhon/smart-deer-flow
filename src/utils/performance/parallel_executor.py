@@ -101,13 +101,15 @@ class SharedTaskContext:
                     )
                     return True
 
-        self.content_hashes.add(content_hash)
         return False
 
     def add_task_output(self, task_id: str, content: str) -> None:
         """Add task output to shared context"""
         if not self.is_content_duplicate(content):
             self.task_outputs[task_id] = content
+            # Add content hash after successful addition
+            content_hash = hashlib.md5(content.encode()).hexdigest()
+            self.content_hashes.add(content_hash)
             logger.debug(f"Added unique task output: {task_id}")
         else:
             logger.info(f"Skipped duplicate task output: {task_id}")
@@ -318,7 +320,9 @@ class ParallelExecutor:
 
                 # Add task output to shared context for deduplication
                 if (
-                    isinstance(task_result, str) and len(task_result) > 100
+                    task_result is not None
+                    and isinstance(task_result, str)
+                    and len(task_result) > 100
                 ):  # Only check substantial content
                     self.shared_context.add_task_output(task.task_id, task_result)
 
@@ -343,7 +347,6 @@ class ParallelExecutor:
                 break
 
             except Exception as e:
-                result.retry_count = attempt
                 error_type = error_handler.classify_error(str(e))
 
                 # Record rate limiting errors
@@ -363,6 +366,7 @@ class ParallelExecutor:
                 if attempt < task.max_retries and error_handler.should_retry_error(
                     error_type
                 ):
+                    result.retry_count = attempt + 1  # Count this as a retry
                     result.status = TaskStatus.RETRYING
                     wait_time = 2**attempt  # Exponential backoff
                     logger.info(f"Retrying task {task.task_id} in {wait_time}s")
@@ -371,6 +375,7 @@ class ParallelExecutor:
                     continue
                 else:
                     # No more retries
+                    result.retry_count = attempt  # Final retry count
                     result.status = TaskStatus.FAILED
                     result.error = e
                     self.failed_tasks += 1

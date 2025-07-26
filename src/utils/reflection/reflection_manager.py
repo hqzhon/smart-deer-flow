@@ -1,4 +1,4 @@
-"""统一的反射管理器，用于控制反射执行次数和避免重复触发。"""
+"""Unified reflection manager for controlling reflection execution count and avoiding duplicate triggers."""
 
 import logging
 import time
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ReflectionStats:
-    """反射统计信息"""
+    """Reflection statistics information"""
 
     total_reflections: int = 0
     iteration_reflections: int = 0
@@ -25,23 +25,26 @@ class ReflectionStats:
 
     @property
     def is_limit_reached(self) -> bool:
-        """检查是否达到反射次数限制"""
+        """Check if reflection count limit is reached"""
         return self.total_reflections >= self.max_allowed
 
     @property
     def remaining_count(self) -> int:
-        """剩余可用反射次数"""
+        """Remaining available reflection count"""
         return max(0, self.max_allowed - self.total_reflections)
 
 
 class ReflectionManager:
-    """统一的反射管理器"""
+    """Unified reflection manager"""
 
-    def __init__(self, max_reflections: Optional[int] = None, config: Optional[Any] = None):
-        # 如果没有提供配置，尝试从统一配置系统加载
+    def __init__(
+        self, max_reflections: Optional[int] = None, config: Optional[Any] = None
+    ):
+        # If no config provided, try to load from unified config system
         if config is None and max_reflections is None:
             try:
                 from src.config.config_loader import get_settings
+
                 app_settings = get_settings()
                 reflection_config = app_settings.get_reflection_config()
                 self.max_reflections = reflection_config.max_reflection_loops
@@ -52,12 +55,12 @@ class ReflectionManager:
         else:
             self.max_reflections = max_reflections or 1
             self.config = config
-            
+
         self._session_stats: Dict[str, ReflectionStats] = {}
         self._global_stats = ReflectionStats(max_allowed=self.max_reflections)
 
     def get_session_stats(self, session_id: str = "default") -> ReflectionStats:
-        """获取会话的反射统计信息"""
+        """Get reflection statistics for a session"""
         if session_id not in self._session_stats:
             self._session_stats[session_id] = ReflectionStats(
                 max_allowed=self.max_reflections
@@ -67,11 +70,11 @@ class ReflectionManager:
     def can_execute_reflection(
         self, session_id: str = "default", reflection_type: str = "general"
     ) -> Tuple[bool, str]:
-        """检查是否可以执行反射
+        """Check if reflection can be executed
 
         Args:
-            session_id: 会话ID
-            reflection_type: 反射类型 (iteration, final, follow_up, general)
+            session_id: Session ID
+            reflection_type: Reflection type (iteration, final, follow_up, general)
 
         Returns:
             (can_execute, reason)
@@ -79,40 +82,40 @@ class ReflectionManager:
         stats = self.get_session_stats(session_id)
 
         if stats.is_limit_reached:
-            return False, f"已达到最大反射次数限制 ({stats.max_allowed})"
+            return False, f"Maximum reflection count limit reached ({stats.max_allowed})"
 
-        # 特殊规则：如果已经有final反射，不允许再次执行final反射
+        # Special rule: if final reflection already exists, don't allow another final reflection
         if reflection_type == "final" and stats.final_reflections > 0:
-            return False, "已执行过最终反射分析"
+            return False, "Final reflection analysis already executed"
 
-        # 检查follow-up反射的频率限制
+        # Check follow-up reflection frequency limit
         if reflection_type == "follow_up" and stats.follow_up_reflections >= 2:
-            return False, "Follow-up反射次数已达到限制"
+            return False, "Follow-up reflection count limit reached"
 
-        return True, f"可以执行反射 (剩余 {stats.remaining_count} 次)"
+        return True, f"Can execute reflection (remaining {stats.remaining_count} times)"
 
     def record_reflection(
         self, session_id: str = "default", reflection_type: str = "general"
     ) -> bool:
-        """记录反射执行
+        """Record reflection execution
 
         Args:
-            session_id: 会话ID
-            reflection_type: 反射类型
+            session_id: Session ID
+            reflection_type: Reflection type
 
         Returns:
-            是否成功记录
+            Whether successfully recorded
         """
         can_execute, reason = self.can_execute_reflection(session_id, reflection_type)
 
         if not can_execute:
-            logger.warning(f"反射执行被拒绝: {reason}")
+            logger.warning(f"Reflection execution rejected: {reason}")
             return False
 
         stats = self.get_session_stats(session_id)
         stats.total_reflections += 1
 
-        # 按类型记录
+        # Record by type
         if reflection_type == "iteration":
             stats.iteration_reflections += 1
         elif reflection_type == "final":
@@ -121,20 +124,20 @@ class ReflectionManager:
             stats.follow_up_reflections += 1
 
         logger.info(
-            f"反射执行记录: 类型={reflection_type}, 总次数={stats.total_reflections}/{stats.max_allowed}, "
-            f"会话={session_id}"
+            f"Reflection execution recorded: type={reflection_type}, total={stats.total_reflections}/{stats.max_allowed}, "
+            f"session={session_id}"
         )
 
         return True
 
     def reset_session(self, session_id: str = "default"):
-        """重置会话的反射统计"""
+        """Reset reflection statistics for a session"""
         if session_id in self._session_stats:
             del self._session_stats[session_id]
-        logger.info(f"已重置会话 {session_id} 的反射统计")
+        logger.info(f"Reset reflection statistics for session {session_id}")
 
     def get_summary(self, session_id: str = "default") -> Dict[str, Any]:
-        """获取反射执行摘要"""
+        """Get reflection execution summary"""
         stats = self.get_session_stats(session_id)
 
         return {
@@ -152,12 +155,12 @@ class ReflectionManager:
         }
 
 
-# 全局反射管理器实例
+# Global reflection manager instance
 _global_reflection_manager: Optional[ReflectionManager] = None
 
 
 def get_reflection_manager(max_reflections: Optional[int] = None) -> ReflectionManager:
-    """获取全局反射管理器实例"""
+    """Get global reflection manager instance"""
     global _global_reflection_manager
 
     if _global_reflection_manager is None:
@@ -167,6 +170,6 @@ def get_reflection_manager(max_reflections: Optional[int] = None) -> ReflectionM
 
 
 def reset_reflection_manager():
-    """重置全局反射管理器"""
+    """Reset global reflection manager"""
     global _global_reflection_manager
     _global_reflection_manager = None

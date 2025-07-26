@@ -41,6 +41,36 @@ class SmartSearchTool(BaseTool):
         default=10, description="Maximum number of search results"
     )
 
+    @property
+    def max_results(self) -> int:
+        """Alias for max_search_results for backward compatibility."""
+        return self.max_search_results
+
+    @property
+    def include_raw_content(self) -> bool:
+        """Delegate to base tool if available."""
+        return getattr(self.base_tool, "include_raw_content", True)
+
+    @property
+    def include_images(self) -> bool:
+        """Delegate to base tool if available."""
+        return getattr(self.base_tool, "include_images", True)
+
+    @property
+    def include_image_descriptions(self) -> bool:
+        """Delegate to base tool if available."""
+        return getattr(self.base_tool, "include_image_descriptions", True)
+
+    @property
+    def search_wrapper(self):
+        """Delegate to base tool if available."""
+        return getattr(self.base_tool, "search_wrapper", None)
+
+    @property
+    def api_wrapper(self):
+        """Delegate to base tool if available."""
+        return getattr(self.base_tool, "api_wrapper", None)
+
     def _run(self, query: str, **kwargs) -> str:
         """Execute search with smart filtering."""
         try:
@@ -127,6 +157,17 @@ class SmartSearchTool(BaseTool):
         return self._run(query, **kwargs)
 
 
+# Export SELECTED_SEARCH_ENGINE for backward compatibility with tests
+# This will be dynamically updated when get_settings() is called
+def _get_selected_search_engine():
+    """Get the currently selected search engine from settings."""
+    return get_settings().tools.search_engine
+
+
+# Initialize SELECTED_SEARCH_ENGINE
+SELECTED_SEARCH_ENGINE = _get_selected_search_engine()
+
+
 # Get the selected search tool with smart filtering
 def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = True):
     """Get web search tool with optional smart filtering.
@@ -140,16 +181,16 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
     """
     # Get configuration settings
     settings = get_settings()
-    selected_search_engine = settings.tools.search_engine
+    selected_search_engine = SELECTED_SEARCH_ENGINE
 
     # Get the base search tool based on selected engine
     if selected_search_engine == SearchEngine.TAVILY:
         base_tool = LoggedTavilySearch(
             name="web_search_base",
             max_results=max_search_results,
-            include_raw_content=False,
-            include_images=False,
-            include_image_descriptions=False,
+            include_raw_content=True,
+            include_images=True,
+            include_image_descriptions=True,
         )
     elif selected_search_engine == SearchEngine.DUCKDUCKGO:
         base_tool = LoggedDuckDuckGoSearch(

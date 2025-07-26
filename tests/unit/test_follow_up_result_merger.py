@@ -5,7 +5,6 @@
 """
 
 import unittest
-from unittest.mock import patch
 import sys
 import os
 
@@ -15,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.utils.common.follow_up_result_merger import FollowUpResultMerger
 from src.config.follow_up_merger_config import (
     FollowUpMergerConfig,
-    get_active_merger_config,
 )
 
 
@@ -127,7 +125,9 @@ class TestFollowUpResultMerger(unittest.TestCase):
         """测试质量过滤"""
         test_results = [
             {
-                "content": "这是一个高质量的详细研究发现，包含了丰富的信息和深入的分析。",
+                "content": (
+                    "这是一个高质量的详细研究发现，包含了丰富的信息和深入的分析。"
+                ),
                 "source": "source1",
                 "type": "research_finding",
                 "metadata": {"confidence": 0.9},
@@ -218,11 +218,11 @@ class TestFollowUpResultMerger(unittest.TestCase):
         """测试配置集成"""
         # 测试使用自定义配置创建合并器
         from src.config.follow_up_merger_config import FollowUpMergerConfig
-        
+
         custom_config = FollowUpMergerConfig(
             similarity_threshold=0.9, enable_semantic_grouping=False
         )
-        
+
         # 创建新的合并器（使用自定义配置）
         merger = FollowUpResultMerger(config=custom_config)
 

@@ -148,9 +148,9 @@ class InteractiveElementGenerator:
                 ],
                 InteractiveElementType.CODE_VIEWER: [
                     r"```.*?```",  # Code blocks
-                    r"SQL查询",
-                    r"Python代码",
-                    r"分析代码",
+                    r"SQL query",
+                    r"Python code",
+                    r"analysis code",
                 ],
             }
         else:  # English

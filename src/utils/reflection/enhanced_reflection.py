@@ -15,8 +15,9 @@ from pydantic import BaseModel, Field, field_validator
 from src.config.config_loader import get_settings
 from src.utils.reflection.reflection_prompt_manager import ReflectionPromptManager
 from src.report_quality.i18n import Language
-
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+from src.llms.error_handler import safe_llm_call_async
 
 
 class KnowledgeGap(BaseModel):
@@ -47,10 +48,6 @@ class ReflectionConfig(BaseModel):
         default=0.7, description="Threshold for sufficiency"
     )
 
-
-from langchain_core.runnables import RunnableConfig
-from src.llms.error_handler import safe_llm_call_async
-from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -107,12 +104,14 @@ class ReflectionResult(BaseModel):
             if isinstance(item, slice):
                 logger.warning(f"Skipping slice object in knowledge_gaps: {item}")
                 continue
-            
+
             if isinstance(item, str):
                 if item.strip() and "slice(" not in item and not item.startswith("<"):
                     result.append(item)
                 else:
-                    logger.warning(f"Skipping invalid string in knowledge_gaps: '{item}'")
+                    logger.warning(
+                        f"Skipping invalid string in knowledge_gaps: '{item}'"
+                    )
             elif isinstance(item, dict):
                 # Extract description or convert dict to string
                 if "description" in item:
@@ -125,14 +124,24 @@ class ReflectionResult(BaseModel):
                         result.append(gap_str)
                 else:
                     item_str = str(item)
-                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    if (
+                        item_str.strip()
+                        and "slice(" not in item_str
+                        and not item_str.startswith("<")
+                    ):
                         result.append(item_str)
             else:
                 item_str = str(item)
-                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                if (
+                    item_str.strip()
+                    and "slice(" not in item_str
+                    and not item_str.startswith("<")
+                ):
                     result.append(item_str)
                 else:
-                    logger.warning(f"Skipping invalid item in knowledge_gaps: '{item_str}'")
+                    logger.warning(
+                        f"Skipping invalid item in knowledge_gaps: '{item_str}'"
+                    )
         return result
 
     @field_validator("follow_up_queries", mode="before")
@@ -148,13 +157,15 @@ class ReflectionResult(BaseModel):
             if isinstance(item, slice):
                 logger.warning(f"Skipping slice object in follow_up_queries: {item}")
                 continue
-            
+
             if isinstance(item, str):
                 # Validate string content
                 if item.strip() and "slice(" not in item and not item.startswith("<"):
                     result.append(item)
                 else:
-                    logger.warning(f"Skipping invalid string in follow_up_queries: '{item}'")
+                    logger.warning(
+                        f"Skipping invalid string in follow_up_queries: '{item}'"
+                    )
             elif isinstance(item, dict):
                 # Extract meaningful string representation from dictionary
                 if "query" in item:
@@ -171,15 +182,25 @@ class ReflectionResult(BaseModel):
                         result.append(gap_str)
                 else:
                     item_str = str(item)
-                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    if (
+                        item_str.strip()
+                        and "slice(" not in item_str
+                        and not item_str.startswith("<")
+                    ):
                         result.append(item_str)
             else:
                 # Convert other types to string with validation
                 item_str = str(item)
-                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                if (
+                    item_str.strip()
+                    and "slice(" not in item_str
+                    and not item_str.startswith("<")
+                ):
                     result.append(item_str)
                 else:
-                    logger.warning(f"Skipping invalid item in follow_up_queries: '{item_str}'")
+                    logger.warning(
+                        f"Skipping invalid item in follow_up_queries: '{item_str}'"
+                    )
         return result
 
     @field_validator("recommendations", mode="before")
@@ -195,12 +216,14 @@ class ReflectionResult(BaseModel):
             if isinstance(item, slice):
                 logger.warning(f"Skipping slice object in recommendations: {item}")
                 continue
-            
+
             if isinstance(item, str):
                 if item.strip() and "slice(" not in item and not item.startswith("<"):
                     result.append(item)
                 else:
-                    logger.warning(f"Skipping invalid string in recommendations: '{item}'")
+                    logger.warning(
+                        f"Skipping invalid string in recommendations: '{item}'"
+                    )
             elif isinstance(item, dict):
                 # Extract relevant field or convert to string
                 if "recommendation" in item:
@@ -213,14 +236,24 @@ class ReflectionResult(BaseModel):
                         result.append(desc_str)
                 else:
                     item_str = str(item)
-                    if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                    if (
+                        item_str.strip()
+                        and "slice(" not in item_str
+                        and not item_str.startswith("<")
+                    ):
                         result.append(item_str)
             else:
                 item_str = str(item)
-                if item_str.strip() and "slice(" not in item_str and not item_str.startswith("<"):
+                if (
+                    item_str.strip()
+                    and "slice(" not in item_str
+                    and not item_str.startswith("<")
+                ):
                     result.append(item_str)
                 else:
-                    logger.warning(f"Skipping invalid item in recommendations: '{item_str}'")
+                    logger.warning(
+                        f"Skipping invalid item in recommendations: '{item_str}'"
+                    )
         return result
 
 
@@ -476,23 +509,63 @@ class EnhancedReflectionAgent:
                 result = json.loads(response.content)
                 raw_queries = result.get("follow_up_queries", [])
 
-                # Ensure all queries are strings
+                # Ensure all queries are strings and filter out invalid objects
                 follow_up_queries = []
                 for query in raw_queries:
-                    if isinstance(query, str):
-                        follow_up_queries.append(query)
+                    # Skip slice objects and other invalid types
+                    if isinstance(query, slice):
+                        logger.warning(f"Skipping slice object in AI response: {query}")
+                        continue
+                    elif isinstance(query, str):
+                        if (
+                            query.strip()
+                            and "slice(" not in query
+                            and not query.startswith("<")
+                        ):
+                            follow_up_queries.append(query)
+                        else:
+                            logger.warning(f"Skipping invalid string query: '{query}'")
                     elif isinstance(query, dict):
                         # Extract meaningful string from dict
                         if "query" in query:
-                            follow_up_queries.append(str(query["query"]))
+                            query_str = str(query["query"])
                         elif "question" in query:
-                            follow_up_queries.append(str(query["question"]))
+                            query_str = str(query["question"])
                         elif "description" in query:
-                            follow_up_queries.append(str(query["description"]))
+                            query_str = str(query["description"])
                         else:
-                            follow_up_queries.append(str(query))
+                            query_str = str(query)
+
+                        if (
+                            query_str.strip()
+                            and "slice(" not in query_str
+                            and not query_str.startswith("<")
+                        ):
+                            follow_up_queries.append(query_str)
+                        else:
+                            logger.warning(f"Skipping invalid dict query: {query}")
                     else:
-                        follow_up_queries.append(str(query))
+                        query_str = str(query)
+                        if (
+                            query_str.strip()
+                            and "slice(" not in query_str
+                            and not query_str.startswith("<")
+                            and not query_str.startswith("{")
+                            and "object at" not in query_str
+                        ):
+                            follow_up_queries.append(query_str)
+                        else:
+                            logger.warning(
+                                f"Skipping invalid query object: {query} (type: {type(query)})"
+                            )
+
+                # Apply maximum limit to prevent excessive queries
+                MAX_FOLLOW_UP_QUERIES = 3
+                if len(follow_up_queries) > MAX_FOLLOW_UP_QUERIES:
+                    follow_up_queries = follow_up_queries[:MAX_FOLLOW_UP_QUERIES]
+                    logger.info(
+                        f"Limited follow-up queries to {MAX_FOLLOW_UP_QUERIES} (from {len(raw_queries)} generated)"
+                    )
 
                 # Log parsed results
                 logger.info(f"Generated {len(follow_up_queries)} follow-up queries")
@@ -506,7 +579,7 @@ class EnhancedReflectionAgent:
                 )
                 if language == Language.ZH_CN:
                     return [
-                        f"关于{gap}的更多信息需要什么？" for gap in knowledge_gaps[:3]
+                        f"What additional information is needed about {gap}?" for gap in knowledge_gaps[:3]
                     ]
                 else:
                     return [
@@ -517,7 +590,7 @@ class EnhancedReflectionAgent:
         except Exception as e:
             logger.error(f"Error generating follow-up queries: {e}")
             if language == Language.ZH_CN:
-                return [f"关于{gap}的更多信息需要什么？" for gap in knowledge_gaps[:3]]
+                return [f"What additional information is needed about {gap}?" for gap in knowledge_gaps[:3]]
             else:
                 return [
                     f"What additional information is needed about {gap}?"
@@ -613,12 +686,14 @@ class EnhancedReflectionAgent:
         # Prepare execution results summary with length limits to prevent truncation
         max_results_length = 2000  # Limit to prevent overly long prompts
         if context.execution_results:
-            combined_results = "\n\n---\n\n".join(str(res) for res in context.execution_results)
+            combined_results = "\n\n---\n\n".join(
+                str(res) for res in context.execution_results
+            )
             if len(combined_results) > max_results_length:
                 # Truncate and add note
                 truncated_results = combined_results[:max_results_length]
                 truncation_note = (
-                    "\n\n[更多结果已省略以控制长度]"
+                    "\n\n[Additional results truncated for length control]"
                     if language == Language.ZH_CN
                     else "\n\n[Additional results truncated for length control]"
                 )
@@ -627,7 +702,7 @@ class EnhancedReflectionAgent:
                 results_summary = combined_results
         else:
             results_summary = (
-                "暂无执行结果。"
+                "No execution results available yet."
                 if language == Language.ZH_CN
                 else "No execution results available yet."
             )
@@ -638,8 +713,8 @@ class EnhancedReflectionAgent:
         for i, step in enumerate(context.completed_steps):
             step_text = ""
             if language == Language.ZH_CN:
-                step_text += f"步骤 {i+1}: {step.get('step', '未知')}\n"
-                step_text += f"描述: {step.get('description', '无描述')}\n"
+                step_text += f"Step {i+1}: {step.get('step', 'Unknown')}\n"
+                step_text += f"Description: {step.get('description', 'No description')}\n"
                 if step.get("execution_res"):
                     # Limit individual step result length
                     exec_res = (
@@ -647,7 +722,7 @@ class EnhancedReflectionAgent:
                         if len(step["execution_res"]) > 150
                         else step["execution_res"]
                     )
-                    step_text += f"结果: {exec_res}\n"
+                    step_text += f"Result: {exec_res}\n"
             else:
                 step_text += f"Step {i+1}: {step.get('step', 'Unknown')}\n"
                 step_text += (
@@ -666,7 +741,7 @@ class EnhancedReflectionAgent:
             # Check if adding this step would exceed length limit
             if len(steps_summary + step_text) > max_steps_length:
                 truncation_note = (
-                    "\n[更多步骤已省略]"
+                    "\n[Additional steps truncated]"
                     if language == Language.ZH_CN
                     else "\n[Additional steps truncated]"
                 )
@@ -681,7 +756,7 @@ class EnhancedReflectionAgent:
             if len(combined_obs) > max_obs_length:
                 truncated_obs = combined_obs[:max_obs_length]
                 truncation_note = (
-                    "\n[更多观察已省略]"
+                    "\n[Additional observations truncated]"
                     if language == Language.ZH_CN
                     else "\n[Additional observations truncated]"
                 )
@@ -690,7 +765,7 @@ class EnhancedReflectionAgent:
                 observations_summary = combined_obs
         else:
             observations_summary = (
-                "无观察记录。"
+                "No observations recorded."
                 if language == Language.ZH_CN
                 else "No observations recorded."
             )
@@ -805,7 +880,7 @@ class EnhancedReflectionAgent:
                         report_content = report_content.encode().decode(
                             "unicode_escape"
                         )
-                except:
+                except (UnicodeDecodeError, UnicodeError, AttributeError):
                     pass
                 extracted_data["comprehensive_report"] = report_content
 
@@ -814,7 +889,7 @@ class EnhancedReflectionAgent:
                     ("。", ".", "!", "?")
                 ):
                     extracted_data["comprehensive_report"] += (
-                        "\n\n[注：由于响应长度限制，报告可能被截断]"
+                        "\n\n[Note: Report may be truncated due to response length limits]"
                         if context.locale.startswith("zh")
                         else "\n\n[Note: Report may be truncated due to response length limits]"
                     )
@@ -863,7 +938,7 @@ class EnhancedReflectionAgent:
                                         items.append(str(obj))
                                 else:
                                     items.append(str(obj))
-                            except:
+                            except (json.JSONDecodeError, ValueError, TypeError):
                                 # If JSON parsing fails, just use the string representation
                                 items.append(str(obj_str))
 
@@ -874,34 +949,57 @@ class EnhancedReflectionAgent:
                             try:
                                 # Skip slice objects and other invalid types
                                 if isinstance(item, slice):
-                                    logger.warning(f"Skipping slice object in {field}: {item}")
+                                    logger.warning(
+                                        f"Skipping slice object in {field}: {item}"
+                                    )
                                     continue
-                                
+
                                 if isinstance(item, str):
-                                    decoded_item = item.encode().decode("unicode_escape")
+                                    decoded_item = item.encode().decode(
+                                        "unicode_escape"
+                                    )
                                     # Additional validation for decoded string
-                                    if decoded_item and decoded_item.strip() and "slice(" not in decoded_item:
+                                    if (
+                                        decoded_item
+                                        and decoded_item.strip()
+                                        and "slice(" not in decoded_item
+                                    ):
                                         decoded_items.append(decoded_item)
                                     else:
-                                        logger.warning(f"Skipping invalid decoded item in {field}: '{decoded_item}'")
+                                        logger.warning(
+                                            f"Skipping invalid decoded item in {field}: '{decoded_item}'"
+                                        )
                                 else:
                                     str_item = str(item)
                                     # Validate string representation
-                                    if str_item and str_item.strip() and "slice(" not in str_item and not str_item.startswith("<"):
+                                    if (
+                                        str_item
+                                        and str_item.strip()
+                                        and "slice(" not in str_item
+                                        and not str_item.startswith("<")
+                                    ):
                                         decoded_items.append(str_item)
                                     else:
-                                        logger.warning(f"Skipping invalid item in {field}: '{str_item}'")
+                                        logger.warning(
+                                            f"Skipping invalid item in {field}: '{str_item}'"
+                                        )
                             except Exception as e:
                                 logger.warning(f"Error processing item in {field}: {e}")
                                 # Only add if it's a valid string
-                                if isinstance(item, str) and item.strip() and "slice(" not in item:
+                                if (
+                                    isinstance(item, str)
+                                    and item.strip()
+                                    and "slice(" not in item
+                                ):
                                     decoded_items.append(item)
-                        
+
                         # Only set the field if we have valid items
                         if decoded_items:
                             extracted_data[field] = decoded_items
                         else:
-                            logger.warning(f"No valid items found for {field}, using empty list")
+                            logger.warning(
+                                f"No valid items found for {field}, using empty list"
+                            )
                             extracted_data[field] = []
 
             logger.info(
@@ -912,7 +1010,7 @@ class EnhancedReflectionAgent:
             logger.error(f"Failed to extract partial data: {extract_error}")
             # Use basic fallback
             extracted_data["comprehensive_report"] = (
-                "研究分析报告\n\n由于技术限制，无法生成完整的综合报告。"
+                "Research Analysis Report\n\nUnable to generate complete comprehensive report due to technical limitations."
                 if context.locale.startswith("zh")
                 else "Research Analysis Report\n\nUnable to generate complete comprehensive report due to technical limitations."
             )
@@ -1044,6 +1142,7 @@ class EnhancedReflectionAgent:
                 follow_up_queries = [
                     f"Additional details about {context.research_topic}"
                 ]
+        # When is_sufficient is True, follow_up_queries remains empty []
 
         recommendations = (
             ["Continue with planned research steps"]

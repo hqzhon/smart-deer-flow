@@ -97,11 +97,19 @@ def test_background_investigation_node_tavily(
     mock_settings = MagicMock()
     mock_settings.tools.search_engine = search_engine
     mock_settings.agent_llm_map.planner = "basic"
-    
-    with patch("src.graph.nodes.get_settings", return_value=mock_settings), \
-         patch("src.graph.nodes.get_llm_by_type", return_value=MagicMock(model_name="test-model")), \
-         patch("src.graph.nodes.safe_llm_call", side_effect=lambda func, *args, **kwargs: func(*args)):
-        
+
+    with (
+        patch("src.graph.nodes.get_settings", return_value=mock_settings),
+        patch(
+            "src.graph.nodes.get_llm_by_type",
+            return_value=MagicMock(model_name="test-model"),
+        ),
+        patch(
+            "src.graph.nodes.safe_llm_call",
+            side_effect=lambda func, *args, **kwargs: func(*args),
+        ),
+    ):
+
         result = background_investigation_node(mock_state, mock_config)
 
         # Verify the result structure
@@ -134,11 +142,19 @@ def test_background_investigation_node_malformed_response(
     mock_settings = MagicMock()
     mock_settings.tools.search_engine = SearchEngine.TAVILY.value
     mock_settings.agent_llm_map.planner = "basic"
-    
-    with patch("src.graph.nodes.get_settings", return_value=mock_settings), \
-         patch("src.graph.nodes.get_llm_by_type", return_value=MagicMock(model_name="test-model")), \
-         patch("src.graph.nodes.safe_llm_call", side_effect=lambda func, *args, **kwargs: func(*args)):
-        
+
+    with (
+        patch("src.graph.nodes.get_settings", return_value=mock_settings),
+        patch(
+            "src.graph.nodes.get_llm_by_type",
+            return_value=MagicMock(model_name="test-model"),
+        ),
+        patch(
+            "src.graph.nodes.safe_llm_call",
+            side_effect=lambda func, *args, **kwargs: func(*args),
+        ),
+    ):
+
         # Mock a malformed response
         mock_tavily_search.return_value.invoke.return_value = "invalid response"
 
@@ -249,7 +265,7 @@ def test_planner_node_basic_has_enough_context(
         mock_response.model_dump_json.return_value = json.dumps(mock_plan)
         mock_llm.invoke.return_value = mock_response
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return the mock response directly
         mock_safe_llm_call.return_value = mock_response
 
@@ -292,7 +308,7 @@ def test_planner_node_basic_not_enough_context(
         mock_response.model_dump_json.return_value = json.dumps(plan)
         mock_llm.invoke.return_value = mock_response
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return the mock response directly
         mock_safe_llm_call.return_value = mock_response
 
@@ -329,7 +345,7 @@ def test_planner_node_stream_mode_has_enough_context(
         chunk.content = json.dumps(mock_plan)
         mock_llm.stream.return_value = [chunk]
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return a mock stream response
         mock_stream_response = MagicMock()
         mock_stream_response.content = json.dumps(mock_plan)
@@ -372,7 +388,7 @@ def test_planner_node_stream_mode_not_enough_context(
         chunk.content = json.dumps(plan)
         mock_llm.stream.return_value = [chunk]
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return a mock stream response
         mock_stream_response = MagicMock()
         mock_stream_response.content = json.dumps(plan)
@@ -397,7 +413,7 @@ def test_planner_node_plan_iterations_exceeded(mock_state_planner):
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
-        
+
         # Mock safe_llm_call to return a mock response
         mock_response = MagicMock()
         mock_safe_llm_call.return_value = mock_response
@@ -428,7 +444,7 @@ def test_planner_node_json_decode_error_first_iteration(mock_state_planner):
         mock_response.model_dump_json.return_value = '{"bad": "json"'
         mock_llm.invoke.return_value = mock_response
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return the mock response directly
         mock_safe_llm_call.return_value = mock_response
 
@@ -460,7 +476,7 @@ def test_planner_node_json_decode_error_second_iteration(mock_state_planner):
         mock_response.model_dump_json.return_value = '{"bad": "json"'
         mock_llm.invoke.return_value = mock_response
         mock_get_llm.return_value = mock_llm
-        
+
         # Mock safe_llm_call to return the mock response directly
         mock_safe_llm_call.return_value = mock_response
 
@@ -958,13 +974,13 @@ class Step:
         self.title = title
         self.description = description
         self.execution_res = execution_res
-    
+
     def copy(self, update=None):
         """Create a copy of the step with optional updates."""
         new_step = Step(
             title=self.title,
             description=self.description,
-            execution_res=self.execution_res
+            execution_res=self.execution_res,
         )
         if update:
             for key, value in update.items():
@@ -985,7 +1001,7 @@ def mock_completed_step():
 class Plan:
     def __init__(self, steps):
         self.steps = steps
-    
+
     def copy(self, update=None):
         """Create a copy of the plan with optional updates."""
         new_plan = Plan(steps=self.steps[:])
@@ -1094,8 +1110,12 @@ async def test_execute_agent_step_with_resources_and_researcher(mock_step):
         # Check that resource info and citation reminder are present in agent_state
         resources_info = input.get("resources_info", "")
         citation_reminder = input.get("citation_reminder", "")
-        assert "local_search_tool" in resources_info, f"Expected local_search_tool in resources_info: {resources_info}"
-        assert "DO NOT include inline citations" in citation_reminder, f"Expected citation reminder: {citation_reminder}"
+        assert (
+            "local_search_tool" in resources_info
+        ), f"Expected local_search_tool in resources_info: {resources_info}"
+        assert (
+            "DO NOT include inline citations" in citation_reminder
+        ), f"Expected citation reminder: {citation_reminder}"
         return MagicMock(content="resource result")
 
     with patch("src.graph.nodes.safe_llm_call_async", side_effect=mock_safe_llm_call):
@@ -1124,7 +1144,9 @@ async def test_execute_agent_step_recursion_limit_env(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, MagicMock(), mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, MagicMock(), mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.info.assert_any_call("Recursion limit set to: 42")
 
@@ -1144,7 +1166,9 @@ async def test_execute_agent_step_recursion_limit_env_invalid(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, MagicMock(), mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, MagicMock(), mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
             "Invalid AGENT_RECURSION_LIMIT value: 'notanint'. Using default value 10."
@@ -1166,7 +1190,9 @@ async def test_execute_agent_step_recursion_limit_env_negative(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, MagicMock(), mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, MagicMock(), mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
             "AGENT_RECURSION_LIMIT value '-5' (parsed as -5) is not positive. Using default value 10."
@@ -1279,12 +1305,12 @@ async def test_setup_and_execute_agent_step_with_mcp(
 ):
     # Should use MCP client, load tools, and call create_agent with correct tools
     from langchain_core.tools import tool
-    
+
     @tool
     def default_tool(query: str) -> str:
         """A default tool for testing."""
         return "default result"
-    
+
     default_tools = [default_tool]
     agent_type = "researcher"
 
@@ -1315,12 +1341,12 @@ async def test_setup_and_execute_agent_step_without_mcp(
 ):
     # Should use default tools and not use MCP client
     from langchain_core.tools import tool
-    
+
     @tool
     def default_tool(query: str) -> str:
         """A default tool for testing."""
         return "default result"
-    
+
     default_tools = [default_tool]
     agent_type = "coder"
 
@@ -1367,12 +1393,12 @@ async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
         return_value=configurable,
     ):
         from langchain_core.tools import tool
-        
+
         @tool
         def default_tool(query: str) -> str:
             """A default tool for testing."""
             return "default result"
-        
+
         default_tools = [default_tool]
         agent_type = "researcher"
         result = await _setup_and_execute_agent_step(
@@ -1397,12 +1423,12 @@ async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
 ):
     # Should update tool.description with Powered by info
     from langchain_core.tools import tool
-    
+
     @tool
     def default_tool(query: str) -> str:
         """A default tool for testing."""
         return "default result"
-    
+
     default_tools = [default_tool]
     agent_type = "researcher"
 
@@ -1459,12 +1485,12 @@ def mock_state_without_resources():
 def patch_get_web_search_tool():
     with patch("src.graph.nodes.get_web_search_tool") as mock:
         from langchain_core.tools import tool
-        
+
         @tool
         def web_search_tool(query: str) -> str:
             """A web search tool for testing."""
             return "search result"
-        
+
         mock.return_value = web_search_tool
         yield mock
 
@@ -1472,12 +1498,12 @@ def patch_get_web_search_tool():
 @pytest.fixture
 def patch_crawl_tool():
     from langchain_core.tools import tool
-    
+
     @tool
     def crawl_tool(url: str) -> str:
         """A crawl tool for testing."""
         return "crawl result"
-    
+
     with patch("src.graph.nodes.crawl_tool", crawl_tool):
         yield
 
@@ -1486,12 +1512,12 @@ def patch_crawl_tool():
 def patch_get_retriever_tool():
     with patch("src.graph.nodes.get_retriever_tool") as mock:
         from langchain_core.tools import tool
-        
+
         @tool
         def retriever_tool(query: str) -> str:
             """A retriever tool for testing."""
             return "retriever result"
-        
+
         mock.return_value = retriever_tool
         yield mock
 

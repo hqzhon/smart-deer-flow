@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class LimitationType(Enum):
-    """Limitation Types"""
+    """Data Limitation Types"""
 
     SAMPLE_SIZE = "sample_size"
     TIME_PERIOD = "time_period"
@@ -27,7 +27,7 @@ class LimitationType(Enum):
 
 
 class ConfidenceLevel(Enum):
-    """Confidence Levels"""
+    """Statistical Confidence Levels"""
 
     VERY_HIGH = "very_high"  # 95%+
     HIGH = "high"  # 80-95%
@@ -37,7 +37,7 @@ class ConfidenceLevel(Enum):
 
 
 class EvidenceQuality(Enum):
-    """Evidence Quality"""
+    """Evidence Quality Assessment"""
 
     STRONG = "strong"  # Multiple verification, authoritative sources
     MODERATE = "moderate"  # Partial verification, credible sources
@@ -47,7 +47,7 @@ class EvidenceQuality(Enum):
 
 @dataclass
 class DataLimitation:
-    """Data Limitation"""
+    """Data Limitation Assessment"""
 
     limitation_id: str
     limitation_type: LimitationType
@@ -59,7 +59,7 @@ class DataLimitation:
 
 @dataclass
 class ConfidenceAnnotation:
-    """Confidence Annotation"""
+    """Statistical Confidence Annotation"""
 
     statement: str
     confidence_level: ConfidenceLevel
@@ -71,7 +71,7 @@ class ConfidenceAnnotation:
 
 @dataclass
 class BiasAssessment:
-    """Bias Assessment"""
+    """Cognitive Bias Assessment"""
 
     bias_type: str
     severity: str  # high, medium, low
@@ -82,7 +82,7 @@ class BiasAssessment:
 
 @dataclass
 class CriticalAnalysis:
-    """Critical Analysis"""
+    """Critical Thinking Analysis Results"""
 
     analysis_id: str
     original_content: str
@@ -94,7 +94,7 @@ class CriticalAnalysis:
 
 
 class LimitationDetector:
-    """Limitation Detector"""
+    """Data Limitation Detection Engine"""
 
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
@@ -105,25 +105,25 @@ class LimitationDetector:
         self.detection_patterns = {
             Language.ZH_CN: {
                 LimitationType.SAMPLE_SIZE: [
-                    r"(\d+)\s*(个|名|家|只)\s*(样本|案例|公司|股票)",
-                    r"基于\s*(\d+)\s*(个|项|例)",
+                    r"(\d+)\s*(个|名|家|只)\s*(样本|案例|公司|股票)",  # N samples/cases/companies/stocks
+                    r"基于\s*(\d+)\s*(个|项|例)",  # Based on N items/cases
                     r"(\d+)\s*(subjects?|participants?|companies?)",
                 ],
                 LimitationType.TIME_PERIOD: [
-                    r"(\d{4})\s*年\s*数据",
-                    r"近\s*(\d+)\s*(年|月|日)",
+                    r"(\d{4})\s*年\s*数据",  # YYYY year data
+                    r"近\s*(\d+)\s*(年|月|日)",  # Recent N years/months/days
                     r"(\d{4})\s*-\s*(\d{4})",
-                    r"(Q[1-4])\s*季度",
+                    r"(Q[1-4])\s*季度",  # Q1-Q4 quarter
                 ],
                 LimitationType.GEOGRAPHIC_SCOPE: [
-                    r"(中国|美国|欧洲|亚洲)\s*(市场|地区)",
-                    r"仅限.*?地区",
-                    r"局限于.*?范围",
+                    r"(中国|美国|欧洲|亚洲)\s*(市场|地区)",  # China/US/Europe/Asia market/region
+                    r"仅限.*?地区",  # Limited to ... region
+                    r"局限于.*?范围",  # Confined to ... scope
                 ],
                 LimitationType.METHODOLOGY: [
-                    r"使用.*?方法",
-                    r"基于.*?模型",
-                    r"通过.*?分析",
+                    r"使用.*?方法",  # Using ... method
+                    r"基于.*?模型",  # Based on ... model
+                    r"通过.*?分析",  # Through ... analysis
                 ],
             },
             Language.EN_US: {
@@ -153,20 +153,20 @@ class LimitationDetector:
 
         self.quality_indicators = {
             "small_sample": {"threshold": 30, "impact": "high"},
-            "short_period": {"threshold": 1, "impact": "medium"},  # 1 year
+            "short_period": {"threshold": 1, "impact": "medium"},  # 1 year threshold
             "single_source": {"impact": "medium"},
             "no_control_group": {"impact": "high"},
         }
 
     def set_language(self, language: Language):
-        """Set language for the detector"""
+        """Set language for the limitation detector"""
         self.language = language
         self.i18n.set_language(language)
 
     def detect_limitations(
         self, content: str, metadata: Dict[str, Any]
     ) -> List[DataLimitation]:
-        """Detect data limitations"""
+        """Detect data limitations in content and metadata"""
         limitations = []
 
         # Detect sample size limitations
@@ -192,7 +192,7 @@ class LimitationDetector:
         return limitations
 
     def _detect_sample_limitations(self, content: str) -> List[DataLimitation]:
-        """Detect sample size limitations"""
+        """Detect sample size limitations in the content"""
         limitations = []
 
         patterns = self.detection_patterns.get(self.language, {}).get(
@@ -240,18 +240,18 @@ class LimitationDetector:
         return limitations
 
     def _detect_time_limitations(self, content: str) -> List[DataLimitation]:
-        """Detect time range limitations"""
+        """Detect time range and temporal limitations"""
         limitations = []
 
         # Detect short time span - language-specific patterns
         if self.language == Language.ZH_CN:
             short_period_patterns = [
-                r"(\d+)\s*个?月",
-                r"(\d+)\s*季度",
-                r"近期",
-                r"最近",
+                r"(\d+)\s*个?月",  # Chinese: N months
+                r"(\d+)\s*季度",  # Chinese: N quarters
+                r"近期",  # Chinese: recent period
+                r"最近",  # Chinese: recently
             ]
-            year_pattern = r"(\d{4})\s*年"
+            year_pattern = r"(\d{4})\s*年"  # Chinese: YYYY year
         else:  # English
             short_period_patterns = [
                 r"(\d+)\s*months?",
@@ -286,7 +286,7 @@ class LimitationDetector:
                 )
                 break
 
-        # Detect data timeliness
+        # Detect data timeliness issues
         years = re.findall(year_pattern, content)
         if years:
             if self.language == Language.ZH_CN:
@@ -322,19 +322,19 @@ class LimitationDetector:
         return limitations
 
     def _detect_geographic_limitations(self, content: str) -> List[DataLimitation]:
-        """Detect geographic scope limitations"""
+        """Detect geographic scope and regional limitations"""
         limitations = []
 
         # Language-specific geographic indicators
         if self.language == Language.ZH_CN:
             geographic_indicators = [
-                "仅限中国",
-                "仅在美国",
-                "局限于",
-                "限于.*地区",
-                "单一市场",
-                "特定地区",
-                "区域性",
+                "仅限中国",  # Chinese: limited to China only
+                "仅在美国",  # Chinese: only in US
+                "局限于",  # Chinese: confined to
+                "限于.*地区",  # Chinese: limited to ... region
+                "单一市场",  # Chinese: single market
+                "特定地区",  # Chinese: specific region
+                "区域性",  # Chinese: regional
             ]
         else:  # English
             geographic_indicators = [
@@ -376,12 +376,17 @@ class LimitationDetector:
         return limitations
 
     def _detect_methodology_limitations(self, content: str) -> List[DataLimitation]:
-        """Detect methodology limitations"""
+        """Detect research methodology limitations"""
         limitations = []
 
         # Language-specific methodology indicators
         if self.language == Language.ZH_CN:
-            single_method_indicators = ["仅使用", "只采用", "单一方法", "基于.*模型"]
+            single_method_indicators = [
+                "仅使用",  # Chinese: only use
+                "只采用",  # Chinese: solely adopt
+                "单一方法",  # Chinese: single method
+                "基于.*模型"  # Chinese: based on ... model
+            ]
         else:  # English
             single_method_indicators = [
                 "only use",
@@ -420,7 +425,7 @@ class LimitationDetector:
     def _detect_metadata_limitations(
         self, metadata: Dict[str, Any]
     ) -> List[DataLimitation]:
-        """Detect limitations based on metadata"""
+        """Detect limitations based on research metadata"""
         limitations = []
 
         # Detect single data source dependency
@@ -476,51 +481,51 @@ class LimitationDetector:
 
 
 class ConfidenceAssessor:
-    """Confidence assessor"""
+    """Statistical Confidence Assessment Engine"""
 
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
         self.i18n = get_i18n_manager()
         self.i18n.set_language(language)
 
-        # Language-specific confidence indicators
+        # Language-specific confidence level indicators
         self.confidence_indicators = {
             Language.ZH_CN: {
                 ConfidenceLevel.VERY_HIGH: [
-                    "多项研究证实",
-                    "大规模随机对照试验",
-                    "元分析显示",
-                    "权威机构确认",
-                    "结论一致",
+                    "多项研究证实",  # Chinese: multiple studies confirm
+                    "大规模随机对照试验",  # Chinese: large-scale randomized controlled trial
+                    "元分析显示",  # Chinese: meta-analysis shows
+                    "权威机构确认",  # Chinese: authoritative institution confirms
+                    "结论一致",  # Chinese: consistent conclusions
                 ],
                 ConfidenceLevel.HIGH: [
-                    "多个数据源",
-                    "反复验证",
-                    "统计显著",
-                    "权威来源",
-                    "长期跟踪",
+                    "多个数据源",  # Chinese: multiple data sources
+                    "反复验证",  # Chinese: repeated verification
+                    "统计显著",  # Chinese: statistically significant
+                    "权威来源",  # Chinese: authoritative sources
+                    "长期跟踪",  # Chinese: long-term tracking
                 ],
                 ConfidenceLevel.MEDIUM: [
-                    "初步研究",
-                    "部分证据",
-                    "样本有限",
-                    "短期观察",
-                    "单一研究",
+                    "初步研究",  # Chinese: preliminary research
+                    "部分证据",  # Chinese: partial evidence
+                    "样本有限",  # Chinese: limited sample
+                    "短期观察",  # Chinese: short-term observation
+                    "单一研究",  # Chinese: single study
                 ],
                 ConfidenceLevel.LOW: [
-                    "理论推测",
-                    "非正式观察",
-                    "轶事证据",
-                    "专家意见",
-                    "初步分析",
+                    "theoretical speculation",
+                    "informal observation",
+                    "anecdotal evidence",
+                    "expert opinion",
+                    "preliminary analysis",
                 ],
                 ConfidenceLevel.VERY_LOW: [
-                    "推测",
-                    "假设",
-                    "可能",
-                    "也许",
-                    "尚无结论",
-                    "证据不足",
+                    "speculation",
+                    "hypothesis",
+                    "possibly",
+                    "perhaps",
+                    "no conclusion yet",
+                    "insufficient evidence",
                 ],
             },
             Language.EN_US: {
@@ -564,14 +569,14 @@ class ConfidenceAssessor:
         }
 
     def set_language(self, language: Language):
-        """Set language for the assessor"""
+        """Set language for the confidence assessor"""
         self.language = language
         self.i18n.set_language(language)
 
     def assess_confidence(
         self, statement: str, supporting_evidence: List[str]
     ) -> ConfidenceAnnotation:
-        """Assess confidence level"""
+        """Assess confidence level of a statement based on evidence"""
         confidence_level = self._determine_confidence_level(
             statement, supporting_evidence
         )
@@ -589,7 +594,7 @@ class ConfidenceAssessor:
     def _determine_confidence_level(
         self, statement: str, evidence: List[str]
     ) -> ConfidenceLevel:
-        """Determine confidence level"""
+        """Determine confidence level based on statement and evidence"""
         statement_lower = statement.lower()
         evidence_text = " ".join(evidence).lower()
 
@@ -600,7 +605,7 @@ class ConfidenceAssessor:
                 if indicator in statement_lower or indicator in evidence_text:
                     return level
 
-        # Based on evidence quantity and quality
+        # Fallback: determine based on evidence quantity and quality
         evidence_count = len(evidence)
         if evidence_count >= 3:
             return ConfidenceLevel.HIGH
@@ -614,7 +619,7 @@ class ConfidenceAssessor:
     def _generate_confidence_reasoning(
         self, statement: str, evidence: List[str], level: ConfidenceLevel
     ) -> str:
-        """Generate confidence reasoning"""
+        """Generate reasoning explanation for confidence level"""
         evidence_count = len(evidence)
 
         reasoning_templates = {
@@ -638,47 +643,47 @@ class ConfidenceAssessor:
 
 
 class BiasDetector:
-    """Bias detector"""
+    """Cognitive Bias Detection Engine"""
 
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
         self.i18n = get_i18n_manager()
         self.i18n.set_language(language)
 
-        # Language-specific bias patterns
+        # Language-specific bias detection patterns
         self.bias_patterns = {
             Language.ZH_CN: {
                 "confirmation_bias": [
-                    "只考虑.*支持",
-                    "忽略.*相反",
-                    "选择性.*使用",
-                    "只关注.*积极",
-                    "排除.*消极",
-                    "有利.*证据",
+                    "只考虑.*支持",  # Chinese: only consider supporting
+                    "忽略.*相反",  # Chinese: ignore contrary
+                    "选择性.*使用",  # Chinese: selective use
+                    "只关注.*积极",  # Chinese: only focus on positive
+                    "排除.*消极",  # Chinese: exclude negative
+                    "有利.*证据",  # Chinese: favorable evidence
                 ],
                 "survivorship_bias": [
-                    "成功案例",
-                    "幸存者",
-                    "只看.*存活",
-                    "忽略.*失败",
-                    "排除.*退市",
-                    "成功.*企业",
+                    "成功案例",  # Chinese: success cases
+                    "幸存者",  # Chinese: survivors
+                    "只看.*存活",  # Chinese: only look at surviving
+                    "忽略.*失败",  # Chinese: ignore failures
+                    "排除.*退市",  # Chinese: exclude delisted
+                    "成功.*企业",  # Chinese: successful companies
                 ],
                 "availability_bias": [
-                    "最近案例",
-                    "容易想到",
-                    "媒体报道",
-                    "印象深刻",
-                    "知名案例",
-                    "热门.*事件",
+                    "最近案例",  # Chinese: recent cases
+                    "容易想到",  # Chinese: easy to think of
+                    "媒体报道",  # Chinese: media reports
+                    "印象深刻",  # Chinese: impressive
+                    "知名案例",  # Chinese: well-known cases
+                    "热门.*事件",  # Chinese: hot events
                 ],
                 "anchoring_bias": [
-                    "基于.*基准",
-                    "参考.*价格",
-                    "基于.*预期",
-                    "锚定.*价值",
-                    "受.*影响",
-                    "参照.*标准",
+                    "基于.*基准",  # Chinese: based on benchmark
+                    "参考.*价格",  # Chinese: reference price
+                    "基于.*预期",  # Chinese: based on expectation
+                    "锚定.*价值",  # Chinese: anchored value
+                    "受.*影响",  # Chinese: influenced by
+                    "参照.*标准",  # Chinese: reference standard
                 ],
             },
             Language.EN_US: {
@@ -714,14 +719,14 @@ class BiasDetector:
         }
 
     def set_language(self, language: Language):
-        """Set language for the detector"""
+        """Set language for the bias detector"""
         self.language = language
         self.i18n.set_language(language)
 
     def detect_biases(
         self, content: str, methodology: Dict[str, Any]
     ) -> List[BiasAssessment]:
-        """Detect biases"""
+        """Detect cognitive biases in content and methodology"""
         biases = []
 
         # Text pattern detection using current language patterns
@@ -737,12 +742,12 @@ class BiasDetector:
         return biases
 
     def _check_bias_patterns(self, content: str, patterns: List[str]) -> bool:
-        """Check bias patterns"""
+        """Check if content matches bias patterns"""
         content_lower = content.lower()
         return any(re.search(pattern, content_lower) for pattern in patterns)
 
     def _create_bias_assessment(self, bias_type: str, content: str) -> BiasAssessment:
-        """Create bias assessment"""
+        """Create bias assessment for detected bias"""
         description = self.i18n.get_text("bias_types", bias_type)
         potential_impact = self.i18n.get_text("potential_impacts", bias_type)
         mitigation_measures = self.i18n.get_text("bias_mitigation", bias_type)
@@ -758,7 +763,7 @@ class BiasDetector:
     def _detect_methodology_biases(
         self, methodology: Dict[str, Any]
     ) -> List[BiasAssessment]:
-        """Detect methodology biases"""
+        """Detect biases in research methodology"""
         biases = []
 
         # Detect sample selection bias
@@ -799,7 +804,7 @@ class BiasDetector:
 
 
 class CriticalThinkingEngine:
-    """Critical thinking engine"""
+    """Comprehensive Critical Thinking Analysis Engine"""
 
     def __init__(self, language: Language = Language.ZH_CN):
         self.language = language
@@ -811,7 +816,7 @@ class CriticalThinkingEngine:
         self.bias_detector = BiasDetector(language)
 
     def set_language(self, language: Language):
-        """Set language for all components"""
+        """Set language for the critical thinking engine"""
         self.language = language
         self.i18n.set_language(language)
         self.limitation_detector.set_language(language)
@@ -821,7 +826,7 @@ class CriticalThinkingEngine:
     def analyze_content(
         self, content: str, metadata: Dict[str, Any] = None
     ) -> CriticalAnalysis:
-        """Analyze content with critical thinking"""
+        """Perform comprehensive critical thinking analysis on content"""
         if metadata is None:
             metadata = {}
 
@@ -865,7 +870,7 @@ class CriticalThinkingEngine:
         )
 
     def _extract_key_statements(self, content: str) -> List[str]:
-        """Extract key statements"""
+        """Extract key statements from content"""
         # Language-specific sentence splitting and patterns
         if self.language == Language.ZH_CN:
             sentences = re.split(r"[。！？]", content)
@@ -908,17 +913,17 @@ class CriticalThinkingEngine:
     def _extract_supporting_evidence(
         self, statement: str, full_content: str
     ) -> List[str]:
-        """Extract supporting evidence"""
+        """Extract supporting evidence for statements"""
         evidence = []
 
         # Language-specific evidence patterns
         if self.language == Language.ZH_CN:
             patterns = [
-                r"数据显示.*?[。！？]",
-                r"根据.*?[。！？]",
-                r"研究发现.*?[。！？]",
+                r"数据显示.*?[。！？]",  # Chinese: data shows
+                r"根据.*?[。！？]",  # Chinese: according to
+                r"研究发现.*?[。！？]",  # Chinese: research found
                 r"\[.*?\]\(.*?\)",  # Markdown links
-                r"来源[:：].*?[。！？]",
+                r"来源[:：].*?[。！？]",  # Chinese: source
             ]
         else:
             patterns = [
@@ -942,7 +947,7 @@ class CriticalThinkingEngine:
         biases: List[BiasAssessment],
         annotations: List[ConfidenceAnnotation],
     ) -> str:
-        """Enhance content with critical thinking"""
+        """Enhance content with critical thinking analysis"""
         enhanced = content + "\n\n"
 
         # Add data limitations explanation
@@ -992,7 +997,7 @@ class CriticalThinkingEngine:
         biases: List[BiasAssessment],
         annotations: List[ConfidenceAnnotation],
     ) -> float:
-        """Calculate quality score"""
+        """Calculate overall quality score based on analysis results"""
         base_score = 80.0  # Base score
 
         # Deduct points for limitations
@@ -1026,7 +1031,7 @@ class CriticalThinkingEngine:
 
 # Usage example
 def demo_critical_thinking(language: Language = Language.ZH_CN):
-    """Demonstrate critical thinking engine"""
+    """Demonstrate critical thinking engine functionality"""
     engine = CriticalThinkingEngine(language)
 
     # Sample content based on language

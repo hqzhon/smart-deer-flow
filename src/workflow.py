@@ -76,7 +76,7 @@ _global_workflow_optimizer: Optional[WorkflowOptimizer] = None
 async def get_workflow_optimizer(
     optimization_level: WorkflowOptimizationLevel = WorkflowOptimizationLevel.ADVANCED,
 ) -> WorkflowOptimizer:
-    """获取全局工作流优化器实例"""
+    """Get global workflow optimizer instance"""
     global _global_workflow_optimizer
 
     if _global_workflow_optimizer is None:
@@ -94,17 +94,17 @@ async def run_optimized_research_workflow(
     enable_parallel_tasks: bool = True,
     max_workers: int = 8,
 ) -> Dict[str, Any]:
-    """运行优化的研究工作流，专门针对并行化处理优化
+    """Run optimized research workflow with parallel processing optimization
 
     Args:
-        user_input: 用户查询
-        workflow_type: 工作流类型 ('research', 'analysis', 'report')
-        optimization_level: 优化级别
-        enable_parallel_tasks: 是否启用并行任务处理
-        max_workers: 最大工作线程数
+        user_input: User query
+        workflow_type: Workflow type ('research', 'analysis', 'report')
+        optimization_level: Optimization level
+        enable_parallel_tasks: Whether to enable parallel task processing
+        max_workers: Maximum number of worker threads
 
     Returns:
-        包含研究结果和性能指标的字典
+        Dictionary containing research results and performance metrics
     """
     start_time = time.time()
     logger.info(f"Starting optimized research workflow: {user_input}")
@@ -114,20 +114,20 @@ async def run_optimized_research_workflow(
             WorkflowOptimizationLevel.ADVANCED,
             WorkflowOptimizationLevel.MAXIMUM,
         ]:
-            # 使用高级并行优化
+            # Use advanced parallel optimization
             optimizer = await get_workflow_optimizer(optimization_level)
 
-            # 执行优化的研究工作流
+            # Execute optimized research workflow
             result = await optimizer.optimize_research_workflow(
                 user_query=user_input, workflow_type=workflow_type
             )
 
-            # 获取性能指标
+            # Get performance metrics
             metrics = await optimizer.get_optimization_metrics()
             result["workflow_metrics"] = metrics
 
         else:
-            # 回退到标准工作流
+            # Fallback to standard workflow
             result = await run_agent_workflow_async(
                 user_input=user_input,
                 enable_advanced_optimization=True,
@@ -135,7 +135,7 @@ async def run_optimized_research_workflow(
             )
             result["optimization_applied"] = False
 
-        # 添加执行时间
+        # Add execution time
         execution_time = time.time() - start_time
         result["total_execution_time"] = execution_time
         result["workflow_type"] = workflow_type
@@ -151,7 +151,7 @@ async def run_optimized_research_workflow(
             f"Optimized research workflow failed after {execution_time:.2f} seconds: {e}"
         )
 
-        # 回退到基础工作流
+        # Fallback to basic workflow
         try:
             result = await run_agent_workflow_async(
                 user_input=user_input, enable_advanced_optimization=False
@@ -171,16 +171,16 @@ async def run_parallel_report_generation(
     user_context: Optional[str] = None,
     optimization_level: WorkflowOptimizationLevel = WorkflowOptimizationLevel.ADVANCED,
 ) -> Dict[str, Any]:
-    """并行化报告生成工作流
+    """Parallel report generation workflow
 
     Args:
-        content_sections: 报告内容部分列表
-        report_type: 报告类型
-        user_context: 用户上下文信息
-        optimization_level: 优化级别
+        content_sections: List of report content sections
+        report_type: Type of report
+        user_context: User context information
+        optimization_level: Optimization level
 
     Returns:
-        生成的报告和性能指标
+        Generated report and performance metrics
     """
     start_time = time.time()
     logger.info(
@@ -190,17 +190,17 @@ async def run_parallel_report_generation(
     try:
         optimizer = await get_workflow_optimizer(optimization_level)
 
-        # 并行生成报告各部分
+        # Generate report sections in parallel
         result = await optimizer.optimize_report_generation(
             content_sections=content_sections, report_type=report_type
         )
 
-        # 如果有用户上下文，进行后处理
+        # Post-process with user context if provided
         if user_context:
             result["user_context"] = user_context
             result["context_applied"] = True
 
-        # 添加执行统计
+        # Add execution statistics
         execution_time = time.time() - start_time
         result["generation_time"] = execution_time
         result["sections_processed"] = len(content_sections)
@@ -216,7 +216,7 @@ async def run_parallel_report_generation(
             f"Parallel report generation failed after {execution_time:.2f} seconds: {e}"
         )
 
-        # 回退到顺序处理
+        # Fallback to sequential processing
         return {
             "error": str(e),
             "fallback_used": True,
@@ -271,19 +271,19 @@ async def run_agent_workflow_async(
     start_time = time.time()
     logger.info(f"Starting async workflow with user input: {user_input}")
 
-    # 确定优化级别
+    # Determine optimization level
     if optimization_level is None:
         if enable_advanced_optimization:
             optimization_level = WorkflowOptimizationLevel.ADVANCED
         else:
             optimization_level = WorkflowOptimizationLevel.BASIC
 
-    # 初始化优化组件
+    # Initialize optimization components
     if optimization_level in [
         WorkflowOptimizationLevel.ADVANCED,
         WorkflowOptimizationLevel.MAXIMUM,
     ]:
-        # 获取工作流优化器
+        # Get workflow optimizer
         workflow_optimizer = None
         if enable_intelligent_task_decomposition or enable_dynamic_resource_allocation:
             try:
@@ -294,15 +294,15 @@ async def run_agent_workflow_async(
                     f"Failed to initialize workflow optimizer: {e}, falling back to standard optimization"
                 )
 
-        # 启动高级组件
+        # Start advanced components
         await advanced_parallel_executor.start()
         await hierarchical_memory.start()
 
-        # 高级速率限制检查
+        # Advanced rate limiting check
         if not await adaptive_rate_limiter.acquire():
             raise RuntimeError("Adaptive rate limit exceeded. Please try again later.")
     else:
-        # 回退到基础速率限制
+        # Fallback to basic rate limiting
         if not await rate_limiter.acquire():
             raise RuntimeError("Rate limit exceeded. Please try again later.")
 
@@ -369,7 +369,7 @@ async def run_agent_workflow_async(
         "messages": [{"role": "user", "content": user_input}],
         "locale": (
             locale
-        ),  # 使用传入的locale参数，确保首次researcher报告有正确的多语言设置
+        ),  # Use passed locale parameter to ensure correct multilingual settings for initial researcher report
         "auto_accepted_plan": True,
         "enable_background_research": enable_background_research,
         "enable_collaboration": (
@@ -379,7 +379,7 @@ async def run_agent_workflow_async(
         "start_time": start_time,
         "thread_id": thread_id or "default",
         "enable_advanced_optimization": enable_advanced_optimization,
-        # 新增优化配置
+        # Additional optimization configuration
         "optimization_level": (
             optimization_level.value if optimization_level else "basic"
         ),

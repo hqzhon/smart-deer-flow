@@ -46,7 +46,7 @@ Provide your reflection analysis in the specified JSON format with:
 - is_sufficient: Whether current research is adequate
 - comprehensive_report: A complete, well-structured research report that synthesizes ALL findings, analysis, insights, and conclusions from the research process. This should be a comprehensive document that can stand alone as the final research output. **IMPORTANT: This MUST be a single string, NOT a nested JSON object.**
 - knowledge_gaps: List of missing information areas (only if is_sufficient is false)
-- follow_up_queries: Specific questions to address gaps (only if is_sufficient is false)
+- follow_up_queries: Specific questions to address gaps (MUST be empty array [] if is_sufficient is true)
 - confidence_score: Your confidence in the sufficiency assessment (0.0-1.0)
 - quality_assessment: Quality metrics for the research
 - recommendations: Actionable recommendations
@@ -74,10 +74,25 @@ IMPORTANT CONSTRAINTS:
   "comprehensive_report": "# Research Report\n\n## Executive Summary\nKey findings and insights...\n\n## Analysis\nDetailed analysis of results...\n\n## Conclusions\nFinal conclusions and recommendations...",
   "knowledge_gaps": ["Gap 1", "Gap 2"],
   "follow_up_queries": ["Query 1", "Query 2"],
-  "confidence_score": 0.7,
-  "quality_assessment": {"completeness": 0.8},
+  "confidence_score": float (0.0 to 1.0),
+  "quality_assessment": {"completeness": float (0.0 to 1.0)},
   "recommendations": ["Recommendation 1"],
   "priority_areas": ["Priority 1"]
+}
+```
+
+**CRITICAL RULE:** If is_sufficient is true, follow_up_queries MUST be an empty array [].
+Example for sufficient research:
+```json
+{
+  "is_sufficient": true,
+  "comprehensive_report": "Complete research report...",
+  "knowledge_gaps": [],
+  "follow_up_queries": [],
+  "confidence_score": 0.85,
+  "quality_assessment": {"completeness": 0.9},
+  "recommendations": ["Proceed to final report"],
+  "priority_areas": []
 }
 ```
 

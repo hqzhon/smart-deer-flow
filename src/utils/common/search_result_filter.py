@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class SearchResultCleaner:
-    """高效的本地搜索结果清洗器"""
+    """Efficient local search result cleaner"""
 
     def __init__(self):
-        # 改进后的噪音模式（匹配完整短语）
+        # Improved noise patterns (match complete phrases)
         self.noise_patterns = [
             r"\b(?:click here|read more|learn more|see more|view all)\b[^.!?]*[.!?]?",
             r"\b(?:advertisement|sponsored|ads?)\b[^.!?]*[.!?]?",
@@ -25,21 +25,21 @@ class SearchResultCleaner:
             r"\b(?:loading|please wait)\b[^.!?]*[.!?]?",
             r"\berror\s*:?\s*(?:loading|occurred|404|500|not found)\b[^.!?]*[.!?]?",  # 只匹配明确的错误消息
             r"\b(?:javascript|enable js|browser)\b[^.!?]*[.!?]?",
-            # 联系信息模式
+            # Contact information patterns
             r"\b(?:contact us|call us|email us)\b[^.!?]*[.!?]?",
             r"\b(?:at|or call)\s+[\w@.-]+\s*[.!?]?",
-            # 时间戳、邮箱、电话号码
+            # Timestamps, emails, phone numbers
             r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}",
             r"\b\w+@\w+\.\w+\b",
             r"\b\d{3}-\d{3}-\d{4}\b",
         ]
 
-        # 编译正则表达式以提高性能
+        # Compile regular expressions for better performance
         self.compiled_patterns = [
             re.compile(pattern, re.IGNORECASE) for pattern in self.noise_patterns
         ]
 
-        # 停用词列表（简化版）
+        # Stop words list (simplified version)
         self.stop_words = {
             "the",
             "a",
@@ -81,7 +81,7 @@ class SearchResultCleaner:
             "those",
         }
 
-        # 无效域名模式
+        # Invalid domain patterns
         self.invalid_domains = {
             "facebook.com",
             "twitter.com",
@@ -94,133 +94,133 @@ class SearchResultCleaner:
         }
 
     def clean_text(self, text: str) -> str:
-        """清洗文本内容"""
+        """Clean text content"""
         if not text or not isinstance(text, str):
             return ""
 
-        # 0. 移除脚本和样式内容
+        # 0. Remove script and style content
         text = self._remove_scripts_and_styles(text)
 
-        # 1. 基础清理
+        # 1. Basic cleaning
         text = self._basic_clean(text)
 
-        # 2. 移除噪音模式
+        # 2. Remove noise patterns
         text = self._remove_noise_patterns(text)
 
-        # 3. 标准化空白字符
+        # 3. Normalize whitespace
         text = self._normalize_whitespace(text)
 
-        # 4. 移除过短或过长的内容
+        # 4. Remove content that is too short or too long
         if len(text.strip()) < 10 or len(text) > 5000:
             return ""
 
         return text.strip()
 
     def _basic_clean(self, text: str) -> str:
-        """基础文本清理"""
-        # 移除HTML标签
+        """Basic text cleaning"""
+        # Remove HTML tags
         text = re.sub(r"<[^>]+>", "", text)
 
-        # 处理乱码和编码问题
+        # Handle garbled text and encoding issues
         text = self._fix_encoding_issues(text)
 
-        # 移除特殊字符和控制字符
+        # Remove special characters and control characters
         text = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", text)
 
-        # 移除多余的标点符号
+        # Remove excessive punctuation
         text = re.sub(r"[.]{3,}", "...", text)
         text = re.sub(r"[!]{2,}", "!", text)
         text = re.sub(r"[?]{2,}", "?", text)
 
-        # 移除URL
+        # Remove URLs
         text = re.sub(r"https?://\S+", "", text)
 
         return text
 
     def _remove_noise_patterns(self, text: str) -> str:
-        """移除噪音模式"""
+        """Remove noise patterns"""
         for pattern in self.compiled_patterns:
             text = pattern.sub("", text)
         return self._post_clean_noise(text)
 
     def _normalize_whitespace(self, text: str) -> str:
-        """标准化空白字符"""
-        # 替换多个空白字符为单个空格
+        """Normalize whitespace characters"""
+        # Replace multiple whitespace characters with single space
         text = re.sub(r"\s+", " ", text)
 
-        # 移除行首行尾空白
+        # Remove leading and trailing whitespace from lines
         text = "\n".join(line.strip() for line in text.split("\n"))
 
-        # 移除多余的换行符
+        # Remove excessive line breaks
         text = re.sub(r"\n{3,}", "\n\n", text)
 
         return text
 
     def _post_clean_noise(self, text: str) -> str:
-        """噪音清理后的文本后处理"""
-        # 移除多余的连接词和标点
+        """Post-processing of text after noise cleaning"""
+        # Remove excessive conjunctions and punctuation
         text = re.sub(r"\b(?:at|or|call|to|and|the|a|an)\s+[.!?]", "", text)
-        # 清理多余的空格和标点
+        # Clean excessive spaces and punctuation
         text = re.sub(r"\s+[.!?]\s+", " ", text)
-        # 移除孤立的标点符号
+        # Remove isolated punctuation marks
         text = re.sub(r"\s+[.!?]$", "", text)
         text = re.sub(r"^[.!?]\s+", "", text)
-        # 移除多余的空格
+        # Remove excessive spaces
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
     def _remove_scripts_and_styles(self, text: str) -> str:
-        """移除脚本和样式内容"""
-        # 移除script标签及其内容
+        """Remove script and style content"""
+        # Remove script tags and their content
         text = re.sub(
             r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE
         )
-        # 移除style标签及其内容
+        # Remove style tags and their content
         text = re.sub(
             r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE
         )
-        # 移除JavaScript代码片段
+        # Remove JavaScript code snippets
         text = re.sub(r"\balert\s*\([^)]*\)\s*;?", "", text)
         text = re.sub(r"\bconsole\.[a-z]+\s*\([^)]*\)\s*;?", "", text)
         return text
 
     def _fix_encoding_issues(self, text: str) -> str:
-        """修复编码问题和乱码"""
+        """Fix encoding issues and garbled text"""
         if not text:
             return text
 
         try:
-            # 1. 处理Unicode替换字符（明确的乱码标记）
+            # 1. Handle Unicode replacement characters (clear garbled text markers)
             if "\ufffd" in text:
                 text = text.replace("\ufffd", "")
 
-            # 2. 处理HTML实体编码（仅处理常见的HTML实体）
+            # 2. Handle HTML entity encoding (only process common HTML entities)
             import html
 
-            # 只处理明确的HTML实体，避免误处理正常文本
+            # Only process clear HTML entities, avoid misprocessing normal text
             if "&" in text and (";" in text):
-                # 检查是否包含常见HTML实体
+                # Check if it contains common HTML entities
                 if any(
                     entity in text
                     for entity in ["&lt;", "&gt;", "&amp;", "&quot;", "&#"]
                 ):
                     text = html.unescape(text)
 
-            # 3. 处理URL编码（更保守的方法）
+            # 3. Handle URL encoding (more conservative approach)
             import urllib.parse
 
-            # 只有当文本看起来像URL编码时才处理
+            # Only process when text looks like URL encoding
             if "%" in text:
-                # 检查是否有URL编码模式
+                # Check for URL encoding patterns
                 url_encoded_pattern = r"%[0-9A-Fa-f]{2}"
                 url_matches = re.findall(url_encoded_pattern, text)
-                if len(url_matches) >= 1:  # 至少1个编码字符
+                if len(url_matches) >= 1:  # At least 1 encoded character
                     try:
                         decoded = urllib.parse.unquote(text, errors="ignore")
-                        # 检查解码是否有意义：
-                        # 1. 解码后不能为空
-                        # 2. 解码后应该包含可读字符
-                        # 3. URL编码字符占比较高时优先解码，或者解码后明显更可读
+                        # Check if decoding makes sense:
+                        # 1. Decoded result cannot be empty
+                        # 2. Decoded result should contain readable characters
+                        # 3. Prioritize decoding when URL encoded characters have high ratio, or decoded result is clearly more readable
                         url_encoded_ratio = len("".join(url_matches)) / len(text)
                         if (
                             decoded
@@ -238,72 +238,72 @@ class SearchResultCleaner:
                     except Exception:
                         pass
 
-            # 4. 移除明确的乱码模式（更保守）
-            # 只移除连续4个或以上的问号（明确的乱码）
+            # 4. Remove clear garbled text patterns (more conservative)
+            # Only remove 4 or more consecutive question marks (clear garbled text)
             text = re.sub(r"\?{4,}", "", text)
 
-            # 移除方块字符（单个或连续的都是乱码）
+            # Remove block characters (both single and consecutive are garbled text)
             text = re.sub(r"[\u25a0\u25a1\u2588■▪▫]+", "", text)
 
-            # 移除零宽字符和其他不可见字符
+            # Remove zero-width characters and other invisible characters
             text = re.sub(r"[\ufeff\u200b-\u200f\u2028\u2029]", "", text)
 
-            # 5. 处理双重编码问题（更谨慎）
-            # 只有当检测到明确的双重编码模式时才处理
+            # 5. Handle double encoding issues (more cautious)
+            # Only process when clear double encoding patterns are detected
             double_encoding_indicators = ["Ã¡", "Ã©", "Ã­", "Ã³", "Ãº", "Ã±", "Ã§"]
             if any(indicator in text for indicator in double_encoding_indicators):
-                # 计算这些指示符的密度
+                # Calculate the density of these indicators
                 indicator_count = sum(
                     text.count(indicator) for indicator in double_encoding_indicators
                 )
-                if indicator_count >= 2:  # 至少出现2次才认为是双重编码
+                if indicator_count >= 2:  # Consider as double encoding only if appears at least 2 times
                     try:
                         text_bytes = text.encode("latin-1")
                         decoded = text_bytes.decode("utf-8", errors="ignore")
-                        # 只有解码后看起来更正常时才使用
-                        if len(decoded) >= len(text) * 0.7:  # 解码后不能丢失太多内容
+                        # Only use if decoded result looks more normal
+                        if len(decoded) >= len(text) * 0.7:  # Decoded result cannot lose too much content
                             text = decoded
                     except (UnicodeEncodeError, UnicodeDecodeError):
                         pass
 
-            # 6. 移除控制字符（保留基本空白字符）
+            # 6. Remove control characters (preserve basic whitespace characters)
             text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", text)
 
-            # 7. 标准化特殊空白字符为普通空格
+            # 7. Normalize special whitespace characters to regular spaces
             text = re.sub(r"[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]", " ", text)
 
-            # 8. 清理多余空格
+            # 8. Clean excessive spaces
             text = re.sub(r"\s+", " ", text).strip()
 
             return text
 
         except Exception as e:
-            # 如果处理过程中出现任何错误，返回原始文本
+            # If any error occurs during processing, return original text
             logger.warning(f"Error fixing encoding issues: {e}")
             return text
 
     def extract_keywords(self, text: str, max_keywords: int = 10) -> List[str]:
-        """提取关键词"""
+        """Extract keywords"""
         if not text:
             return []
 
-        # 转换为小写并分词
+        # Convert to lowercase and tokenize
         words = re.findall(r"\b\w{3,}\b", text.lower())
 
-        # 过滤停用词
+        # Filter stop words
         keywords = [word for word in words if word not in self.stop_words]
 
-        # 统计词频
+        # Count word frequency
         word_freq = {}
         for word in keywords:
             word_freq[word] = word_freq.get(word, 0) + 1
 
-        # 按频率排序并返回前N个
+        # Sort by frequency and return top N
         sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
         return [word for word, freq in sorted_words[:max_keywords]]
 
     def is_valid_url(self, url: str) -> bool:
-        """检查URL是否有效"""
+        """Check if URL is valid"""
         if not url or not isinstance(url, str):
             return False
 
@@ -312,7 +312,7 @@ class SearchResultCleaner:
             if not parsed.scheme or not parsed.netloc:
                 return False
 
-            # 检查是否为无效域名
+            # Check if it's an invalid domain
             domain = parsed.netloc.lower()
             for invalid_domain in self.invalid_domains:
                 if invalid_domain in domain:
@@ -323,13 +323,13 @@ class SearchResultCleaner:
             return False
 
     def calculate_content_quality(self, content: str) -> float:
-        """计算内容质量分数 (0-1)"""
+        """Calculate content quality score (0-1)"""
         if not content:
             return 0.0
 
         score = 0.0
 
-        # 长度分数 (适中长度得分更高)
+        # Length score (moderate length gets higher score)
         length = len(content)
         if 50 <= length <= 1000:
             score += 0.3
@@ -338,18 +338,18 @@ class SearchResultCleaner:
         elif length > 2000:
             score += 0.1
 
-        # 句子完整性分数
+        # Sentence completeness score
         sentences = content.split(".")
         complete_sentences = sum(1 for s in sentences if len(s.strip()) > 10)
         if complete_sentences >= 2:
             score += 0.3
 
-        # 信息密度分数 (关键词密度)
+        # Information density score (keyword density)
         keywords = self.extract_keywords(content, 5)
         if len(keywords) >= 3:
             score += 0.2
 
-        # 可读性分数 (基于标点符号和结构)
+        # Readability score (based on punctuation and structure)
         if "." in content and ("," in content or ";" in content):
             score += 0.2
 
@@ -364,14 +364,14 @@ class SearchResultFilter:
     DEFAULT_BATCH_SIZE = 3
     MAX_SECONDARY_RESULTS = 5
 
-    # 清洗配置选项
+    # Cleaning configuration options
     DEFAULT_CLEANING_CONFIG = {
-        "min_quality_score": 0.3,  # 最低质量分数
-        "max_results": 20,  # 最大结果数
-        "enable_keyword_extraction": True,  # 启用关键词提取
-        "enable_enhanced_key_points": True,  # 启用增强关键点提取
-        "filter_invalid_urls": True,  # 过滤无效URL
-        "sort_by_quality": True,  # 按质量排序
+        "min_quality_score": 0.3,  # Minimum quality score
+        "max_results": 20,  # Maximum number of results
+        "enable_keyword_extraction": True,  # Enable keyword extraction
+        "enable_enhanced_key_points": True,  # Enable enhanced key point extraction
+        "filter_invalid_urls": True,  # Filter invalid URLs
+        "sort_by_quality": True,  # Sort by quality
     }
 
     def __init__(
@@ -383,21 +383,21 @@ class SearchResultFilter:
 
         Args:
             content_processor: Content processor instance
-            cleaning_config: 清洗配置选项
+            cleaning_config: Cleaning configuration options
         """
         self.content_processor = content_processor
-        self.cleaner = SearchResultCleaner()  # 初始化清洗器
+        self.cleaner = SearchResultCleaner()  # Initialize cleaner
         self.cleaning_config = {
             **self.DEFAULT_CLEANING_CONFIG,
             **(cleaning_config or {}),
         }
-        # 添加新的配置选项
+        # Add new configuration options
         self.cleaning_config.setdefault(
             "filter_raw_content", True
-        )  # 是否过滤raw_content
+        )  # Whether to filter raw_content
         self.cleaning_config.setdefault(
             "prefer_content_over_raw", True
-        )  # 优先使用content而非raw_content
+        )  # Prefer content over raw_content
 
     def should_enable_smart_filtering(
         self, search_results: List[Dict[str, Any]], model_name: str
@@ -506,50 +506,50 @@ Content: {content}
         processed_results = []
 
         for i, result in enumerate(search_results):
-            # 获取原始内容
+            # Get original content
             raw_title = str(result.get("title", f"Result {i+1}"))
             raw_content = str(result.get("content", result.get("snippet", "")))
             raw_url = str(result.get("url", ""))
 
-            # 使用新的清洗器进行深度清洗
+            # Use new cleaner for deep cleaning
             cleaned_title = self.cleaner.clean_text(raw_title)
             cleaned_content = self.cleaner.clean_text(raw_content)
 
-            # 验证URL有效性
+            # Validate URL validity
             if not self.cleaner.is_valid_url(raw_url):
-                continue  # 跳过无效URL的结果
+                continue  # Skip results with invalid URLs
 
-            # 计算内容质量分数
+            # Calculate content quality score
             quality_score = self.cleaner.calculate_content_quality(cleaned_content)
 
-            # 过滤低质量内容
+            # Filter low-quality content
             if quality_score < 0.3 or not cleaned_content:
                 continue
 
-            # 提取关键词和关键点
+            # Extract keywords and key points
             keywords = self.cleaner.extract_keywords(cleaned_content, 8)
             key_points = self._extract_enhanced_key_points(cleaned_content, keywords)
 
-            # 最终清理（使用原有的sanitize_content作为补充）
+            # Final cleaning (use original sanitize_content as supplement)
             title = self.content_processor.sanitize_content(cleaned_title)
             content = self.content_processor.sanitize_content(cleaned_content)
             url = self.content_processor.sanitize_content(raw_url)
 
-            # 创建处理后的结果
+            # Create processed result
             processed_result = {
                 "title": title,
                 "content": content,
                 "url": url,
                 "relevance_score": quality_score,
                 "key_points": key_points,
-                "keywords": keywords[:5],  # 保留前5个关键词
+                "keywords": keywords[:5],  # Keep top 5 keywords
                 "content_length": len(content),
                 "quality_score": quality_score,
             }
 
             processed_results.append(processed_result)
 
-        # 按质量分数排序
+        # Sort by quality score
         processed_results.sort(key=lambda x: x["quality_score"], reverse=True)
 
         return processed_results
@@ -578,12 +578,12 @@ Content: {content}
         if not content:
             return []
 
-        # 分割句子
+        # Split sentences
         sentences = [s.strip() for s in content.split(".") if s.strip()]
         if not sentences:
             return []
 
-        # 为每个句子计算分数
+        # Calculate score for each sentence
         sentence_scores = []
         for sentence in sentences:
             if len(sentence) < 15 or len(sentence) > 300:
@@ -592,32 +592,32 @@ Content: {content}
             score = 0
             sentence_lower = sentence.lower()
 
-            # 关键词匹配分数
+            # Keyword matching score
             keyword_matches = sum(
                 1 for keyword in keywords if keyword in sentence_lower
             )
             score += keyword_matches * 2
 
-            # 句子位置分数（开头的句子更重要）
+            # Sentence position score (earlier sentences are more important)
             position_score = max(0, 3 - sentences.index(sentence) * 0.5)
             score += position_score
 
-            # 句子长度分数（适中长度更好）
+            # Sentence length score (moderate length is better)
             length = len(sentence)
             if 50 <= length <= 150:
                 score += 2
             elif 150 < length <= 250:
                 score += 1
 
-            # 信息密度分数（包含数字、专业术语等）
-            if re.search(r"\d+", sentence):  # 包含数字
+            # Information density score (contains numbers, technical terms, etc.)
+            if re.search(r"\d+", sentence):  # Contains numbers
                 score += 0.5
-            if re.search(r"[A-Z]{2,}", sentence):  # 包含缩写
+            if re.search(r"[A-Z]{2,}", sentence):  # Contains abbreviations
                 score += 0.5
 
             sentence_scores.append((sentence, score))
 
-        # 按分数排序并返回前3个
+        # Sort by score and return top 3
         sentence_scores.sort(key=lambda x: x[1], reverse=True)
         key_points = [sentence for sentence, score in sentence_scores[:3] if score > 0]
 
@@ -626,25 +626,25 @@ Content: {content}
     def batch_clean_search_results(
         self, search_results_list: List[List[Dict[str, Any]]], model_name: str
     ) -> List[Dict[str, Any]]:
-        """批量清洗多个搜索结果集
+        """Batch clean multiple search result sets
 
         Args:
-            search_results_list: 多个搜索结果集的列表
-            model_name: 模型名称
+            search_results_list: List of multiple search result sets
+            model_name: Model name
 
         Returns:
-            List[Dict[str, Any]]: 批量处理后的结果列表
+            List[Dict[str, Any]]: List of batch processed results
         """
         batch_results = []
 
         for i, search_results in enumerate(search_results_list):
             logger.debug(f"Processing batch {i+1}/{len(search_results_list)}")
 
-            # 应用配置限制
+            # Apply configuration limits
             max_results = self.cleaning_config.get("max_results", 20)
             limited_results = search_results[:max_results]
 
-            # 处理单个结果集
+            # Process single result set
             processed_batch = self._process_search_results_with_config(limited_results)
 
             batch_results.append(
@@ -661,45 +661,45 @@ Content: {content}
     def _process_search_results_with_config(
         self, search_results: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """使用配置选项处理搜索结果"""
+        """Process search results using configuration options"""
         processed_results = []
 
         for i, result in enumerate(search_results):
-            # 获取原始内容，优先使用content而非raw_content
+            # Get original content, prefer content over raw_content
             raw_title = str(result.get("title", f"Result {i+1}"))
-            # 优先使用content字段，避免raw_content中的无用信息
+            # Prefer content field, avoid useless information in raw_content
             raw_content = str(result.get("content", result.get("snippet", "")))
             raw_url = str(result.get("url", ""))
 
-            # 如果存在raw_content但没有content，则从raw_content中提取有用信息
+            # If raw_content exists but no content, extract useful information from raw_content
             if not raw_content and result.get("raw_content"):
                 raw_content = self._extract_useful_content_from_raw(
                     result.get("raw_content")
                 )
 
-            # 使用清洗器进行深度清洗
+            # Use cleaner for deep cleaning
             cleaned_title = self.cleaner.clean_text(raw_title)
             cleaned_content = self.cleaner.clean_text(raw_content)
 
-            # 根据配置验证URL有效性
+            # Validate URL validity based on configuration
             if self.cleaning_config.get("filter_invalid_urls", True):
                 if not self.cleaner.is_valid_url(raw_url):
                     continue
 
-            # 计算内容质量分数
+            # Calculate content quality score
             quality_score = self.cleaner.calculate_content_quality(cleaned_content)
 
-            # 根据配置过滤低质量内容
+            # Filter low-quality content based on configuration
             min_quality = self.cleaning_config.get("min_quality_score", 0.3)
             if quality_score < min_quality or not cleaned_content:
                 continue
 
-            # 根据配置提取关键词
+            # Extract keywords based on configuration
             keywords = []
             if self.cleaning_config.get("enable_keyword_extraction", True):
                 keywords = self.cleaner.extract_keywords(cleaned_content, 8)
 
-            # 根据配置提取关键点
+            # Extract key points based on configuration
             key_points = []
             if self.cleaning_config.get("enable_enhanced_key_points", True):
                 key_points = self._extract_enhanced_key_points(
@@ -708,12 +708,12 @@ Content: {content}
             else:
                 key_points = self._extract_key_points(cleaned_content)
 
-            # 最终清理
+            # Final cleaning
             title = self.content_processor.sanitize_content(cleaned_title)
             content = self.content_processor.sanitize_content(cleaned_content)
             url = self.content_processor.sanitize_content(raw_url)
 
-            # 创建处理后的结果，不包含raw_content
+            # Create processed result without raw_content
             processed_result = {
                 "title": title,
                 "content": content,
@@ -727,7 +727,7 @@ Content: {content}
 
             processed_results.append(processed_result)
 
-        # 根据配置按质量分数排序
+        # Sort by quality score based on configuration
         if self.cleaning_config.get("sort_by_quality", True):
             processed_results.sort(key=lambda x: x["quality_score"], reverse=True)
 
@@ -775,18 +775,25 @@ Content: {content}
         return "\n".join(formatted_parts)
 
     def _extract_useful_content_from_raw(self, raw_content: str) -> str:
-        """从raw_content中提取有用信息，过滤掉广告、外链等无用内容"""
+        """Extract useful information from raw content, filtering out ads, external links and other useless content
+
+        Args:
+            raw_content: Raw content string
+
+        Returns:
+            str: Extracted useful content
+        """
         if not raw_content:
             return ""
 
-        # 移除HTML标签
+        # Remove HTML tags
         import re
 
         text = re.sub(r"<[^>]+>", " ", raw_content)
 
-        # 移除常见的广告和无用信息模式
+        # Remove common ad and useless information patterns
         ad_patterns = [
-            r"广告[^\n]*",  # 广告相关
+            r"广告[^\n]*",  # Advertisement related
             r"Advertisement[^\n]*",
             r"Sponsored[^\n]*",
             r"推广[^\n]*",
@@ -800,59 +807,59 @@ Content: {content}
             r"立即.*?咨询[^\n]*",
             r"联系我们[^\n]*",
             r"Contact us[^\n]*",
-            r"订阅[^\n]*",
+            r"订阅[^\n]*",  # Subscribe patterns
             r"Subscribe[^\n]*",
-            r"关注我们[^\n]*",
+            r"关注我们[^\n]*",  # Follow us patterns
             r"Follow us[^\n]*",
-            r"分享到[^\n]*",
+            r"分享到[^\n]*",  # Share to patterns
             r"Share[^\n]*",
-            r"相关推荐[^\n]*",
+            r"相关推荐[^\n]*",  # Related recommendations patterns
             r"Related[^\n]*",
-            r"热门.*?推荐[^\n]*",
+            r"热门.*?推荐[^\n]*",  # Popular recommendations patterns
             r"Popular[^\n]*",
-            r"猜你喜欢[^\n]*",
+            r"猜你喜欢[^\n]*",  # You might like patterns
             r"You might like[^\n]*",
         ]
 
         for pattern in ad_patterns:
             text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-        # 移除外链模式
+        # Remove external link patterns
         link_patterns = [
-            r"http[s]?://[^\s]+",  # HTTP链接
-            r"www\.[^\s]+",  # www链接
-            r"\b[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",  # 域名
-            r"点击.*?链接[^\n]*",
-            r"Click.*?link[^\n]*",
-            r"访问.*?网站[^\n]*",
+            r"http[s]?://[^\s]+",  # HTTP links
+            r"www\.[^\s]+",  # www links
+            r"\b[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",  # Domain names
+            r"点击.*?链接[^\n]*",  # Click link patterns
+            r"Click.*?link[^\n]*",  # Click link patterns
+            r"访问.*?网站[^\n]*",  # Visit website patterns
             r"Visit.*?website[^\n]*",
         ]
 
         for pattern in link_patterns:
             text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-        # 移除图片相关信息
+        # Remove image-related information
         image_patterns = [
-            r"\[图片\]",
-            r"\[Image\]",
+            r"\[图片\]",  # Image placeholders
+            r"\[Image\]",  # Image placeholders
             r"\[img\]",
-            r"图片来源[^\n]*",
+            r"图片来源[^\n]*",  # Image source patterns
             r"Image source[^\n]*",
-            r"图：[^\n]*",
+            r"图：[^\n]*",  # Figure patterns
             r"Figure[^\n]*",
         ]
 
         for pattern in image_patterns:
             text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-        # 移除多余的空白字符
+        # Remove excessive whitespace characters
         text = re.sub(r"\s+", " ", text)
         text = re.sub(r"\n\s*\n", "\n", text)
 
-        # 移除开头和结尾的空白
+        # Remove leading and trailing whitespace
         text = text.strip()
 
-        # 如果处理后的文本太短，返回空字符串
+        # If processed text is too short, return empty string
         if len(text) < 20:
             return ""
 
