@@ -928,7 +928,7 @@ async def research_team_node(state: State, config: RunnableConfig):
 
     # Phase 1 Simplification: Use unified config for parallel execution
     configurable = get_configuration_from_config(config)
-    from src.graph.isolation_config_manager import IsolationConfigManager
+    from src.utils.researcher.isolation_config_manager import IsolationConfigManager
 
     config_manager = IsolationConfigManager(configurable)
     unified_config = config_manager.get_unified_config()
@@ -1346,7 +1346,7 @@ async def _execute_agent_step(
 
     # Phase 1 Simplification: Use unified config for context management
     configurable = get_configuration_from_config(config)
-    from src.graph.isolation_config_manager import IsolationConfigManager
+    from src.utils.researcher.isolation_config_manager import IsolationConfigManager
 
     config_manager = IsolationConfigManager(configurable)
     unified_config = config_manager.get_unified_config()

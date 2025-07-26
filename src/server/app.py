@@ -51,7 +51,6 @@ from src.server.mcp_request import MCPServerMetadataRequest, MCPServerMetadataRe
 from src.server.mcp_utils import load_mcp_tools
 from src.server.rag_request import (
     RAGConfigResponse,
-    RAGResourceRequest,
     RAGResourcesResponse,
 )
 from src.server.config_request import ConfigResponse
@@ -1115,11 +1114,11 @@ async def rag_config():
 
 
 @app.get("/api/rag/resources", response_model=RAGResourcesResponse)
-async def rag_resources(request: Annotated[RAGResourceRequest, Query()]):
+async def rag_resources(query: str | None = None):
     """Get the resources of the RAG."""
     retriever = build_retriever()
     if retriever:
-        return RAGResourcesResponse(resources=retriever.list_resources(request.query))
+        return RAGResourcesResponse(resources=retriever.list_resources(query))
     return RAGResourcesResponse(resources=[])
 
 

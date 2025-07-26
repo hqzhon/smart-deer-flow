@@ -50,6 +50,10 @@ class UnifiedResearchConfig:
     mcp_enabled: bool = False
     mcp_servers: list = None
 
+    # Parallel execution configuration
+    enable_parallel_execution: bool = True
+    max_parallel_tasks: int = 3
+
     # Other configuration
     max_step_num: Optional[int] = None
 
