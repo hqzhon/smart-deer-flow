@@ -76,15 +76,15 @@ class IterativeResearchEngine:
         """
         decision_factors = {
             "current_iteration": self.iteration_count,
-            "max_iterations": self.unified_config.max_research_iterations,
+            "max_iterations": self.unified_config.max_follow_up_iterations,
             "elapsed_time": self._get_elapsed_time(),
             "max_time": getattr(self.unified_config, "max_research_time_minutes", 30),
             "has_reflection_result": reflection_result is not None,
         }
 
         # Check maximum iterations
-        if self.iteration_count >= self.unified_config.max_research_iterations:
-            reason = f"Reached maximum iterations ({self.unified_config.max_research_iterations})"
+        if self.iteration_count >= self.unified_config.max_follow_up_iterations:
+            reason = f"Reached maximum iterations ({self.unified_config.max_follow_up_iterations})"
             logger.info(f"Termination condition met: {reason}")
             return True, reason, decision_factors
 
@@ -124,7 +124,7 @@ class IterativeResearchEngine:
 
         # Continue research
         logger.debug(
-            f"Continuing research - iteration {self.iteration_count}/{self.unified_config.max_research_iterations}"
+            f"Continuing research - iteration {self.iteration_count}/{self.unified_config.max_follow_up_iterations}"
         )
         return False, "Continue research", decision_factors
 
@@ -234,7 +234,7 @@ class IterativeResearchEngine:
         """
         return {
             "iteration_count": self.iteration_count,
-            "max_iterations": self.unified_config.max_research_iterations,
+            "max_iterations": self.unified_config.max_follow_up_iterations,
             "elapsed_time_minutes": self._get_elapsed_time(),
             "max_time_minutes": getattr(
                 self.unified_config, "max_research_time_minutes", 30
@@ -252,3 +252,76 @@ class IterativeResearchEngine:
         """
         # Return a copy of history records to avoid external modification
         return [record.copy() for record in self.research_history]
+
+    async def execute_iterative_research(
+        self,
+        query: str,
+        state: Dict[str, Any],
+        reflection_result: Any = None,
+        prompt_context: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """Execute iterative research process
+
+        Args:
+            query: Research query
+            state: Current state
+            reflection_result: Reflection result (optional)
+            prompt_context: Full prompt context with original_user_query, resources_info, etc. (optional)
+
+        Returns:
+            Research execution result
+        """
+        # --- Start of new code ---
+        # Store the prompt context for use in research operations
+        if prompt_context:
+            self.prompt_context = prompt_context
+        # --- End of new code ---
+        logger.info(f"Starting iterative research execution for query: {query}")
+
+        # Start research session if not already started
+        if self.start_time is None:
+            self.start_research_session()
+
+        # Increment iteration
+        current_iteration = self.increment_iteration()
+
+        # Check termination conditions before execution
+        should_terminate, reason, decision_factors = self.check_termination_conditions(
+            state, reflection_result
+        )
+
+        if should_terminate:
+            logger.info(f"Research terminated: {reason}")
+            return {
+                "terminated": True,
+                "termination_reason": reason,
+                "decision_factors": decision_factors,
+                "iteration": current_iteration,
+                "research_summary": self.get_research_summary(),
+            }
+
+        # Generate follow-up queries if reflection result is available
+        follow_up_queries = []
+        if reflection_result:
+            follow_up_queries = self.generate_follow_up_queries(
+                reflection_result, state
+            )
+            follow_up_queries = self.filter_valid_queries(follow_up_queries, state)
+
+        # Execute research iteration
+        execution_result = {
+            "terminated": False,
+            "iteration": current_iteration,
+            "query": query,
+            "follow_up_queries": follow_up_queries,
+            "decision_factors": decision_factors,
+            "research_summary": self.get_research_summary(),
+        }
+
+        # Add research record
+        self.add_research_record(query, execution_result, reflection_result)
+
+        logger.info(
+            f"Iterative research execution completed for iteration {current_iteration}"
+        )
+        return execution_result

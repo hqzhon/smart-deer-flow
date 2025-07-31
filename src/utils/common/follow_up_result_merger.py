@@ -257,7 +257,9 @@ class FollowUpResultMerger:
             else:
                 logger.debug(f"Found duplicate content, skipped: {content[:100]}...")
 
-        logger.info(f"After deduplication, retained {len(deduplicated)}/{len(results)} results")
+        logger.info(
+            f"After deduplication, retained {len(deduplicated)}/{len(results)} results"
+        )
         return deduplicated
 
     def _generate_content_fingerprint(self, content: str) -> str:
@@ -337,9 +339,13 @@ class FollowUpResultMerger:
                 filtered.append(result)
             else:
                 self._stats["deduplication_count"] += 1
-                logger.debug(f"Filtered duplicate content: {result['content'][:100]}...")
+                logger.debug(
+                    f"Filtered duplicate content: {result['content'][:100]}..."
+                )
 
-        logger.info(f"After original findings filtering, retained {len(filtered)}/{len(results)} results")
+        logger.info(
+            f"After original findings filtering, retained {len(filtered)}/{len(results)} results"
+        )
         return filtered
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
@@ -416,7 +422,9 @@ class FollowUpResultMerger:
             ungrouped = remaining
             groups.append(current_group)
 
-        logger.info(f"Semantic grouping completed: {len(results)} results grouped into {len(groups)} groups")
+        logger.info(
+            f"Semantic grouping completed: {len(results)} results grouped into {len(groups)} groups"
+        )
         return groups
 
     def _merge_group(
@@ -450,7 +458,9 @@ class FollowUpResultMerger:
             merged_metadata.update(result["metadata"])
 
         # Calculate confidence and relevance scores
-        confidence_score = min(0.9, 0.6 + len(group) * 0.1)  # More sources = higher confidence
+        confidence_score = min(
+            0.9, 0.6 + len(group) * 0.1
+        )  # More sources = higher confidence
         relevance_score = self._calculate_relevance_score(merged_content, query_context)
 
         return MergedResult(

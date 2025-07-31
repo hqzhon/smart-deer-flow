@@ -47,7 +47,7 @@ class ReflectionManager:
 
                 app_settings = get_settings()
                 reflection_config = app_settings.get_reflection_config()
-                self.max_reflections = reflection_config.max_reflection_loops
+                self.max_reflections = reflection_config.max_loops
                 self.config = reflection_config
             except ImportError:
                 self.max_reflections = 1
@@ -82,7 +82,10 @@ class ReflectionManager:
         stats = self.get_session_stats(session_id)
 
         if stats.is_limit_reached:
-            return False, f"Maximum reflection count limit reached ({stats.max_allowed})"
+            return (
+                False,
+                f"Maximum reflection count limit reached ({stats.max_allowed})",
+            )
 
         # Special rule: if final reflection already exists, don't allow another final reflection
         if reflection_type == "final" and stats.final_reflections > 0:

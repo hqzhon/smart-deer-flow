@@ -1,7 +1,6 @@
 """Configuration management module - Unified management of various researcher configurations"""
 
 import logging
-import types
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
@@ -28,19 +27,11 @@ class UnifiedResearchConfig:
     researcher_isolation_threshold: float = 0.7
     researcher_max_local_context: int = 3000
 
-    # Phase 4 reflection configuration
-    enable_enhanced_reflection: bool = True
-    max_reflection_loops: int = 3
-    reflection_model: str = "basic"
-    knowledge_gap_threshold: float = 0.7
-    sufficiency_threshold: float = 0.8
-    enable_reflection_integration: bool = True
-
-    # Phase 5 iterative research configuration
-    max_follow_up_iterations: int = 3
-    enable_iterative_research: bool = True
-    max_queries_per_iteration: int = 3
-    follow_up_delay_seconds: float = 1.0
+    # Unified reflection configuration (simplified)
+    enabled: bool = True
+    max_loops: int = 1
+    quality_threshold: float = 0.7
+    model: str = "basic"
 
     # Tool configuration
     max_search_results: int = 10
@@ -53,6 +44,8 @@ class UnifiedResearchConfig:
     # Parallel execution configuration
     enable_parallel_execution: bool = True
     max_parallel_tasks: int = 3
+    max_context_steps_parallel: int = 1
+    disable_context_parallel: bool = False
 
     # Other configuration
     max_step_num: Optional[int] = None
@@ -108,15 +101,12 @@ class IsolationConfigManager:
                     self.configurable.update({"locale": state_locale})
                 else:
                     # Create a new configurable dict with locale
-                    new_configurable = types.SimpleNamespace(
-                        **(
-                            self.configurable.__dict__
-                            if hasattr(self.configurable, "__dict__")
-                            else {}
-                        )
-                    )
-                    new_configurable.locale = state_locale
-                    self.configurable = new_configurable
+                    # Preserve the original configurable object and just set locale
+                    if hasattr(self.configurable, "locale"):
+                        self.configurable.locale = state_locale
+                    else:
+                        # Only create new namespace if configurable doesn't support locale
+                        setattr(self.configurable, "locale", state_locale)
 
         return {"locale": state_locale, "configurable_updated": True}
 
@@ -183,75 +173,53 @@ class IsolationConfigManager:
         # Get reflection model configuration
         reflection_model = None
         try:
-            reflection_model = getattr(
-                self.configurable.reflection, "reflection_model", None
-            )
+            if (
+                hasattr(self.configurable, "reflection")
+                and self.configurable.reflection
+            ):
+                reflection_model = getattr(self.configurable.reflection, "model", None)
         except AttributeError:
-            pass
+            logger.warning("Could not access configurable.reflection")
 
         if not reflection_model:
             # Determine reflection model based on deep thinking settings
             try:
-                enable_deep_thinking = getattr(
-                    self.configurable.agents, "enable_deep_thinking", False
-                )
+                enable_deep_thinking = False
+                if hasattr(self.configurable, "agents") and self.configurable.agents:
+                    enable_deep_thinking = getattr(
+                        self.configurable.agents, "enable_deep_thinking", False
+                    )
                 reflection_model = "reasoning" if enable_deep_thinking else "basic"
             except AttributeError:
+                logger.warning(
+                    "Could not access configurable.agents, using basic reflection model"
+                )
                 reflection_model = "basic"
 
-        reflection_config = {
-            "enable_enhanced_reflection": getattr(
-                self.configurable, "enable_enhanced_reflection", True
-            ),
-            "max_reflection_loops": getattr(
-                self.configurable, "max_reflection_loops", 3
-            ),
-            "reflection_model": reflection_model,
-            "knowledge_gap_threshold": getattr(
-                self.configurable, "knowledge_gap_threshold", 0.7
-            ),
-            "sufficiency_threshold": getattr(
-                self.configurable, "sufficiency_threshold", 0.8
-            ),
-            "enable_reflection_integration": getattr(
-                self.configurable, "enable_reflection_integration", True
-            ),
-        }
+        # Get unified reflection configuration (simplified)
+        reflection_attr = getattr(self.configurable, "reflection", None)
+        if reflection_attr is None:
+            # Create a default reflection configuration if not available
+            reflection_config = {
+                "enabled": True,
+                "max_loops": 1,
+                "quality_threshold": 0.7,
+                "reflection_model": reflection_model,
+            }
+        else:
+            reflection_config = {
+                "enabled": getattr(reflection_attr, "enabled", True),
+                "max_loops": getattr(reflection_attr, "max_loops", 1),
+                "quality_threshold": getattr(reflection_attr, "quality_threshold", 0.7),
+                "reflection_model": reflection_model,
+            }
 
         logger.info(
-            f"Reflection config: enabled={reflection_config['enable_enhanced_reflection']}, "
-            f"model={reflection_config['reflection_model']}"
+            f"Unified reflection config: enabled={reflection_config['enabled']}, "
+            f"model={reflection_config['reflection_model']}, "
+            f"max_loops={reflection_config['max_loops']}"
         )
         return reflection_config
-
-    def setup_iterative_research_config(self) -> Dict[str, Any]:
-        """Set up Phase 5 iterative research configuration
-
-        Returns:
-            Iterative research configuration dictionary
-        """
-        logger.debug("Setting up iterative research configuration")
-
-        iterative_config = {
-            "max_follow_up_iterations": getattr(
-                self.configurable, "max_follow_up_iterations", 3
-            ),
-            "enable_iterative_research": getattr(
-                self.configurable, "enable_iterative_research", True
-            ),
-            "max_queries_per_iteration": getattr(
-                self.configurable, "max_queries_per_iteration", 3
-            ),
-            "follow_up_delay_seconds": getattr(
-                self.configurable, "follow_up_delay_seconds", 1.0
-            ),
-        }
-
-        logger.info(
-            f"Iterative research config: enabled={iterative_config['enable_iterative_research']}, "
-            f"max_iterations={iterative_config['max_follow_up_iterations']}"
-        )
-        return iterative_config
 
     def setup_tool_config(self) -> Dict[str, Any]:
         """Set up tool configuration
@@ -261,13 +229,33 @@ class IsolationConfigManager:
         """
         logger.debug("Setting up tool configuration")
 
+        # Safely get max_search_results from agents
+        max_search_results = 10
+        try:
+            if hasattr(self.configurable, "agents") and self.configurable.agents:
+                max_search_results = getattr(
+                    self.configurable.agents, "max_search_results", 10
+                )
+        except AttributeError:
+            logger.warning(
+                "Could not access configurable.agents, using default max_search_results=10"
+            )
+
+        # Safely get enable_smart_filtering from content
+        enable_smart_filtering = True
+        try:
+            if hasattr(self.configurable, "content") and self.configurable.content:
+                enable_smart_filtering = getattr(
+                    self.configurable.content, "enable_smart_filtering", True
+                )
+        except AttributeError:
+            logger.warning(
+                "Could not access configurable.content, using default enable_smart_filtering=True"
+            )
+
         tool_config = {
-            "max_search_results": getattr(
-                self.configurable.agents, "max_search_results", 10
-            ),
-            "enable_smart_filtering": getattr(
-                self.configurable.content, "enable_smart_filtering", True
-            ),
+            "max_search_results": max_search_results,
+            "enable_smart_filtering": enable_smart_filtering,
         }
 
         return tool_config
@@ -280,9 +268,21 @@ class IsolationConfigManager:
         """
         logger.debug("Setting up MCP configuration")
 
+        # Safely get MCP configuration
+        enabled = False
+        servers = []
+        try:
+            if hasattr(self.configurable, "mcp") and self.configurable.mcp:
+                enabled = getattr(self.configurable.mcp, "enabled", False)
+                servers = getattr(self.configurable.mcp, "servers", [])
+        except AttributeError:
+            logger.warning(
+                "Could not access configurable.mcp, using default MCP settings"
+            )
+
         mcp_config = {
-            "enabled": getattr(self.configurable.mcp, "enabled", False),
-            "servers": getattr(self.configurable.mcp, "servers", []),
+            "enabled": enabled,
+            "servers": servers,
         }
 
         if mcp_config["enabled"]:
@@ -306,7 +306,6 @@ class IsolationConfigManager:
         isolation_config = self.setup_isolation_level()
         phase3_config = self.setup_phase3_config()
         reflection_config = self.setup_reflection_config()
-        iterative_config = self.setup_iterative_research_config()
         tool_config = self.setup_tool_config()
         mcp_config = self.setup_mcp_config()
 
@@ -323,26 +322,28 @@ class IsolationConfigManager:
                 "researcher_isolation_threshold"
             ],
             researcher_max_local_context=phase3_config["researcher_max_local_context"],
-            # Phase 4 reflection configuration
-            enable_enhanced_reflection=reflection_config["enable_enhanced_reflection"],
-            max_reflection_loops=reflection_config["max_reflection_loops"],
-            reflection_model=reflection_config["reflection_model"],
-            knowledge_gap_threshold=reflection_config["knowledge_gap_threshold"],
-            sufficiency_threshold=reflection_config["sufficiency_threshold"],
-            enable_reflection_integration=reflection_config[
-                "enable_reflection_integration"
-            ],
-            # Phase 5 iterative research configuration
-            max_follow_up_iterations=iterative_config["max_follow_up_iterations"],
-            enable_iterative_research=iterative_config["enable_iterative_research"],
-            max_queries_per_iteration=iterative_config["max_queries_per_iteration"],
-            follow_up_delay_seconds=iterative_config["follow_up_delay_seconds"],
+            # Unified reflection configuration (simplified)
+            enabled=reflection_config["enabled"],
+            max_loops=reflection_config["max_loops"],
+            quality_threshold=reflection_config["quality_threshold"],
+            model=reflection_config["reflection_model"],
             # Tool configuration
             max_search_results=tool_config["max_search_results"],
             enable_smart_filtering=tool_config["enable_smart_filtering"],
             # MCP configuration
             mcp_enabled=mcp_config["enabled"],
             mcp_servers=mcp_config["servers"],
+            # Parallel execution configuration
+            enable_parallel_execution=getattr(
+                self.configurable, "enable_parallel_execution", True
+            ),
+            max_parallel_tasks=getattr(self.configurable, "max_parallel_tasks", 3),
+            max_context_steps_parallel=getattr(
+                self.configurable, "max_context_steps_parallel", 1
+            ),
+            disable_context_parallel=getattr(
+                self.configurable, "disable_context_parallel", False
+            ),
             # Other configuration
             max_step_num=getattr(self.configurable, "max_step_num", None),
         )
@@ -365,17 +366,103 @@ class IsolationConfigManager:
         }
 
     def get_reflection_config_dict(self) -> Dict[str, Any]:
-        """Get reflection configuration dictionary (for backward compatibility)
+        """Get unified reflection configuration dictionary (for backward compatibility)
 
         Returns:
-            Reflection configuration dictionary
+            Unified reflection configuration dictionary
         """
         unified = self.get_unified_config()
         return {
-            "enable_enhanced_reflection": unified.enable_enhanced_reflection,
-            "max_reflection_loops": unified.max_reflection_loops,
+            "enabled": unified.enabled,
+            "max_loops": unified.max_loops,
+            "quality_threshold": unified.quality_threshold,
             "reflection_model": unified.reflection_model,
-            "knowledge_gap_threshold": unified.knowledge_gap_threshold,
-            "sufficiency_threshold": unified.sufficiency_threshold,
-            "enable_reflection_integration": unified.enable_reflection_integration,
+        }
+
+    async def setup_isolation_context(
+        self, config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Set up isolation context for research execution
+
+        Args:
+            config: Optional configuration dictionary to override defaults
+
+        Returns:
+            Isolation context dictionary
+        """
+        logger.debug("Setting up isolation context")
+
+        # Get unified configuration
+        unified_config = self.get_unified_config()
+
+        # Apply any config overrides
+        if config:
+            logger.debug(f"Applying config overrides: {list(config.keys())}")
+            # Create a copy of unified config and update with overrides
+            context_config = unified_config.__dict__.copy()
+            context_config.update(config)
+        else:
+            context_config = unified_config.__dict__.copy()
+
+        # Build isolation context
+        isolation_context = {
+            "isolation_config": unified_config.isolation_config,
+            "language_config": {"locale": unified_config.locale},
+            "tool_config": {
+                "max_search_results": unified_config.max_search_results,
+                "enable_smart_filtering": unified_config.enable_smart_filtering,
+            },
+            "reflection_config": {
+                "enabled": unified_config.enabled,
+                "max_loops": unified_config.max_loops,
+                "quality_threshold": unified_config.quality_threshold,
+                "reflection_model": unified_config.model,
+            },
+            "mcp_config": {
+                "enabled": unified_config.mcp_enabled,
+                "servers": unified_config.mcp_servers,
+            },
+            "phase3_config": {
+                "researcher_isolation_metrics": (
+                    unified_config.researcher_isolation_metrics
+                ),
+                "researcher_auto_isolation": unified_config.researcher_auto_isolation,
+                "researcher_isolation_threshold": (
+                    unified_config.researcher_isolation_threshold
+                ),
+                "researcher_max_local_context": (
+                    unified_config.researcher_max_local_context
+                ),
+            },
+            "parallel_config": {
+                "enable_parallel_execution": unified_config.enable_parallel_execution,
+                "max_parallel_tasks": unified_config.max_parallel_tasks,
+                "max_context_steps_parallel": unified_config.max_context_steps_parallel,
+                "disable_context_parallel": unified_config.disable_context_parallel,
+            },
+        }
+
+        logger.info("Isolation context setup completed")
+        return isolation_context
+
+    def get_config_summary(self) -> Dict[str, Any]:
+        """Get configuration summary for debugging and monitoring
+
+        Returns:
+            Configuration summary dictionary
+        """
+        unified_config = self.get_unified_config()
+        return {
+            "locale": unified_config.locale,
+            "isolation_level": (
+                unified_config.isolation_config.isolation_level
+                if unified_config.isolation_config
+                else "default"
+            ),
+            "reflection_enabled": unified_config.enabled,
+            "reflection_model": unified_config.model,
+            "reflection_max_loops": unified_config.max_loops,
+            "mcp_enabled": unified_config.mcp_enabled,
+            "parallel_execution_enabled": unified_config.enable_parallel_execution,
+            "max_search_results": unified_config.max_search_results,
         }

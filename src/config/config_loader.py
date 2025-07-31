@@ -107,49 +107,15 @@ class ConfigLoader:
                 "research",
                 "max_context_steps_researcher",
             ],
-            # Reflection settings
-            "DEER_ENABLE_ENHANCED_REFLECTION": [
+            # Unified Reflection settings (simplified)
+            "DEER_REFLECTION_ENABLED": [
                 "reflection",
-                "enable_enhanced_reflection",
+                "enabled",
             ],
-            "DEER_MAX_REFLECTION_LOOPS": ["reflection", "max_reflection_loops"],
-            "DEER_REFLECTION_TEMPERATURE": ["reflection", "reflection_temperature"],
-            "DEER_REFLECTION_CONFIDENCE_THRESHOLD": [
+            "DEER_REFLECTION_MAX_LOOPS": ["reflection", "max_loops"],
+            "DEER_REFLECTION_QUALITY_THRESHOLD": [
                 "reflection",
-                "reflection_confidence_threshold",
-            ],
-            "DEER_ENABLE_REFLECTION_INTEGRATION": [
-                "reflection",
-                "enable_reflection_integration",
-            ],
-            "DEER_ENABLE_PROGRESSIVE_REFLECTION": [
-                "reflection",
-                "enable_progressive_reflection",
-            ],
-            "DEER_ENABLE_REFLECTION_METRICS": [
-                "reflection",
-                "enable_reflection_metrics",
-            ],
-            # Iterative research settings
-            "DEER_MAX_FOLLOW_UP_ITERATIONS": [
-                "iterative_research",
-                "max_follow_up_iterations",
-            ],
-            "DEER_SUFFICIENCY_THRESHOLD": [
-                "iterative_research",
-                "sufficiency_threshold",
-            ],
-            "DEER_ENABLE_ITERATIVE_RESEARCH": [
-                "iterative_research",
-                "enable_iterative_research",
-            ],
-            "DEER_MAX_QUERIES_PER_ITERATION": [
-                "iterative_research",
-                "max_queries_per_iteration",
-            ],
-            "DEER_FOLLOW_UP_DELAY_SECONDS": [
-                "iterative_research",
-                "follow_up_delay_seconds",
+                "quality_threshold",
             ],
             # Content settings
             "DEER_ENABLE_CONTENT_SUMMARIZATION": [

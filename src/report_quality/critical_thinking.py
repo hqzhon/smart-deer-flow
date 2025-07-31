@@ -385,7 +385,7 @@ class LimitationDetector:
                 "仅使用",  # Chinese: only use
                 "只采用",  # Chinese: solely adopt
                 "单一方法",  # Chinese: single method
-                "基于.*模型"  # Chinese: based on ... model
+                "基于.*模型",  # Chinese: based on ... model
             ]
         else:  # English
             single_method_indicators = [

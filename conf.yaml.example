@@ -98,31 +98,24 @@ research:
 
 # Reflection Configuration
 # Controls the reflection and self-improvement capabilities
+# ============================================================================
+# Simplified Reflection Configuration
+# ============================================================================
+# Controls the system's self-reflection and iterative improvement capabilities.
 reflection:
-  # Core reflection control
-  enable_enhanced_reflection: true               # Enable enhanced reflection system
-  max_reflection_loops: 1                        # Maximum reflection loops per task
-  max_total_reflections: 3                       # Maximum total reflections per session
-  reflection_temperature: 0.3                    # Temperature for reflection model
+  # [Main Switch] Enable reflection-enhanced research
+  # If false, the system will only execute the initially planned research steps
+  enabled: true
   
-  # Threshold settings
-  reflection_confidence_threshold: 0.8           # Confidence threshold for reflection
-  knowledge_gap_threshold: 0.3                   # Knowledge gap threshold
-  sufficiency_threshold: 0.7                     # Content sufficiency threshold
+  # [Loop Limit] Maximum number of reflection cycles per task
+  # This is crucial for preventing infinite loops and controlling costs. Recommended: 1-3
+  max_loops: 2
   
-  # Integration settings
-  enable_reflection_integration: true            # Enable reflection integration with research flow
-  enable_progressive_reflection: true            # Enable progressive reflection across iterations
-  enable_reflection_metrics: true                # Enable reflection performance metrics
-  skip_initial_stage_reflection: false           # Skip reflection in initial research stage
-  
-  # Follow-up query control
-  disable_followup_reflection: false             # Disable reflection for follow-up queries
-  merge_followup_results: true                   # Merge follow-up query results intelligently
-  
-  # Session management
-  enable_global_counter: true                    # Enable global reflection counter across sessions
-  reset_counter_on_new_task: true                # Reset reflection counter for new tasks
+  # [Quality Threshold] Unified threshold for reflection decisions (0.0-1.0)
+  # Controls when to trigger additional research based on quality assessment
+  # Higher values = more strict quality requirements, more likely to trigger additional research
+  # Lower values = more lenient, less likely to trigger additional research
+  quality_threshold: 0.75
 
 # Follow-up Result Merger Configuration
 # Controls intelligent merging of follow-up query results
@@ -161,14 +154,7 @@ followup_merger:
   enable_detailed_logging: false                 # Enable detailed merge operation logging
   log_merge_statistics: true                     # Log merge statistics and performance metrics
 
-# Iterative Research Configuration
-# Controls follow-up research and iterative improvement
-iterative_research:
-  max_follow_up_iterations: 1                    # Maximum follow-up research iterations
-  sufficiency_threshold: 0.7                     # Threshold for research sufficiency (0.0-1.0)
-  enable_iterative_research: true                # Enable iterative research capabilities
-  max_queries_per_iteration: 3                   # Maximum queries per iteration
-  follow_up_delay_seconds: 1.0                   # Delay between follow-up queries
+
 
 # Content Processing Configuration
 # Controls how content is processed and optimized

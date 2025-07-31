@@ -118,9 +118,13 @@ class AdaptiveSemaphore:
             # Adjustment strategy
             new_value = self.current_value
 
-            if avg_time < 2.0 and cv < 0.5:  # Tasks are fast and stable, can increase concurrency
+            if (
+                avg_time < 2.0 and cv < 0.5
+            ):  # Tasks are fast and stable, can increase concurrency
                 new_value = min(self.max_value, self.current_value + 1)
-            elif avg_time > 10.0 or cv > 1.0:  # Tasks are slow or unstable, reduce concurrency
+            elif (
+                avg_time > 10.0 or cv > 1.0
+            ):  # Tasks are slow or unstable, reduce concurrency
                 new_value = max(self.min_value, self.current_value - 1)
 
             if new_value != self.current_value:

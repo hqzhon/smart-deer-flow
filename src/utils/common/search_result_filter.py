@@ -256,12 +256,16 @@ class SearchResultCleaner:
                 indicator_count = sum(
                     text.count(indicator) for indicator in double_encoding_indicators
                 )
-                if indicator_count >= 2:  # Consider as double encoding only if appears at least 2 times
+                if (
+                    indicator_count >= 2
+                ):  # Consider as double encoding only if appears at least 2 times
                     try:
                         text_bytes = text.encode("latin-1")
                         decoded = text_bytes.decode("utf-8", errors="ignore")
                         # Only use if decoded result looks more normal
-                        if len(decoded) >= len(text) * 0.7:  # Decoded result cannot lose too much content
+                        if (
+                            len(decoded) >= len(text) * 0.7
+                        ):  # Decoded result cannot lose too much content
                             text = decoded
                     except (UnicodeEncodeError, UnicodeDecodeError):
                         pass

@@ -49,17 +49,17 @@ class SmartSearchTool(BaseTool):
     @property
     def include_raw_content(self) -> bool:
         """Delegate to base tool if available."""
-        return getattr(self.base_tool, "include_raw_content", True)
+        return getattr(self.base_tool, "include_raw_content", False)
 
     @property
     def include_images(self) -> bool:
         """Delegate to base tool if available."""
-        return getattr(self.base_tool, "include_images", True)
+        return getattr(self.base_tool, "include_images", False)
 
     @property
     def include_image_descriptions(self) -> bool:
         """Delegate to base tool if available."""
-        return getattr(self.base_tool, "include_image_descriptions", True)
+        return getattr(self.base_tool, "include_image_descriptions", False)
 
     @property
     def search_wrapper(self):
@@ -188,9 +188,9 @@ def get_web_search_tool(max_search_results: int, enable_smart_filtering: bool = 
         base_tool = LoggedTavilySearch(
             name="web_search_base",
             max_results=max_search_results,
-            include_raw_content=True,
-            include_images=True,
-            include_image_descriptions=True,
+            include_raw_content=False,
+            include_images=False,
+            include_image_descriptions=False,
         )
     elif selected_search_engine == SearchEngine.DUCKDUCKGO:
         base_tool = LoggedDuckDuckGoSearch(

@@ -34,18 +34,13 @@ class KnowledgeGap(BaseModel):
 class ReflectionConfig(BaseModel):
     """Configuration for reflection system."""
 
-    enable_enhanced_reflection: bool = Field(
-        default=True, description="Enable enhanced reflection"
-    )
-    max_reflection_loops: int = Field(default=1, description="Maximum reflection loops")
+    enabled: bool = Field(default=True, description="Enable enhanced reflection")
+    max_loops: int = Field(default=1, description="Maximum reflection loops")
     reflection_model: Optional[str] = Field(
         default=None, description="Model for reflection"
     )
-    knowledge_gap_threshold: float = Field(
-        default=0.6, description="Threshold for knowledge gaps"
-    )
-    sufficiency_threshold: float = Field(
-        default=0.7, description="Threshold for sufficiency"
+    quality_threshold: float = Field(
+        default=0.7, description="Threshold for research quality and sufficiency"
     )
 
 
@@ -270,7 +265,7 @@ class ReflectionContext:
     total_steps: int = 0
     current_step_index: int = 0
     locale: str = "en-US"
-    max_reflection_loops: int = 1
+    max_loops: int = 1
     current_reflection_loop: int = 0
 
 
@@ -311,7 +306,7 @@ class EnhancedReflectionAgent:
         self.metrics = {}
 
         # Reflection configuration
-        self.max_reflection_loops = getattr(self.config, "max_reflection_loops", 1)
+        self.max_reflection_loops = getattr(self.config, "max_loops", 1)
         self.reflection_model_name = getattr(self.config, "reflection_model", None)
         self.reflection_model = (
             None  # Will be initialized lazily via _get_reflection_model
@@ -319,12 +314,10 @@ class EnhancedReflectionAgent:
         self.reflection_temperature = getattr(
             self.config, "reflection_temperature", 0.7
         )
-        self.enable_enhanced_reflection = getattr(
-            self.config, "enable_enhanced_reflection", True
-        )
+        self.reflection_enabled = getattr(self.config, "enabled", True)
 
         logger.info(
-            f"Initialized EnhancedReflectionAgent with enhanced_reflection={self.enable_enhanced_reflection}"
+            f"Initialized EnhancedReflectionAgent with reflection_enabled={self.reflection_enabled}"
         )
 
     async def analyze_knowledge_gaps(
@@ -341,7 +334,7 @@ class EnhancedReflectionAgent:
         Returns:
             ReflectionResult with gap analysis and recommendations
         """
-        if not self.enable_enhanced_reflection:
+        if not self.reflection_enabled:
             logger.debug("Enhanced reflection disabled, returning basic result")
             return self._create_basic_reflection_result(context)
 
@@ -579,7 +572,8 @@ class EnhancedReflectionAgent:
                 )
                 if language == Language.ZH_CN:
                     return [
-                        f"What additional information is needed about {gap}?" for gap in knowledge_gaps[:3]
+                        f"What additional information is needed about {gap}?"
+                        for gap in knowledge_gaps[:3]
                     ]
                 else:
                     return [
@@ -590,7 +584,10 @@ class EnhancedReflectionAgent:
         except Exception as e:
             logger.error(f"Error generating follow-up queries: {e}")
             if language == Language.ZH_CN:
-                return [f"What additional information is needed about {gap}?" for gap in knowledge_gaps[:3]]
+                return [
+                    f"What additional information is needed about {gap}?"
+                    for gap in knowledge_gaps[:3]
+                ]
             else:
                 return [
                     f"What additional information is needed about {gap}?"
@@ -616,9 +613,7 @@ class EnhancedReflectionAgent:
         )
 
         # Enhanced sufficiency assessment
-        confidence_threshold = getattr(
-            self.config, "reflection_confidence_threshold", 0.7
-        )
+        confidence_threshold = getattr(self.config, "quality_threshold", 0.7)
         enhanced_sufficient = (
             reflection_result.is_sufficient
             and reflection_result.confidence_score is not None
@@ -665,7 +660,7 @@ class EnhancedReflectionAgent:
             "confidence_score": reflection_result.confidence_score,
             "knowledge_gaps_count": len(reflection_result.knowledge_gaps),
             "reflection_loop": context.current_reflection_loop,
-            "max_loops": self.max_reflection_loops,
+            "max_loops": getattr(self.config, "max_loops", 1),
         }
 
         logger.info(f"Sufficiency assessment: {is_sufficient} - {reasoning}")
@@ -714,7 +709,9 @@ class EnhancedReflectionAgent:
             step_text = ""
             if language == Language.ZH_CN:
                 step_text += f"Step {i+1}: {step.get('step', 'Unknown')}\n"
-                step_text += f"Description: {step.get('description', 'No description')}\n"
+                step_text += (
+                    f"Description: {step.get('description', 'No description')}\n"
+                )
                 if step.get("execution_res"):
                     # Limit individual step result length
                     exec_res = (
@@ -1189,7 +1186,7 @@ class EnhancedReflectionAgent:
             "sufficient_rate": sufficient_count / total_reflections,
             "average_confidence": avg_confidence,
             "average_follow_up_queries": avg_follow_ups,
-            "enhanced_reflection_enabled": self.enable_enhanced_reflection,
+            "reflection_enabled": getattr(self.config, "enabled", True),
         }
 
     async def analyze_research_quality(

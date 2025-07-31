@@ -38,19 +38,16 @@ class TestEnhancedResearcher(unittest.TestCase):
         self.assertIsNotNone(researcher.tool_manager)
         self.assertIsNotNone(researcher.mcp_manager)
         self.assertIsNotNone(researcher.reflection_manager)
-        self.assertIsNotNone(researcher.research_engine)
         self.assertIsNotNone(researcher.result_processor)
 
     @patch("src.utils.researcher.enhanced_researcher.IsolationConfigManager")
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     async def test_setup_isolation_context(
         self,
         mock_processor,
-        mock_engine,
         mock_reflection,
         mock_mcp,
         mock_tool,
@@ -121,12 +118,10 @@ class TestEnhancedResearcher(unittest.TestCase):
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     async def test_execute_research_with_reflection_success(
         self,
         mock_processor,
-        mock_engine,
         mock_reflection,
         mock_mcp,
         mock_tool,
@@ -150,12 +145,10 @@ class TestEnhancedResearcher(unittest.TestCase):
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     async def test_execute_research_with_reflection_error(
         self,
         mock_processor,
-        mock_engine,
         mock_reflection,
         mock_mcp,
         mock_tool,
@@ -181,12 +174,10 @@ class TestEnhancedResearcher(unittest.TestCase):
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     async def test_cleanup_on_exception(
         self,
         mock_processor,
-        mock_engine,
         mock_reflection,
         mock_mcp,
         mock_tool,
@@ -217,12 +208,10 @@ class TestEnhancedResearcher(unittest.TestCase):
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     async def test_context_manager_support(
         self,
         mock_processor,
-        mock_engine,
         mock_reflection,
         mock_mcp,
         mock_tool,
@@ -263,14 +252,12 @@ class TestEnhancedResearcherIntegration(unittest.TestCase):
     @patch("src.utils.researcher.enhanced_researcher.ResearchToolManager")
     @patch("src.utils.researcher.enhanced_researcher.MCPClientManager")
     @patch("src.utils.researcher.enhanced_researcher.ReflectionSystemManager")
-    @patch("src.utils.researcher.enhanced_researcher.IterativeResearchEngine")
     @patch("src.utils.researcher.enhanced_researcher.ResearchResultProcessor")
     @patch("src.utils.researcher.enhanced_researcher._setup_and_execute_agent_step")
     async def test_full_research_workflow(
         self,
         mock_execute_step,
         mock_processor_class,
-        mock_engine_class,
         mock_reflection_class,
         mock_mcp_class,
         mock_tool_class,
@@ -289,11 +276,6 @@ class TestEnhancedResearcherIntegration(unittest.TestCase):
         mock_mcp_instance.cleanup_clients = AsyncMock()
 
         # mock_reflection_instance = mock_reflection_class.return_value
-
-        mock_engine_instance = mock_engine_class.return_value
-        mock_engine_instance.execute_research_loop = AsyncMock(
-            return_value={"results": "test"}
-        )
 
         mock_processor_instance = mock_processor_class.return_value
         mock_processor_instance.process_final_results.return_value = Command(
@@ -316,7 +298,6 @@ class TestEnhancedResearcherIntegration(unittest.TestCase):
         # 验证所有组件都被正确调用
         mock_config_instance.get_unified_config.assert_called_once()
         mock_tool_instance.get_all_tools.assert_called_once()
-        mock_engine_instance.execute_research_loop.assert_called_once()
         mock_processor_instance.process_final_results.assert_called_once()
         mock_mcp_instance.cleanup_clients.assert_called_once()
 

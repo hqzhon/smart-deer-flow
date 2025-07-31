@@ -28,7 +28,7 @@ class TestPydanticSettingsConfig:
         assert settings.llm.temperature == 0.7
         assert settings.agents.max_plan_iterations == 1
         assert settings.research.enable_researcher_isolation is True
-        assert settings.reflection.enable_enhanced_reflection is True
+        assert settings.reflection.reflection_enabled is True
 
     def test_environment_variable_loading(self):
         """Test that environment variables are automatically loaded."""
@@ -44,13 +44,15 @@ class TestPydanticSettingsConfig:
             "DEER_AGENTS__ENABLE_DEEP_THINKING": "true",
             "DEER_RESEARCH__ENABLE_RESEARCHER_ISOLATION": "false",
             "DEER_RESEARCH__RESEARCHER_ISOLATION_LEVEL": "aggressive",
-            "DEER_REFLECTION__MAX_REFLECTION_LOOPS": "5",
+            "DEER_REFLECTION__REFLECTION_MAX_LOOPS": "5",
             "DEER_MCP__ENABLED": "true",
             "DEER_MCP__TIMEOUT": "60",
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            settings = AppSettings()
+            from src.config.config_loader import get_settings
+
+            settings = get_settings()
 
             # Test core settings
             assert settings.report_style == "business"
@@ -68,7 +70,7 @@ class TestPydanticSettingsConfig:
             assert settings.research.researcher_isolation_level == "aggressive"
 
             # Test reflection settings
-            assert settings.reflection.max_reflection_loops == 5
+            assert settings.reflection.reflection_max_loops == 5
 
             # Test MCP settings
             assert settings.mcp.enabled is True

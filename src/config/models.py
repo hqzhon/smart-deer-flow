@@ -1,6 +1,4 @@
-"""
-Pydantic-based configuration models for unified configuration management.
-"""
+"""Nydantic-based configuration models for unified configuration management."""
 
 from typing import Dict, List, Optional, Any, Literal, Union
 from pydantic import BaseModel, Field, field_validator
@@ -71,6 +69,18 @@ class AgentSettings(BaseModel):
     max_plan_iterations: int = Field(default=1, ge=1)
     max_step_num: int = Field(default=2, ge=1)
     max_search_results: int = Field(default=2, ge=1)
+    max_research_cycles: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of research cycles to perform",
+    )
+    max_total_observations: int = Field(
+        default=10,
+        ge=0,
+        le=100,
+        description="Maximum total observations to keep in memory (0 = clear all)",
+    )
     enable_deep_thinking: bool = False
     enable_parallel_execution: bool = True
     max_parallel_tasks: int = Field(default=3, ge=1)
@@ -91,151 +101,123 @@ class ResearchSettings(BaseModel):
 
 
 class ReflectionSettings(BaseModel):
-    """Reflection system configuration settings."""
+    """Simplified reflection configuration settings."""
 
-    # Core reflection control
-    enable_enhanced_reflection: bool = Field(
-        default=True, description="Enable enhanced reflection system"
-    )
-    max_reflection_loops: int = Field(
-        default=1, ge=1, le=10, description="Maximum reflection loops per task"
-    )
-    max_total_reflections: int = Field(
-        default=3, ge=1, le=50, description="Maximum total reflections per session"
-    )
-    reflection_temperature: float = Field(
-        default=0.3, ge=0.0, le=2.0, description="Temperature for reflection model"
+    # [Main Switch] Enable reflection-enhanced research.
+    enabled: bool = Field(
+        default=True, description="Enable reflection-enhanced research."
     )
 
-    # Threshold settings
-    reflection_confidence_threshold: float = Field(
-        default=0.8, ge=0.0, le=1.0, description="Confidence threshold for reflection"
-    )
-    knowledge_gap_threshold: float = Field(
-        default=0.3, ge=0.0, le=1.0, description="Knowledge gap threshold"
-    )
-    sufficiency_threshold: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Content sufficiency threshold"
+    # [Loop Limit] Maximum number of reflection cycles per task.
+    max_loops: int = Field(
+        default=2, ge=1, le=10, description="Maximum reflection loops per task."
     )
 
-    # Integration settings
-    enable_reflection_integration: bool = Field(
-        default=True, description="Enable reflection integration with research flow"
-    )
-    enable_progressive_reflection: bool = Field(
-        default=True, description="Enable progressive reflection across iterations"
-    )
-    enable_reflection_metrics: bool = Field(
-        default=True, description="Enable reflection performance metrics"
-    )
-    skip_initial_stage_reflection: bool = Field(
-        default=False, description="Skip reflection in initial research stage"
-    )
-
-    # Follow-up query control
-    disable_followup_reflection: bool = Field(
-        default=False, description="Disable reflection for follow-up queries"
-    )
-    merge_followup_results: bool = Field(
-        default=True, description="Merge follow-up query results intelligently"
-    )
-
-    # Session management
-    enable_global_counter: bool = Field(
-        default=True, description="Enable global reflection counter across sessions"
-    )
-    reset_counter_on_new_task: bool = Field(
-        default=True, description="Reset reflection counter for new tasks"
+    # [Quality Threshold] Unified threshold for judging research quality (0.0-1.0).
+    quality_threshold: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description="Unified threshold for research quality.",
     )
 
 
 class FollowUpMergerSettings(BaseModel):
-    """Follow-up查询结果合并配置设置"""
+    """Follow-up query result merging configuration settings"""
 
-    # 基础合并参数
+    # Basic merging parameters
     similarity_threshold: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="内容相似度阈值"
+        default=0.7, ge=0.0, le=1.0, description="Content similarity threshold"
     )
-    min_content_length: int = Field(default=50, ge=10, description="最小内容长度")
+    min_content_length: int = Field(
+        default=50, ge=10, description="Minimum content length"
+    )
     max_merged_results: int = Field(
-        default=20, ge=1, le=100, description="最大合并结果数量"
+        default=20, ge=1, le=100, description="Maximum number of merged results"
     )
 
-    # 功能开关
-    enable_semantic_grouping: bool = Field(default=True, description="启用语义分组")
-    enable_intelligent_merging: bool = Field(default=True, description="启用智能合并")
-    enable_deduplication: bool = Field(default=True, description="启用去重功能")
-    enable_quality_filtering: bool = Field(default=True, description="启用质量过滤")
+    # Feature switches
+    enable_semantic_grouping: bool = Field(
+        default=True, description="Enable semantic grouping"
+    )
+    enable_intelligent_merging: bool = Field(
+        default=True, description="Enable intelligent merging"
+    )
+    enable_deduplication: bool = Field(default=True, description="Enable deduplication")
+    enable_quality_filtering: bool = Field(
+        default=True, description="Enable quality filtering"
+    )
 
-    # 质量评估参数
+    # Quality assessment parameters
     quality_threshold: float = Field(
-        default=0.3, ge=0.0, le=1.0, description="内容质量阈值"
+        default=0.3, ge=0.0, le=1.0, description="Content quality threshold"
     )
     confidence_weight: float = Field(
-        default=0.4, ge=0.0, le=1.0, description="置信度权重"
+        default=0.4, ge=0.0, le=1.0, description="Confidence weight"
     )
     relevance_weight: float = Field(
-        default=0.4, ge=0.0, le=1.0, description="相关性权重"
+        default=0.4, ge=0.0, le=1.0, description="Relevance weight"
     )
     content_quality_weight: float = Field(
-        default=0.2, ge=0.0, le=1.0, description="内容质量权重"
+        default=0.2, ge=0.0, le=1.0, description="Content quality weight"
     )
 
-    # 合并策略参数
+    # Merging strategy parameters
     max_sentences_per_result: int = Field(
-        default=10, ge=1, le=50, description="每个结果最大句子数"
+        default=10, ge=1, le=50, description="Maximum sentences per result"
     )
-    max_key_points: int = Field(default=2, ge=1, le=10, description="最大关键点数")
-    preserve_source_info: bool = Field(default=True, description="保留源信息")
+    max_key_points: int = Field(
+        default=2, ge=1, le=10, description="Maximum key points"
+    )
+    preserve_source_info: bool = Field(
+        default=True, description="Preserve source information"
+    )
 
-    # 性能优化参数
-    enable_similarity_cache: bool = Field(default=True, description="启用相似度缓存")
+    # Performance optimization parameters
+    enable_similarity_cache: bool = Field(
+        default=True, description="Enable similarity cache"
+    )
     max_cache_size: int = Field(
-        default=1000, ge=100, le=10000, description="最大缓存大小"
+        default=1000, ge=100, le=10000, description="Maximum cache size"
     )
 
-    # 预设配置选择
+    # Preset configuration selection
     active_config_preset: str = Field(
-        default="default", description="当前激活的配置预设"
+        default="default", description="Currently active configuration preset"
     )
     enable_config_switching: bool = Field(
-        default=True, description="允许运行时切换配置"
+        default=True, description="Allow runtime configuration switching"
     )
 
-    # 日志和调试
-    enable_detailed_logging: bool = Field(default=False, description="启用详细日志")
-    log_merge_statistics: bool = Field(default=True, description="记录合并统计信息")
+    # Logging and debugging
+    enable_detailed_logging: bool = Field(
+        default=False, description="Enable detailed logging"
+    )
+    log_merge_statistics: bool = Field(default=True, description="Log merge statistics")
 
     @field_validator("confidence_weight", "relevance_weight", "content_quality_weight")
     @classmethod
     def validate_weights(cls, v, info):
-        """验证权重值"""
+        """Validate weight values"""
         if not 0.0 <= v <= 1.0:
-            raise ValueError(f"权重值必须在0.0到1.0之间，当前值: {v}")
+            raise ValueError(
+                f"Weight value must be between 0.0 and 1.0, current value: {v}"
+            )
         return v
 
     def model_post_init(self, __context) -> None:
-        """模型初始化后验证"""
-        # 验证权重总和
+        """Validation after model initialization"""
+        # Validate weight sum
         total_weight = (
             self.confidence_weight + self.relevance_weight + self.content_quality_weight
         )
-        if abs(total_weight - 1.0) > 0.01:  # 允许小的浮点误差
+        if abs(total_weight - 1.0) > 0.01:  # Allow small floating point errors
             import warnings
 
             warnings.warn(
-                f"权重总和应该接近1.0，当前总和: {total_weight:.3f}", UserWarning
+                f"Weight sum should be close to 1.0, current sum: {total_weight:.3f}",
+                UserWarning,
             )
-
-
-class IterativeResearchSettings(BaseModel):
-    """Iterative research configuration settings."""
-
-    max_follow_up_iterations: int = Field(default=1, ge=1)
-    sufficiency_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
-    enable_iterative_research: bool = True
-    max_queries_per_iteration: int = Field(default=2, ge=1)
-    follow_up_delay_seconds: float = Field(default=1.0, ge=0.0)
 
 
 class ContentSettings(BaseModel):
@@ -430,9 +412,6 @@ class AppSettings(BaseSettings):
         default_factory=FollowUpMergerSettings
     )
 
-    iterative_research: IterativeResearchSettings = Field(
-        default_factory=IterativeResearchSettings
-    )
     content: ContentSettings = Field(default_factory=ContentSettings)
     advanced_context: AdvancedContextConfig = Field(
         default_factory=AdvancedContextConfig

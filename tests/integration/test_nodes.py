@@ -1550,8 +1550,8 @@ async def test_researcher_node_with_retriever_tool(
 
     result = await researcher_node(mock_state_with_resources, mock_config)
 
-    # Should call get_web_search_tool with correct max_search_results
-    patch_get_web_search_tool.assert_called_once_with(7)
+    # Should call get_web_search_tool with correct max_search_results and enable_smart_filtering
+    patch_get_web_search_tool.assert_called_once_with(5, True)
     # Should call get_retriever_tool with resources
     patch_get_retriever_tool.assert_called_once_with(["resource1", "resource2"])
     # Should call _setup_and_execute_agent_step with retriever_tool first
@@ -1577,7 +1577,7 @@ async def test_researcher_node_without_retriever_tool(
 
         result = await researcher_node(mock_state_with_resources, mock_config)
 
-        patch_get_web_search_tool.assert_called_once_with(7)
+        patch_get_web_search_tool.assert_called_once_with(5, True)
         mock_get_retriever_tool.assert_called_once_with(["resource1", "resource2"])
         args, kwargs = patch_setup_and_execute_agent_step.call_args
         tools = args[3]
@@ -1601,7 +1601,7 @@ async def test_researcher_node_without_resources(
 
         result = await researcher_node(mock_state_without_resources, mock_config)
 
-        patch_get_web_search_tool.assert_called_once_with(7)
+        patch_get_web_search_tool.assert_called_once_with(5, True)
         mock_get_retriever_tool.assert_called_once_with([])
         args, kwargs = patch_setup_and_execute_agent_step.call_args
         tools = args[3]

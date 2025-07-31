@@ -157,7 +157,9 @@ class ExecutionContextManager:
             execution_res = step.get("execution_res", "")
 
             # Simple content fingerprint
-            content_hash = hash(execution_res[:200])  # Use first 200 characters as fingerprint
+            content_hash = hash(
+                execution_res[:200]
+            )  # Use first 200 characters as fingerprint
 
             if content_hash not in seen_content:
                 seen_content.add(content_hash)
@@ -449,7 +451,15 @@ class ExecutionContextManager:
                 score += 0.3
 
             # Keyword scoring
-            keywords = ["conclusion", "finding", "important", "key", "recommendation", "summary", "analysis"]
+            keywords = [
+                "conclusion",
+                "finding",
+                "important",
+                "key",
+                "recommendation",
+                "summary",
+                "analysis",
+            ]
             for keyword in keywords:
                 if keyword in obs:
                     score += 0.2
@@ -480,7 +490,9 @@ class ExecutionContextManager:
 
                 if keep_end > 0:
                     compressed_obs = (
-                        obs[:keep_start] + "\n[...content compressed...]\n" + obs[-keep_end:]
+                        obs[:keep_start]
+                        + "\n[...content compressed...]\n"
+                        + obs[-keep_end:]
                     )
                 else:
                     compressed_obs = obs[:target_length] + "..."
@@ -506,7 +518,14 @@ class ExecutionContextManager:
             # Identify important messages
             if any(
                 keyword in content
-                for keyword in ["user request", "task goal", "error", "failure", "important", "key"]
+                for keyword in [
+                    "user request",
+                    "task goal",
+                    "error",
+                    "failure",
+                    "important",
+                    "key",
+                ]
             ):
                 important_messages.append(msg)
             else:

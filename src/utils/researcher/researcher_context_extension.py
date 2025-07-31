@@ -67,7 +67,7 @@ class ResearcherContextExtension:
 
         # Phase 2 - GFLQ Integration: Initialize reflection agent
         self.reflection_agent = None
-        if self.config.get("enable_enhanced_reflection", True):
+        if self.config.get("reflection_enabled", True):
             try:
                 from src.utils.reflection.enhanced_reflection import (
                     EnhancedReflectionAgent,
@@ -218,22 +218,24 @@ class ResearcherContextExtension:
             completed_steps, current_step_dict, agent_name
         )
 
-        # Prepare the input for the agent with isolated context
-        agent_input = {
-            "messages": [
-                HumanMessage(
-                    content=f"{context_info}\n\n# Current Task\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
-                )
-            ]
+        # Prepare the agent state for template rendering (unified with standard path)
+        agent_state = {
+            **state,  # Include all existing state
+            "current_step_title": current_step.title,
+            "current_step_description": current_step.description,
+            "context_info": context_info,
+            "completed_steps": optimized_steps,
+            "agent_name": agent_name,
+            "locale": state.get("locale", "en-US"),
         }
 
-        # Add researcher-specific guidance and resource information
-        agent_input = await self._add_researcher_guidance(agent_input, state)
+        # Add researcher-specific guidance and resource information to state
+        agent_state = await self._add_researcher_guidance_to_state(agent_state, state)
 
         # Execute the agent with proper error handling
         try:
             result = await self._execute_agent_with_isolation(
-                agent, agent_input, current_step
+                agent, agent_state, current_step
             )
 
             # Phase 3: Update metrics on successful execution
@@ -323,17 +325,17 @@ class ResearcherContextExtension:
             goto="research_team",
         )
 
-    async def _add_researcher_guidance(
-        self, agent_input: Dict[str, Any], state: State
+    async def _add_researcher_guidance_to_state(
+        self, agent_state: Dict[str, Any], state: State
     ) -> Dict[str, Any]:
-        """Add researcher-specific guidance and resource information.
+        """Add researcher-specific guidance and resource information to agent state.
 
         Args:
-            agent_input: Base agent input dictionary
+            agent_state: Base agent state dictionary
             state: Current state
 
         Returns:
-            Enhanced agent input with researcher guidance
+            Enhanced agent state with researcher guidance
         """
         # Phase 2 - GFLQ Integration: Add reflection-enhanced guidance
         if self.reflection_agent:
@@ -401,11 +403,8 @@ class ResearcherContextExtension:
                         for gap in reflection_result.knowledge_gaps[:3]:
                             guidance_content += f"- {gap}\n"
 
-                    agent_input["messages"].append(
-                        HumanMessage(
-                            content=guidance_content, name="reflection_guidance"
-                        )
-                    )
+                    # Add reflection guidance to agent state
+                    agent_state["reflection_guidance"] = guidance_content
 
             except Exception as e:
                 logger.warning(f"Reflection guidance failed: {e}")
@@ -415,33 +414,27 @@ class ResearcherContextExtension:
             resources_info = "**The user mentioned the following resource files:**\n\n"
             for resource in state.get("resources"):
                 resources_info += f"- {resource.title} ({resource.description})\n"
+            resources_info += "\n\nYou MUST use the **local_search_tool** to retrieve the information from the resource files."
 
-            agent_input["messages"].append(
-                HumanMessage(
-                    content=resources_info
-                    + "\n\n"
-                    + "You MUST use the **local_search_tool** to retrieve the information from the resource files.",
-                )
-            )
+            # Add resources info to agent state
+            agent_state["resources_info"] = resources_info
 
-        # Add citation guidance
-        agent_input["messages"].append(
-            HumanMessage(
-                content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
-                name="system",
-            )
+        # Add citation reminder to agent state (consistent with standard path)
+        agent_state["citation_reminder"] = (
+            "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. "
+            "Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"
         )
 
-        return agent_input
+        return agent_state
 
     async def _execute_agent_with_isolation(
-        self, agent, agent_input: Dict[str, Any], current_step
-    ) -> Any:
-        """Execute agent with isolation-specific settings.
+        self, agent, agent_state: Dict[str, Any], current_step
+    ) -> Dict[str, Any]:
+        """Execute agent with isolation and error handling.
 
         Args:
             agent: The agent to execute
-            agent_input: Input for the agent
+            agent_state: State for the agent
             current_step: Current step being executed
 
         Returns:
@@ -463,18 +456,24 @@ class ResearcherContextExtension:
             )
             recursion_limit = default_recursion_limit
 
+        # Use template system to render messages like standard path
+        from src.utils.template import apply_prompt_template
+
+        # Apply prompt template using agent_state
+        messages = apply_prompt_template("researcher", agent_state)
+
         # Optimize messages for token efficiency
         max_messages = 15  # Reduced for isolation
-        if len(agent_input["messages"]) > max_messages:
-            agent_input["messages"] = agent_input["messages"][-max_messages:]
+        if len(messages) > max_messages:
+            messages = messages[-max_messages:]
             logger.debug(f"Truncated messages to {max_messages} for isolation")
 
-        logger.info(f"Executing agent with {len(agent_input['messages'])} messages")
+        logger.info(f"Executing agent with {len(messages)} messages")
 
         # Execute with safe LLM call
         result = await safe_llm_call_async(
             agent.ainvoke,
-            input=agent_input,
+            input={"messages": messages},
             config={"recursion_limit": recursion_limit},
             operation_name="researcher executor with isolation",
             context=f"Execute step with isolation: {current_step.title}",
