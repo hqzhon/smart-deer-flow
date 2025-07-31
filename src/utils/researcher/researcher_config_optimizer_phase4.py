@@ -546,11 +546,15 @@ class ConfigurationOptimizer:
 
         # Check if auto-tuning should be enabled
         if not self.auto_tuning_enabled and len(self.performance_history) >= 50:
-            recommendations.append("Consider enabling auto-tuning feature to optimize performance")
+            recommendations.append(
+                "Consider enabling auto-tuning feature to optimize performance"
+            )
 
         # Check optimization history
         if len(self.optimization_history) == 0:
-            recommendations.append("No configuration optimization performed yet, recommend running performance analysis")
+            recommendations.append(
+                "No configuration optimization performed yet, recommend running performance analysis"
+            )
 
         # Check configuration age
         config_path = Path(self.config_file)

@@ -12,6 +12,14 @@ You are dedicated to conducting thorough investigations using search tools and p
 {{ context_info }}
 {% endif %}
 
+{% if original_user_query %}
+# Original User Query
+
+The user's original research request: {{ original_user_query }}
+
+Keep this original context in mind while executing your current task to ensure your research aligns with the user's overall intent.
+{% endif %}
+
 {% if current_step_title and current_step_description %}
 # Current Task
 
@@ -92,6 +100,12 @@ You have access to two types of tools:
       ```
 - Always output in the locale of **{{ locale }}**.
 - DO NOT include inline citations in the text. Instead, track all sources and list them in the References section at the end using link reference format.
+
+{% if reflection_guidance %}
+# Reflection Guidance
+
+{{ reflection_guidance }}
+{% endif %}
 
 {% if citation_reminder %}
 # Citation Guidelines

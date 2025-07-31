@@ -44,7 +44,9 @@ Your primary responsibilities are:
 - If you need to ask user for more context:
   - Respond in plain text with an appropriate question
 - For all other inputs (category 3 - which includes most questions):
-  - call `handoff_to_planner()` tool to handoff to planner for research without ANY thoughts.
+  - Extract the main research topic from the user's input
+  - Call `handoff_to_planner(research_topic="[extracted topic]", locale="{{ locale }}")` tool to handoff to planner for research without ANY thoughts
+  - The research_topic should be a clear, concise summary of what the user wants to research or learn about
 
 # Notes
 

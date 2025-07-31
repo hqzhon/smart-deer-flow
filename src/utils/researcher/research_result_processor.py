@@ -206,7 +206,9 @@ class ResearchResultProcessor:
         if metadata.get("score") and isinstance(metadata["score"], (int, float)):
             # If there's a raw score, normalize and weight it
             raw_score = float(metadata["score"])
-            normalized_score = min(raw_score / 100.0, 1.0)  # Assume max raw score is 100
+            normalized_score = min(
+                raw_score / 100.0, 1.0
+            )  # Assume max raw score is 100
             score += normalized_score * 0.2
 
         return min(score, 1.0)
@@ -371,6 +373,94 @@ class ResearchResultProcessor:
                 distribution["poor"] += 1
 
         return distribution
+
+    async def process_research_result(
+        self, preprocessed_result: Any, reflection_result: Any
+    ) -> Dict[str, Any]:
+        """Process research result with reflection analysis
+
+        Args:
+            preprocessed_result: Preprocessed research result
+            reflection_result: Reflection analysis result
+
+        Returns:
+            Processed final result dictionary
+        """
+        try:
+            # Extract basic information
+            final_result = {
+                "research_result": preprocessed_result,
+                "reflection_analysis": reflection_result,
+                "processing_timestamp": datetime.now(),
+                "sources": [],
+                "quality_metrics": {},
+            }
+
+            # Process research result content
+            if isinstance(preprocessed_result, dict):
+                # Extract iterations and search results
+                iterations = preprocessed_result.get("iterations", [])
+                all_search_results = []
+
+                for iteration in iterations:
+                    search_results = iteration.get("search_results", [])
+                    all_search_results.extend(search_results)
+
+                # Aggregate search results
+                if all_search_results:
+                    aggregated_results = self.aggregate_results(all_search_results)
+                    final_result.update(aggregated_results)
+
+                    # Extract sources
+                    sources = []
+                    for result in all_search_results:
+                        metadata = result.get("metadata", {})
+                        if metadata.get("url"):
+                            sources.append(
+                                {
+                                    "url": metadata["url"],
+                                    "title": metadata.get("title", "Unknown"),
+                                    "quality_score": result.get("quality_score", 0.0),
+                                }
+                            )
+                    final_result["sources"] = sources
+
+                # Add research summary from preprocessed result
+                if "final_result" in preprocessed_result:
+                    final_result["research_summary"] = preprocessed_result[
+                        "final_result"
+                    ]
+
+            # Process reflection result
+            if isinstance(reflection_result, dict):
+                quality_score = reflection_result.get("quality_score", 0.0)
+                insights = reflection_result.get("insights", [])
+                recommendations = reflection_result.get("recommendations", [])
+
+                final_result["quality_metrics"] = {
+                    "reflection_quality_score": quality_score,
+                    "insights_count": len(insights) if insights else 0,
+                    "recommendations_count": (
+                        len(recommendations) if recommendations else 0
+                    ),
+                }
+
+                final_result["insights"] = insights
+                final_result["recommendations"] = recommendations
+
+            logger.info("Research result processing completed successfully")
+            return final_result
+
+        except Exception as e:
+            logger.error(f"Failed to process research result: {e}")
+            return {
+                "research_result": preprocessed_result,
+                "reflection_analysis": reflection_result,
+                "processing_timestamp": datetime.now(),
+                "sources": [],
+                "quality_metrics": {},
+                "error": str(e),
+            }
 
     def get_processing_summary(self) -> Dict[str, Any]:
         """Get processing summary

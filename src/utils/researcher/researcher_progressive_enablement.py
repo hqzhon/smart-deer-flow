@@ -67,7 +67,7 @@ class ResearcherProgressiveEnabler:
 
         # Phase 2 - GFLQ Integration: Initialize reflection agent if enabled
         self.reflection_agent = None
-        if config and getattr(config, "enable_enhanced_reflection", True):
+        if config and getattr(config, "enabled", True):
             try:
                 from src.utils.reflection.enhanced_reflection import (
                     EnhancedReflectionAgent,

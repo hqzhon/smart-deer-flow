@@ -582,26 +582,38 @@ class ResearcherIsolationMetrics:
         recommendations = []
 
         if self.isolation_sessions < 10:
-            recommendations.append("Collect more data for more accurate performance analysis")
+            recommendations.append(
+                "Collect more data for more accurate performance analysis"
+            )
             return recommendations
 
         # Analyze performance
         if self.context_compression_ratio > 0.8:
-            recommendations.append("Consider using more aggressive isolation levels to improve compression")
+            recommendations.append(
+                "Consider using more aggressive isolation levels to improve compression"
+            )
 
         if self.performance_overhead > 0.1:
-            recommendations.append("High performance overhead, consider optimizing isolation algorithm or reducing isolation level")
+            recommendations.append(
+                "High performance overhead, consider optimizing isolation algorithm or reducing isolation level"
+            )
 
         if self.token_savings_estimated / self.isolation_sessions < 500:
-            recommendations.append("Token savings effect is not significant, suggest adjusting isolation threshold")
+            recommendations.append(
+                "Token savings effect is not significant, suggest adjusting isolation threshold"
+            )
 
         # Analyze recent success rate
         recent_success_rate = self._get_recent_success_rate()
         if recent_success_rate < 0.9:
-            recommendations.append("Recent success rate is low, suggest checking isolation configuration and error logs")
+            recommendations.append(
+                "Recent success rate is low, suggest checking isolation configuration and error logs"
+            )
 
         if not recommendations:
-            recommendations.append("Isolation system is running well, continue monitoring performance metrics")
+            recommendations.append(
+                "Isolation system is running well, continue monitoring performance metrics"
+            )
 
         return recommendations
 

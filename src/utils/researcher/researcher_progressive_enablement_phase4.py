@@ -428,13 +428,9 @@ class AdvancedResearcherProgressiveEnabler(BaseEnabler):
         scenario = features.base_scenario
 
         if isolation_score >= threshold:
-            explanation = (
-                f"Enable isolation (score: {isolation_score:.1f} >= threshold: {threshold:.1f})"
-            )
+            explanation = f"Enable isolation (score: {isolation_score:.1f} >= threshold: {threshold:.1f})"
         else:
-            explanation = (
-                f"Disable isolation (score: {isolation_score:.1f} < threshold: {threshold:.1f})"
-            )
+            explanation = f"Disable isolation (score: {isolation_score:.1f} < threshold: {threshold:.1f})"
 
         # Add key contributing factors
         key_factors = []

@@ -60,29 +60,48 @@ def get_configuration_from_config(config):
                 self.content = type("content", (), {})()
                 self.reflection = type("reflection", (), {})()
 
+                # Initialize all configuration attributes
+                self._setup_configuration()
+
+            def _has_override(self, key):
+                """Check if override exists, handling both dict and object types"""
+                if isinstance(self._overrides, dict):
+                    return key in self._overrides
+                else:
+                    return hasattr(self._overrides, key)
+
+            def _get_override(self, key, default=None):
+                """Get override value, handling both dict and object types"""
+                if isinstance(self._overrides, dict):
+                    return self._overrides.get(key, default)
+                else:
+                    return getattr(self._overrides, key, default)
+
+            def _setup_configuration(self):
+                """Setup configuration with overrides"""
                 # Set agents configuration with overrides
-                if "max_search_results" in self._overrides:
-                    self.agents.max_search_results = self._overrides[
+                if self._has_override("max_search_results"):
+                    self.agents.max_search_results = self._get_override(
                         "max_search_results"
-                    ]
+                    )
                 else:
                     self.agents.max_search_results = getattr(
                         base_settings.agents, "max_search_results", 5
                     )
 
-                if "enable_deep_thinking" in self._overrides:
-                    self.agents.enable_deep_thinking = self._overrides[
+                if self._has_override("enable_deep_thinking"):
+                    self.agents.enable_deep_thinking = self._get_override(
                         "enable_deep_thinking"
-                    ]
+                    )
                 else:
                     self.agents.enable_deep_thinking = getattr(
                         base_settings.agents, "enable_deep_thinking", False
                     )
 
-                if "max_plan_iterations" in self._overrides:
-                    self.agents.max_plan_iterations = self._overrides[
+                if self._has_override("max_plan_iterations"):
+                    self.agents.max_plan_iterations = self._get_override(
                         "max_plan_iterations"
-                    ]
+                    )
                 else:
                     self.agents.max_plan_iterations = getattr(
                         base_settings.agents, "max_plan_iterations", 3
@@ -104,68 +123,72 @@ def get_configuration_from_config(config):
                     base_settings, "model_token_limits", {}
                 )
 
-                # Enhanced reflection configuration with overrides
-                if "enable_enhanced_reflection" in self._overrides:
-                    self.enable_enhanced_reflection = self._overrides[
-                        "enable_enhanced_reflection"
-                    ]
-                else:
-                    self.enable_enhanced_reflection = getattr(
-                        base_settings, "enable_enhanced_reflection", True
-                    )
-                self.max_reflection_loops = getattr(
-                    base_settings, "max_reflection_loops", 1
-                )
+                # Simplified reflection configuration with overrides - removed redundant top-level assignments
 
                 # Set reflection configuration with override support
-                if "reflection_model" in self._overrides:
-                    self.reflection.reflection_model = self._overrides[
-                        "reflection_model"
-                    ]
+                if self._has_override("reflection_model"):
+                    self.reflection.model = self._get_override("reflection_model")
                 else:
-                    reflection_model = getattr(
-                        base_settings.reflection, "reflection_model", None
-                    )
+                    reflection_model = getattr(base_settings.reflection, "model", None)
                     if reflection_model is None:
                         # Use reasoning model if enabled, otherwise use basic model
                         if self.agents.enable_deep_thinking:
-                            self.reflection.reflection_model = "reasoning"
+                            self.reflection.model = "reasoning"
                         else:
-                            self.reflection.reflection_model = "basic"
+                            self.reflection.model = "basic"
                     else:
-                        self.reflection.reflection_model = reflection_model
+                        self.reflection.model = reflection_model
 
-                # Also set it at the top level for backward compatibility
-                self.reflection_model = self.reflection.reflection_model
+                # Removed backward compatibility assignment for reflection_model
 
-                self.knowledge_gap_threshold = getattr(
-                    base_settings, "knowledge_gap_threshold", 0.7
-                )
-                self.sufficiency_threshold = getattr(
-                    base_settings, "sufficiency_threshold", 0.8
-                )
-                self.enable_reflection_integration = getattr(
-                    base_settings, "enable_reflection_integration", True
+                # Set reflection object attributes with simplified configuration and overrides
+                reflection_overrides = (
+                    self._overrides.get("reflection", {})
+                    if isinstance(self._overrides, dict)
+                    else {}
                 )
 
-                # Reflection integration configuration for initial stage skipping
-                self.reflection.skip_initial_stage_reflection = getattr(
-                    base_settings.reflection, "skip_initial_stage_reflection", True
-                )
-                # Also set them at the top level for backward compatibility
-                self.skip_initial_stage_reflection = (
-                    self.reflection.skip_initial_stage_reflection
-                )
+                if reflection_overrides.get("enabled") is not None:
+                    self.reflection.enabled = reflection_overrides["enabled"]
+                else:
+                    self.reflection.enabled = getattr(
+                        base_settings.reflection, "enabled", True
+                    )
+
+                if reflection_overrides.get("max_loops") is not None:
+                    self.reflection.max_loops = reflection_overrides["max_loops"]
+                else:
+                    self.reflection.max_loops = getattr(
+                        base_settings.reflection, "max_loops", 2
+                    )
+
+                if reflection_overrides.get("quality_threshold") is not None:
+                    self.reflection.quality_threshold = reflection_overrides[
+                        "quality_threshold"
+                    ]
+                else:
+                    self.reflection.quality_threshold = getattr(
+                        base_settings.reflection, "quality_threshold", 0.75
+                    )
+
+                # Use unified quality_threshold for both knowledge gap and sufficiency decisions
+                quality_threshold = self.reflection.quality_threshold
+                self.knowledge_gap_threshold = quality_threshold
+                self.sufficiency_threshold = quality_threshold
+
+                # Default behavior: skip initial stage reflection (simplified approach)
+                self.reflection.skip_initial_stage_reflection = True
+                # Removed backward compatibility assignments for enabled and skip_initial_stage_reflection
 
                 # Max step num configuration with override - prioritize API override
-                if "max_step_num" in self._overrides:
-                    self.max_step_num = self._overrides["max_step_num"]
+                if self._has_override("max_step_num"):
+                    self.max_step_num = self._get_override("max_step_num")
                 else:
                     self.max_step_num = getattr(base_settings.agents, "max_step_num", 3)
 
                 # Resources configuration with override
-                if "resources" in self._overrides:
-                    self.resources = self._overrides["resources"]
+                if self._has_override("resources"):
+                    self.resources = self._get_override("resources")
                 else:
                     self.resources = getattr(base_settings, "resources", [])
 
@@ -176,7 +199,7 @@ def get_configuration_from_config(config):
                     type("mcp", (), {"enabled": False, "servers": [], "timeout": 30})(),
                 )
 
-        if "configurable" in config:
+        if isinstance(config, dict) and "configurable" in config:
             config = config["configurable"]
         return ConfigWithOverrides(base_settings, config)
 
@@ -370,17 +393,17 @@ def planner_node(
 
     # Phase 1 Simplification: Use unified config for reflection
     reflection_config = {
-        "enable_enhanced_reflection": unified_config.enable_enhanced_reflection,
-        "max_reflection_loops": unified_config.max_reflection_loops,
-        "reflection_model": unified_config.reflection_model,
-        "knowledge_gap_threshold": unified_config.knowledge_gap_threshold,
-        "sufficiency_threshold": unified_config.sufficiency_threshold,
-        "enable_reflection_integration": unified_config.enable_reflection_integration,
+        "reflection_enabled": getattr(unified_config, "enabled", True),
+        "reflection_max_loops": getattr(unified_config, "max_loops", 1),
+        "reflection_model": getattr(unified_config, "model", None),
+        "reflection_quality_threshold": getattr(
+            unified_config, "quality_threshold", 0.7
+        ),
     }
 
     # Phase 5: Initialize reflection agent for planner if enabled
     reflection_agent = None
-    if reflection_config.get("enable_enhanced_reflection", True):
+    if reflection_config.get("reflection_enabled", True):
         try:
             from src.utils.reflection.enhanced_reflection import (
                 EnhancedReflectionAgent,
@@ -409,19 +432,17 @@ def planner_node(
 
     # Phase 5: Integrate reflection-driven planning adjustments with enhanced analysis
     reflection_context = ""
-    if reflection_insights and reflection_config.get(
-        "enable_reflection_integration", True
-    ):
+    if reflection_insights and reflection_config.get("reflection_enabled", True):
         logger.info("Integrating reflection insights into planning")
 
         # Add reflection context to planning messages
         reflection_context = f"""
         
 REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
-        - Knowledge Gaps Identified: {len(reflection_insights.get('knowledge_gaps', []))}
-        - Research Sufficiency: {'Sufficient' if reflection_insights.get('is_sufficient', False) else 'Insufficient'}
-        - Suggested Follow-up Queries: {reflection_insights.get('follow_up_queries', [])}
-        - Confidence Score: {reflection_insights.get('confidence_score', 'N/A')}
+        - Knowledge Gaps Identified: {len(getattr(reflection_insights, 'knowledge_gaps', []))}
+        - Research Sufficiency: {'Sufficient' if getattr(reflection_insights, 'is_sufficient', False) else 'Insufficient'}
+        - Suggested Follow-up Queries: {getattr(reflection_insights, 'follow_up_queries', [])}
+        - Confidence Score: {getattr(reflection_insights, 'confidence_score', 'N/A')}
         
         Please adjust the research plan to address these knowledge gaps and incorporate the suggested follow-up queries.
         """
@@ -607,7 +628,14 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.agents.max_plan_iterations:
-        return Command(goto="reporter")
+        return Command(
+            update={
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+            },
+            goto="reporter",
+        )
 
     # Context evaluation will be handled automatically by safe_llm_call
 
@@ -655,9 +683,23 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         logger.warning(f"Planner response is not a valid JSON: {e}")
         logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 0:
-            return Command(goto="reporter")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="reporter",
+            )
         else:
-            return Command(goto="__end__")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="__end__",
+            )
     if curr_plan.get("has_enough_context"):
         logger.info("Planner response has enough context.")
         try:
@@ -668,13 +710,27 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             )
             logger.warning(f"Full traceback: {traceback.format_exc()}")
             if plan_iterations > 0:
-                return Command(goto="reporter")
+                return Command(
+                    update={
+                        "research_topic": state.get("research_topic", ""),
+                        "resources": state.get("resources", []),
+                        "locale": state.get("locale", "en-US"),
+                    },
+                    goto="reporter",
+                )
             else:
-                return Command(goto="__end__")
+                return Command(
+                    update={
+                        "research_topic": state.get("research_topic", ""),
+                        "resources": state.get("resources", []),
+                        "locale": state.get("locale", "en-US"),
+                    },
+                    goto="__end__",
+                )
         # Phase 5: Add reflection metadata to command result
         reflection_metadata = {
             "reflection_applied": (
-                reflection_config.get("enable_reflection_integration", True)
+                reflection_config.get("enabled", True)
                 and reflection_insights is not None
             ),
             "timestamp": datetime.now().isoformat(),
@@ -686,10 +742,12 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             reflection_metadata.update(
                 {
                     "knowledge_gaps_count": len(
-                        reflection_insights.get("knowledge_gaps", [])
+                        getattr(reflection_insights, "knowledge_gaps", [])
                     ),
-                    "confidence": reflection_insights.get("confidence_score", 0.0),
-                    "is_sufficient": reflection_insights.get("is_sufficient", False),
+                    "confidence": getattr(reflection_insights, "confidence_score", 0.0),
+                    "is_sufficient": getattr(
+                        reflection_insights, "is_sufficient", False
+                    ),
                 }
             )
 
@@ -699,6 +757,9 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 "current_plan": new_plan,
                 "reflection_metadata": reflection_metadata,
                 "plan_iterations": plan_iterations + 1,
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+                "locale": state.get("locale", "en-US"),
             },
             goto="reporter",
         )
@@ -706,8 +767,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
     # Phase 5: Add reflection metadata for human feedback path as well
     reflection_metadata = {
         "reflection_applied": (
-            reflection_config.get("enable_reflection_integration", True)
-            and reflection_insights is not None
+            reflection_config.get("enabled", True) and reflection_insights is not None
         ),
         "timestamp": datetime.now().isoformat(),
         "planner_reflection_enabled": reflection_agent is not None,
@@ -718,10 +778,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         reflection_metadata.update(
             {
                 "knowledge_gaps_count": len(
-                    reflection_insights.get("knowledge_gaps", [])
+                    getattr(reflection_insights, "knowledge_gaps", [])
                 ),
-                "confidence": reflection_insights.get("confidence_score", 0.0),
-                "is_sufficient": reflection_insights.get("is_sufficient", False),
+                "confidence": getattr(reflection_insights, "confidence_score", 0.0),
+                "is_sufficient": getattr(reflection_insights, "is_sufficient", False),
             }
         )
 
@@ -731,6 +791,9 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
             "current_plan": full_response,
             "reflection_metadata": reflection_metadata,
             "plan_iterations": plan_iterations + 1,
+            "research_topic": state.get("research_topic", ""),
+            "resources": state.get("resources", []),
+            "locale": state.get("locale", "en-US"),
         },
         goto="human_feedback",
     )
@@ -752,6 +815,9 @@ def human_feedback_node(
                     "messages": [
                         HumanMessage(content=feedback, name="feedback"),
                     ],
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
                 },
                 goto="planner",
             )
@@ -775,9 +841,23 @@ def human_feedback_node(
         logger.warning(f"Planner response is not a valid JSON: {e}")
         logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 1:  # the plan_iterations is increased before this check
-            return Command(goto="reporter")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="reporter",
+            )
         else:
-            return Command(goto="__end__")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="__end__",
+            )
 
     try:
         validated_plan = Plan.model_validate(new_plan)
@@ -787,15 +867,32 @@ def human_feedback_node(
         )
         logger.warning(f"Full traceback: {traceback.format_exc()}")
         if plan_iterations > 1:
-            return Command(goto="reporter")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="reporter",
+            )
         else:
-            return Command(goto="__end__")
+            return Command(
+                update={
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                    "locale": state.get("locale", "en-US"),
+                },
+                goto="__end__",
+            )
 
     return Command(
         update={
             "current_plan": validated_plan,
             "plan_iterations": plan_iterations,
             "locale": new_plan["locale"],
+            # Preserve research_topic and resources from coordinator_node
+            "research_topic": state.get("research_topic", ""),
+            "resources": state.get("resources", []),
         },
         goto=goto,
     )
@@ -1173,6 +1270,9 @@ async def _execute_steps_parallel(
                 "messages": all_messages,
                 "observations": observations,
                 "current_plan": updated_plan,
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
             },
             goto="planner",
         )
@@ -1183,6 +1283,9 @@ async def _execute_steps_parallel(
                 "messages": all_messages,
                 "observations": observations,
                 "current_plan": updated_plan,
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
             },
             goto="research_team",
         )
@@ -1385,8 +1488,12 @@ async def _execute_agent_step(
         "context_info": context_info,
         "completed_steps": optimized_steps,
         "agent_name": agent_name,
-        "messages": [],  # Start with empty messages for prompt system
+        "original_user_query": state.get(
+            "research_topic", ""
+        ),  # Add original user query for context
     }
+
+    agent_state["messages"] = [HumanMessage(content=current_step.description)]
 
     # Add resources information for researcher agent
     if agent_name == "researcher" and state.get("resources"):
@@ -1484,6 +1591,9 @@ async def _execute_agent_step(
             ],
             "observations": optimized_observations,
             "current_plan": updated_plan,
+            # Preserve research_topic and resources from coordinator_node
+            "research_topic": state.get("research_topic", ""),
+            "resources": state.get("resources", []),
         },
         goto="research_team",
     )
@@ -1559,59 +1669,20 @@ async def _setup_and_execute_agent_step(
         return await _execute_agent_step(state, config, agent, agent_type)
 
 
-async def researcher_node_with_isolation(
+async def _fallback_research_logic(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
-    """Researcher node with context isolation - Phase 3 Simplified Implementation.
+    """Fallback research logic to avoid recursion in error handling.
 
-    This function implements the enhanced researcher node with context isolation
-    using the EnhancedResearcher class for better maintainability and modularity.
+    This implements the standard researcher node logic directly without
+    calling researcher_node to prevent infinite recursion.
     """
-    # Phase 3 Simplification: Import EnhancedResearcher
-    from src.utils.researcher import EnhancedResearcher
-
-    logger.info("Executing researcher node with context isolation (Phase 3 Optimized)")
+    logger.info("Executing fallback research logic")
 
     try:
-        # Phase 3: Create and initialize enhanced researcher
-        researcher = EnhancedResearcher(state, config)
+        configurable = get_configuration_from_config(config)
 
-        # Execute complete research workflow with reflection
-        result = await researcher.execute_research_with_reflection()
-
-        logger.info("Enhanced researcher node completed successfully")
-        return result
-
-    except Exception as e:
-        logger.error(f"Enhanced researcher node failed: {e}")
-        logger.warning("Falling back to standard researcher node")
-
-        # Fallback to standard researcher node
-        return await researcher_node(state, config)
-
-
-async def researcher_node(
-    state: State, config: RunnableConfig
-) -> Command[Literal["research_team"]]:
-    """Researcher node that do research with context isolation capabilities.
-
-    Phase 1 Implementation: Enhanced with ResearcherContextExtension for
-    context isolation to prevent context accumulation in parallel execution.
-    """
-    logger.info("Researcher node is researching.")
-    configurable = get_configuration_from_config(config)
-
-    # Check if context isolation is enabled
-    enable_researcher_isolation = getattr(
-        configurable, "enable_researcher_isolation", True
-    )
-
-    if enable_researcher_isolation:
-        logger.info("Using researcher node with context isolation")
-        return await researcher_node_with_isolation(state, config)
-    else:
-        print("DEBUG: === Using standard researcher node ===")
-        logger.info("Using standard researcher node")
+        # Set up standard research tools
         tools = [
             get_web_search_tool(
                 configurable.agents.max_search_results,
@@ -1619,16 +1690,86 @@ async def researcher_node(
             ),
             crawl_tool,
         ]
+
+        # Add retriever tool if resources are available
         retriever_tool = get_retriever_tool(state.get("resources", []))
         if retriever_tool:
             tools.insert(0, retriever_tool)
-        logger.info(f"Researcher tools: {tools}")
+
+        logger.info(f"Fallback researcher tools: {tools}")
+
+        # Execute standard agent step
         return await _setup_and_execute_agent_step(
             state,
             config,
             "researcher",
             tools,
         )
+
+    except Exception as fallback_error:
+        logger.error(f"Fallback research logic also failed: {fallback_error}")
+        # Return a minimal command to prevent complete failure
+        return Command(
+            update={
+                "observations": [
+                    {"error": "Research failed", "details": str(fallback_error)}
+                ],
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+            },
+            goto="research_team",
+        )
+
+
+async def researcher_node(
+    state: State, config: RunnableConfig
+) -> Command[Literal["research_team"]]:
+    """Researcher node that do research with unified EnhancedResearcher.
+
+    Refactored Implementation: Uses EnhancedResearcher as the unified entry point
+    for all research execution, with observations count control.
+    """
+    logger.info("Researcher node is researching.")
+
+    try:
+        # Use EnhancedResearcher as the unified entry point
+        from src.utils.researcher.enhanced_researcher import EnhancedResearcher
+
+        enhanced_researcher = EnhancedResearcher(state, config)
+
+        # Get the configurable settings to access max_total_observations
+        configurable = get_configuration_from_config(config)
+        max_total_obs = getattr(configurable.agents, "max_total_observations", 10)
+
+        # Execute the research
+        result_command = await enhanced_researcher.execute()
+
+        # Apply observations count control if the command has observations
+        if result_command.update and "observations" in result_command.update:
+            observations = result_command.update["observations"]
+
+            # Apply max_total_observations limit
+            if max_total_obs > 0 and len(observations) > max_total_obs:
+                # Keep only the most recent observations
+                optimized_observations = observations[-max_total_obs:]
+                result_command.update["observations"] = optimized_observations
+                logger.info(
+                    f"Applied observations limit: {len(observations)} -> {len(optimized_observations)} observations"
+                )
+            elif max_total_obs == 0:
+                # If limit is 0, clear all observations
+                result_command.update["observations"] = []
+                logger.info("Cleared all observations due to max_total_observations=0")
+
+        return result_command
+
+    except Exception as e:
+        logger.error(f"Enhanced researcher execution failed: {e}")
+        logger.info("Falling back to standard research logic")
+
+        # Fallback to standard logic if enhanced researcher fails
+        return await _fallback_research_logic(state, config)
 
 
 async def coder_node(
@@ -1702,7 +1843,15 @@ async def context_optimizer_node(
             f"Compression: {compression_ratio:.2%}"
         )
 
-        return Command(update={"observations": optimized_observations}, goto="reporter")
+        return Command(
+            update={
+                "observations": optimized_observations,
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+            },
+            goto="reporter",
+        )
 
     except Exception as e:
         logger.error(f"Context optimization failed: {e}")
@@ -1712,7 +1861,14 @@ async def context_optimizer_node(
         )
 
         # Fallback: proceed with original observations if optimization fails
-        return Command(goto="reporter")
+        return Command(
+            update={
+                # Preserve research_topic and resources from coordinator_node
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+            },
+            goto="reporter",
+        )
 
 
 async def planning_context_optimizer_node(
@@ -1809,6 +1965,13 @@ async def planning_context_optimizer_node(
                 update_dict["observations_optimization_fallback"] = True
 
         # Update state and jump to planner
+        # Preserve research_topic and resources from coordinator_node
+        update_dict.update(
+            {
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+            }
+        )
         return Command(update=update_dict, goto="planner")
 
     except Exception as e:
@@ -1838,13 +2001,23 @@ async def planning_context_optimizer_node(
                     "messages": truncated_messages,
                     "context_optimization_fallback": True,
                     "fallback_reason": str(e),
+                    # Preserve research_topic and resources from coordinator_node
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
                 },
                 goto="planner",
             )
         except Exception as fallback_error:
             logger.error(f"Fallback optimization also failed: {fallback_error}")
             # Final fallback: use original messages directly
-            return Command(goto="planner")
+            return Command(
+                update={
+                    # Preserve research_topic and resources from coordinator_node
+                    "research_topic": state.get("research_topic", ""),
+                    "resources": state.get("resources", []),
+                },
+                goto="planner",
+            )
 
 
 # Export all node functions for testing and external use
@@ -1856,7 +2029,6 @@ __all__ = [
     "coordinator_node",
     "reporter_node",
     "researcher_node",
-    "researcher_node_with_isolation",
     "context_optimizer_node",
     "planning_context_optimizer_node",
     "_execute_agent_step",

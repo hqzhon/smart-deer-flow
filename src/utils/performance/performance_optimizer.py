@@ -1137,7 +1137,7 @@ class AdvancedParallelExecutor:
 class AdaptiveRateLimiter:
     """Adaptive rate limiter that adjusts based on system load."""
 
-    def __init__(self, initial_rate: int = 100, time_window: int = 60):
+    def __init__(self, initial_rate: float = 100.0, time_window: int = 60):
         self.initial_rate = initial_rate
         self.current_rate = initial_rate
         self.time_window = time_window

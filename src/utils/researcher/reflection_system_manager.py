@@ -27,7 +27,7 @@ class ReflectionSystemManager:
         Returns:
             Reflection agent instance, or None if setup fails
         """
-        if not self.unified_config.enable_enhanced_reflection:
+        if not getattr(self.unified_config, "enabled", True):
             logger.info("Enhanced reflection is disabled")
             return None
 
@@ -44,7 +44,7 @@ class ReflectionSystemManager:
             self.reflection_agent = EnhancedReflectionAgent(config=configurable)
 
             logger.info(
-                f"Reflection agent initialized: model={self.unified_config.reflection_model}"
+                f"Reflection agent initialized: model={getattr(self.unified_config, 'model', 'basic')}"
             )
             return self.reflection_agent
 
@@ -68,9 +68,19 @@ class ReflectionSystemManager:
         try:
             from src.utils.reflection.reflection_integration import ReflectionIntegrator
 
+            # Convert UnifiedResearchConfig to dict for ReflectionIntegrator
+            config_dict = {
+                "reflection_enabled": getattr(self.unified_config, "enabled", True),
+                "max_reflection_iterations": getattr(
+                    self.unified_config, "max_loops", 1
+                ),
+                "reflection_timeout": 30.0,  # Default value
+                "enable_reflection_metrics": True,  # Default value
+            }
+
             self.reflection_integrator = ReflectionIntegrator(
                 reflection_agent=reflection_agent,
-                config=self.unified_config,
+                config=config_dict,
             )
 
             logger.info("Reflection integrator initialized")
@@ -167,13 +177,14 @@ class ReflectionSystemManager:
             Reflection system summary dictionary
         """
         return {
-            "reflection_enabled": self.unified_config.enable_enhanced_reflection,
-            "reflection_model": self.unified_config.reflection_model,
-            "max_reflection_loops": self.unified_config.max_reflection_loops,
-            "knowledge_gap_threshold": self.unified_config.knowledge_gap_threshold,
-            "sufficiency_threshold": self.unified_config.sufficiency_threshold,
-            "reflection_integration_enabled": (
-                self.unified_config.enable_reflection_integration
+            "reflection_enabled": getattr(self.unified_config, "enabled", True),
+            "reflection_model": getattr(self.unified_config, "model", None),
+            "reflection_max_loops": getattr(self.unified_config, "max_loops", 1),
+            "reflection_quality_threshold": getattr(
+                self.unified_config, "quality_threshold", 0.7
+            ),
+            "reflection_integration_enabled": getattr(
+                self.unified_config, "enabled", True
             ),
             "agent_initialized": self.reflection_agent is not None,
             "integrator_initialized": self.reflection_integrator is not None,

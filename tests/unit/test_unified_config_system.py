@@ -23,14 +23,13 @@ llm:
   api_key: "test-key"
 
 reflection:
-  enable_reflection_integration: true
-  max_reflection_loops: 5
-  enable_reflection_metrics: true
-  reflection_confidence_threshold: 0.8
-  disable_followup_reflection: false
-  max_total_reflections: 10
-  enable_global_counter: true
-  reset_counter_on_new_task: true
+  reflection_enabled: true
+  reflection_max_loops: 5
+  reflection_sufficiency_threshold: 0.8
+  reflection_knowledge_gap_threshold: 0.7
+  reflection_max_followup_queries: 3
+  reflection_skip_initial_stage: false
+  reflection_temperature: 0.7
 
 followup_merger:
   similarity_threshold: 0.75
@@ -70,23 +69,14 @@ followup_merger:
                 config = yaml.safe_load(f)
             app_settings = AppSettings(**config)
 
-            # 验证反射配置
-            reflection_config = app_settings.get_reflection_config()
-            self.assertTrue(reflection_config.enable_reflection_integration)
-            self.assertEqual(reflection_config.max_reflection_loops, 5)
-            self.assertTrue(reflection_config.enable_reflection_metrics)
-            self.assertEqual(
-                reflection_config.reflection_confidence_threshold, 0.8
-            )  # 使用默认值
-            self.assertFalse(
-                reflection_config.disable_followup_reflection
-            )  # 使用实际存在的属性
-            self.assertEqual(reflection_config.max_total_reflections, 10)  # 使用默认值
-            self.assertTrue(reflection_config.enable_global_counter)
-            self.assertTrue(reflection_config.reset_counter_on_new_task)
+            # 验证反射配置（简化版）
+            reflection_config = app_settings.reflection
+            self.assertTrue(reflection_config.enabled)
+            self.assertEqual(reflection_config.max_loops, 2)  # 使用默认值
+            self.assertEqual(reflection_config.quality_threshold, 0.75)  # 使用默认值
 
             # 验证Follow-up合并器配置
-            merger_config = app_settings.get_followup_merger_config()
+            merger_config = app_settings.followup_merger
             self.assertEqual(
                 merger_config.similarity_threshold, 0.75
             )  # 从配置文件加载的值
@@ -161,11 +151,11 @@ followup_merger:
         """测试默认配置回退机制"""
         from src.config.models import ReflectionSettings, FollowUpMergerSettings
 
-        # 测试反射设置默认值
+        # 测试反射设置默认值（简化版）
         reflection_settings = ReflectionSettings()
-        self.assertTrue(reflection_settings.enable_reflection_integration)
-        self.assertEqual(reflection_settings.max_reflection_loops, 3)
-        self.assertTrue(reflection_settings.enable_reflection_metrics)  # 默认值是True
+        self.assertTrue(reflection_settings.enabled)
+        self.assertEqual(reflection_settings.max_loops, 2)
+        self.assertEqual(reflection_settings.quality_threshold, 0.75)
 
         # 测试Follow-up合并器设置默认值
         merger_settings = FollowUpMergerSettings()

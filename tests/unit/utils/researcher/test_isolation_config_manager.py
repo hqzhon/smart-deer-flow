@@ -109,8 +109,8 @@ class TestIsolationConfigManager(unittest.TestCase):
 
         # 检查必需的配置项
         self.assertIsInstance(reflection_config, dict)
-        self.assertIn("enable_enhanced_reflection", reflection_config)
-        self.assertIn("max_reflection_loops", reflection_config)
+        self.assertIn("enabled", reflection_config)
+        self.assertIn("max_loops", reflection_config)
         self.assertIn("reflection_model", reflection_config)
 
     @patch(
@@ -132,7 +132,7 @@ class TestIsolationConfigManager(unittest.TestCase):
         # 验证包含所有配置属性
         self.assertTrue(hasattr(unified_config, "locale"))
         self.assertTrue(hasattr(unified_config, "isolation_config"))
-        self.assertTrue(hasattr(unified_config, "enable_enhanced_reflection"))
+        self.assertTrue(hasattr(unified_config, "enabled"))
         self.assertTrue(hasattr(unified_config, "max_search_results"))
         self.assertTrue(hasattr(unified_config, "mcp_enabled"))
 

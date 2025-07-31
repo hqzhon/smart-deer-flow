@@ -8,11 +8,11 @@ import os
 import threading
 import time
 import asyncio
-from typing import Annotated, List, cast, Dict, Any
+from typing import List, cast, Dict, Any
 from uuid import uuid4
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
@@ -518,7 +518,7 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
             },
         )
     except Exception as e:
-        # 确保在异常情况下释放连接
+        # Ensure the connection is released in case of an exception
         if connection_acquired:
             try:
                 await _release_connection()
@@ -688,17 +688,22 @@ async def _astream_workflow_generator(
             async for agent, stream_type, event_data in graph.astream(
                 input_,
                 config={
-                    "thread_id": thread_id,
-                    "resources": resources,
-                    "max_plan_iterations": max_plan_iterations,
-                    "max_step_num": max_step_num,
-                    "max_search_results": max_search_results,
-                    "mcp_settings": mcp_settings,
-                    "report_style": report_style.value,
-                    "enable_deep_thinking": enable_deep_thinking,
-                    "enable_collaboration": enable_collaboration,
-                    "enable_parallel_execution": enable_parallel_execution,
-                    "max_parallel_tasks": max_parallel_tasks,
+                    "thread_id": thread_id,  # Top-level parameters for LangGraph
+                    "resources": (
+                        resources
+                    ),  # Top-level parameters for LangGraph, also consumed by configurable
+                    "configurable": {  # All custom parameters should be placed here
+                        "max_plan_iterations": max_plan_iterations,
+                        "max_step_num": max_step_num,
+                        "max_search_results": max_search_results,
+                        "mcp_settings": mcp_settings,
+                        "report_style": report_style.value,
+                        "enable_deep_thinking": enable_deep_thinking,
+                        "enable_collaboration": enable_collaboration,
+                        "enable_parallel_execution": enable_parallel_execution,
+                        "max_parallel_tasks": max_parallel_tasks,
+                        "resources": resources,  # Ensure a copy is also in configurable
+                    },
                 },
                 stream_mode=["messages", "updates"],
                 subgraphs=True,

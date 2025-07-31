@@ -58,22 +58,18 @@ class ReflectionIntegrator:
                 app_settings = get_settings()
                 reflection_config = app_settings.get_reflection_config()
                 self.config = {
-                    "enable_reflection_integration": (
-                        reflection_config.enable_reflection_integration
-                    ),
-                    "max_reflection_iterations": reflection_config.max_reflection_loops,
+                    "reflection_enabled": reflection_config.enabled,
+                    "max_reflection_iterations": reflection_config.max_loops,
                     "reflection_timeout": 30.0,  # Not in new config, use default
-                    "enable_reflection_metrics": (
-                        reflection_config.enable_reflection_metrics
-                    ),
+                    "enable_reflection_metrics": True,  # Default value
                 }
             except ImportError:
                 # Fallback to default config
                 self.config = {
-                    "enable_reflection_integration": True,
-                    "max_reflection_iterations": 3,
+                    "reflection_enabled": True,
+                    "max_reflection_iterations": 1,
                     "reflection_timeout": 30.0,
-                    "enable_reflection_metrics": False,
+                    "enable_reflection_metrics": True,
                 }
         else:
             self.config = config
@@ -83,7 +79,7 @@ class ReflectionIntegrator:
         self.reflection_sessions: Dict[str, List[ReflectionResult]] = {}
 
         logger.info(
-            f"Initialized simplified ReflectionIntegrator with integration_enabled={self.config.get('enable_reflection_integration', True)}"
+            f"Initialized simplified ReflectionIntegrator with integration_enabled={self.config.get('reflection_enabled', True)}"
         )
 
     def should_trigger_reflection(
@@ -104,7 +100,7 @@ class ReflectionIntegrator:
         Returns:
             Tuple of (should_trigger, reason, decision_factors)
         """
-        if not self.config.get("enable_reflection_integration", True):
+        if not self.config.get("reflection_enabled", True):
             return (
                 False,
                 "Reflection integration disabled",
@@ -409,7 +405,7 @@ class ReflectionIntegrator:
             ),
             current_step_index=len(completed_steps),
             locale=state.get("locale", "en-US"),
-            max_reflection_loops=self.config.max_reflection_iterations,
+            max_reflection_loops=self.config.get("max_reflection_iterations", 1),
         )
 
     def _is_initial_research_stage(
@@ -554,7 +550,7 @@ class ReflectionIntegrator:
         reflection_metrics = self.reflection_agent.get_reflection_metrics()
 
         return {
-            "integration_enabled": self.config.enable_reflection_integration,
+            "integration_enabled": self.config.get("reflection_enabled", True),
             "active_reflection_sessions": active_sessions,
             "total_reflection_sessions": total_sessions,
             "reflection_agent_metrics": reflection_metrics,

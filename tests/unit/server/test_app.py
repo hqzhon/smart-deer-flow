@@ -413,6 +413,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -453,6 +456,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -487,6 +493,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -524,6 +533,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -566,6 +578,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -608,6 +623,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -647,6 +665,9 @@ class TestAstreamWorkflowGenerator:
             enable_background_investigation=False,
             report_style=ReportStyle.ACADEMIC,
             enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
         )
 
         events = []
@@ -670,12 +691,44 @@ class TestAstreamWorkflowGenerator:
 
         async def verify_config(*args, **kwargs):
             config = kwargs.get("config", {})
+            # 验证顶层参数
             assert config["thread_id"] == "test_thread"
-            assert config["max_plan_iterations"] == 5
-            assert config["max_step_num"] == 20
-            assert config["max_search_results"] == 10
-            assert config["report_style"] == ReportStyle.NEWS.value
+            # 验证 configurable 键下的参数
+            configurable = config.get("configurable", {})
+            assert configurable["max_plan_iterations"] == 5
+            assert configurable["max_step_num"] == 20
+            assert configurable["max_search_results"] == 10
+            assert configurable["report_style"] == ReportStyle.NEWS.value
             yield ("agent1", "messages", [mock_ai_message])
+
+        mock_graph.astream = verify_config
+
+        # 调用 _astream_workflow_generator 函数
+        generator = _astream_workflow_generator(
+            messages=[{"role": "user", "content": "Hello"}],
+            thread_id="test_thread",
+            resources=[],
+            max_plan_iterations=5,
+            max_step_num=20,
+            max_search_results=10,
+            auto_accepted_plan=True,
+            interrupt_feedback="",
+            mcp_settings={},
+            enable_background_investigation=False,
+            report_style=ReportStyle.NEWS,
+            enable_deep_thinking=False,
+            enable_collaboration=False,
+            enable_parallel_execution=False,
+            max_parallel_tasks=1,
+        )
+
+        # 执行生成器以触发配置验证
+        events = []
+        async for event in generator:
+            events.append(event)
+
+        # 验证至少有一个事件被生成
+        assert len(events) >= 1
 
 
 class TestGenerateProseEndpoint:
