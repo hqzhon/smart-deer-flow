@@ -554,7 +554,8 @@ Content: {content}
             processed_results.append(processed_result)
 
         # Sort by quality score
-        processed_results.sort(key=lambda x: x["quality_score"], reverse=True)
+        if self.cleaning_config.get("sort_by_quality", True):
+            processed_results.sort(key=lambda x: x["quality_score"], reverse=True)
 
         return processed_results
 

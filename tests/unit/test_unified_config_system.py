@@ -23,13 +23,9 @@ llm:
   api_key: "test-key"
 
 reflection:
-  reflection_enabled: true
-  reflection_max_loops: 5
-  reflection_sufficiency_threshold: 0.8
-  reflection_knowledge_gap_threshold: 0.7
-  reflection_max_followup_queries: 3
-  reflection_skip_initial_stage: false
-  reflection_temperature: 0.7
+  enabled: true
+  max_loops: 5
+  quality_threshold: 0.8
 
 followup_merger:
   similarity_threshold: 0.75
@@ -72,8 +68,10 @@ followup_merger:
             # 验证反射配置（简化版）
             reflection_config = app_settings.reflection
             self.assertTrue(reflection_config.enabled)
-            self.assertEqual(reflection_config.max_loops, 2)  # 使用默认值
-            self.assertEqual(reflection_config.quality_threshold, 0.75)  # 使用默认值
+            self.assertEqual(reflection_config.max_loops, 5)  # 使用测试配置中设置的值
+            self.assertEqual(
+                reflection_config.quality_threshold, 0.8
+            )  # 使用测试配置中设置的值
 
             # 验证Follow-up合并器配置
             merger_config = app_settings.followup_merger

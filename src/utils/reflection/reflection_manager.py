@@ -47,10 +47,14 @@ class ReflectionManager:
 
                 app_settings = get_settings()
                 reflection_config = app_settings.get_reflection_config()
-                self.max_reflections = reflection_config.max_loops
+                self.max_reflections = reflection_config.max_loops  # 默认为2
                 self.config = reflection_config
-            except ImportError:
-                self.max_reflections = 1
+                logger.debug(
+                    f"Successfully loaded reflection config: max_loops={reflection_config.max_loops}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to load reflection config: {e}")
+                self.max_reflections = 2  # Fallback to 2 if config is not available
                 self.config = None
         else:
             self.max_reflections = max_reflections or 1
@@ -127,8 +131,9 @@ class ReflectionManager:
             stats.follow_up_reflections += 1
 
         logger.info(
-            f"Reflection execution recorded: type={reflection_type}, total={stats.total_reflections}/{stats.max_allowed}, "
-            f"session={session_id}"
+            f"Reflection recorded - Session: {session_id}, "
+            f"Type: {reflection_type}, "
+            f"Total: {stats.total_reflections}/{stats.max_allowed}"
         )
 
         return True

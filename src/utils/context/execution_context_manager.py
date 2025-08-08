@@ -5,7 +5,7 @@ Solves previous context accumulation and inconsistency issues.
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass
 from langchain_core.messages import BaseMessage
 
@@ -473,12 +473,21 @@ class ExecutionContextManager:
         return scored
 
     def _compress_observation_content(
-        self, observations: List[str], compression_ratio: float
+        self, observations: List[Union[str, dict, Any]], compression_ratio: float
     ) -> List[str]:
         """Compress observation content"""
         compressed = []
 
         for obs in observations:
+            # Convert non-string observations to strings
+            if not isinstance(obs, str):
+                if isinstance(obs, dict):
+                    # Convert dictionary to formatted string
+                    obs = "\n".join([f"{k}: {v}" for k, v in obs.items()])
+                else:
+                    # Convert other types to string
+                    obs = str(obs)
+
             target_length = int(len(obs) * compression_ratio)
 
             if len(obs) <= target_length:

@@ -39,17 +39,30 @@ def mock_configurable():
     mock = MagicMock()
     mock.agents.max_search_results = 5
     mock.agents.max_plan_iterations = 3
+    mock.agents.max_reflection_loops = 3
     mock.agents.enable_deep_thinking = False
     mock.content.enable_smart_filtering = True
     mock.content.enable_content_summarization = False
     mock.model_token_limits = MagicMock()
+    # Add reflection configuration
+    mock.reflection.enabled = True
+    mock.reflection.max_loops = 3
     return mock
 
 
 @pytest.fixture
 def mock_config():
     # 你可以根据实际需要返回一个 MagicMock 或 dict
-    return MagicMock()
+    config = MagicMock()
+
+    # Set up the nested structure that researcher_node expects
+    def mock_get(key, default=None):
+        if key == "configurable":
+            return {"use_legacy_researcher": True}
+        return default
+
+    config.get.side_effect = mock_get
+    return config
 
 
 @pytest.fixture
@@ -987,6 +1000,10 @@ class Step:
                 setattr(new_step, key, value)
         return new_step
 
+    def get(self, key, default=None):
+        """Dictionary-like get method for compatibility."""
+        return getattr(self, key, default)
+
 
 @pytest.fixture
 def mock_step():
@@ -1052,6 +1069,7 @@ def mock_agent():
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_execute_agent_step_basic(mock_state_with_steps, mock_agent):
     # Should execute the first unexecuted step and update execution_res
     with patch(
@@ -1078,6 +1096,7 @@ async def test_execute_agent_step_basic(mock_state_with_steps, mock_agent):
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_execute_agent_step_no_unexecuted_step(
     mock_state_no_unexecuted, mock_agent
 ):
@@ -1091,6 +1110,7 @@ async def test_execute_agent_step_no_unexecuted_step(
         mock_logger.warning.assert_called_with("No unexecuted step found")
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_execute_agent_step_with_resources_and_researcher(mock_step):
     # Should add resource info and citation reminder for researcher
@@ -1130,6 +1150,7 @@ async def test_execute_agent_step_with_resources_and_researcher(mock_step):
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env(
     monkeypatch, mock_state_with_steps, mock_agent
 ):
@@ -1151,6 +1172,7 @@ async def test_execute_agent_step_recursion_limit_env(
         mock_logger.info.assert_any_call("Recursion limit set to: 42")
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env_invalid(
     monkeypatch, mock_state_with_steps, mock_agent
@@ -1175,6 +1197,7 @@ async def test_execute_agent_step_recursion_limit_env_invalid(
         )
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env_negative(
     monkeypatch, mock_state_with_steps, mock_agent
@@ -1295,6 +1318,7 @@ def patch_multiserver_mcp_client():
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_setup_and_execute_agent_step_with_mcp(
     mock_state_with_steps,
     mock_config,
@@ -1332,6 +1356,7 @@ async def test_setup_and_execute_agent_step_with_mcp(
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_setup_and_execute_agent_step_without_mcp(
     mock_state_with_steps,
     mock_config,
@@ -1363,6 +1388,7 @@ async def test_setup_and_execute_agent_step_without_mcp(
     assert result == "EXECUTED"
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
     mock_state_with_steps,
@@ -1413,6 +1439,7 @@ async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
         assert result == "EXECUTED"
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
     mock_state_with_steps,
@@ -1470,7 +1497,22 @@ async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
 
 @pytest.fixture
 def mock_state_with_resources():
-    return {"resources": ["resource1", "resource2"], "other": "value"}
+    # Use the Step and Plan classes defined in this file
+    mock_step = Step(
+        title="Test Research Step",
+        description="Conduct research on the topic",
+        execution_res=None,
+    )
+
+    return {
+        "resources": ["resource1", "resource2"],
+        "other": "value",
+        "research_topic": "Test Research Topic",
+        "current_plan": Plan(steps=[mock_step]),
+        "observations": [],
+        "reflection": {},
+        "current_step": mock_step,
+    }
 
 
 @pytest.fixture
@@ -1483,7 +1525,7 @@ def mock_state_without_resources():
 
 @pytest.fixture
 def patch_get_web_search_tool():
-    with patch("src.graph.nodes.get_web_search_tool") as mock:
+    with patch("src.tools.search.get_web_search_tool") as mock:
         from langchain_core.tools import tool
 
         @tool
@@ -1491,6 +1533,7 @@ def patch_get_web_search_tool():
             """A web search tool for testing."""
             return "search result"
 
+        # Mock the function to return the tool regardless of parameters
         mock.return_value = web_search_tool
         yield mock
 
@@ -1504,13 +1547,13 @@ def patch_crawl_tool():
         """A crawl tool for testing."""
         return "crawl result"
 
-    with patch("src.graph.nodes.crawl_tool", crawl_tool):
-        yield
+    with patch("src.tools.crawl.crawl_tool", crawl_tool) as mock:
+        yield mock
 
 
 @pytest.fixture
 def patch_get_retriever_tool():
-    with patch("src.graph.nodes.get_retriever_tool") as mock:
+    with patch("src.tools.retriever.get_retriever_tool") as mock:
         from langchain_core.tools import tool
 
         @tool
@@ -1518,6 +1561,7 @@ def patch_get_retriever_tool():
             """A retriever tool for testing."""
             return "retriever result"
 
+        # Mock the function to return the tool regardless of parameters
         mock.return_value = retriever_tool
         yield mock
 
@@ -1535,6 +1579,7 @@ def patch_setup_and_execute_agent_step():
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_researcher_node_with_retriever_tool(
     mock_state_with_resources,
     mock_config,
@@ -1544,9 +1589,7 @@ async def test_researcher_node_with_retriever_tool(
     patch_get_retriever_tool,
     patch_setup_and_execute_agent_step,
 ):
-    # Simulate retriever_tool is returned
-    retriever_tool = MagicMock(name="retriever_tool")
-    patch_get_retriever_tool.return_value = retriever_tool
+    # The retriever_tool is already mocked by the fixture
 
     result = await researcher_node(mock_state_with_resources, mock_config)
 
@@ -1557,11 +1600,12 @@ async def test_researcher_node_with_retriever_tool(
     # Should call _setup_and_execute_agent_step with retriever_tool first
     args, kwargs = patch_setup_and_execute_agent_step.call_args
     tools = args[3]
-    assert tools[0] == retriever_tool
+    assert tools[0] == patch_get_retriever_tool.return_value
     assert patch_get_web_search_tool.return_value in tools
     assert result == "RESEARCHER_RESULT"
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_researcher_node_without_retriever_tool(
     mock_state_with_resources,
@@ -1587,6 +1631,7 @@ async def test_researcher_node_without_retriever_tool(
         assert result == "RESEARCHER_RESULT"
 
 
+@pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_researcher_node_without_resources(
     mock_state_without_resources,

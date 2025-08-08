@@ -26,6 +26,12 @@ from .nodes import (
     background_investigation_node,
     context_optimizer_node,
     planning_context_optimizer_node,
+    # New refactored nodes for EnhancedResearcher decomposition
+    prepare_research_step_node,
+    researcher_agent_node,
+    reflection_node,
+    update_plan_node,
+    check_research_completion_node,
 )
 
 # Import enhanced collaboration modules
@@ -64,11 +70,24 @@ def continue_to_running_research_team(state: State):
     for step in current_plan.steps:
         if not step.execution_res:
             if step.step_type and step.step_type == StepType.RESEARCH:
-                return "researcher"
+                # Check if enhanced features are available for new research workflow
+                if ENHANCED_FEATURES_AVAILABLE:
+                    logger.debug(
+                        "Routing to enhanced research workflow: prepare_research_step"
+                    )
+                    return "prepare_research_step"
+                else:
+                    logger.debug(
+                        "Enhanced features not available, routing to legacy researcher"
+                    )
+                    return "researcher"
             elif step.step_type and step.step_type == StepType.PROCESSING:
                 return "coder"
             else:
                 # 如果步骤类型未知或为None，返回planner重新规划
+                logger.warning(
+                    f"Unknown step type: {step.step_type}, routing to planner"
+                )
                 return "planner"
 
     # 如果没有找到未执行的步骤，返回planner
@@ -119,8 +138,6 @@ def _build_base_graph():
             "planning_context_optimizer",
         ],
     )
-    builder.add_edge("context_optimizer", "reporter")
-    builder.add_edge("reporter", END)
     return builder
 
 
@@ -216,99 +233,6 @@ async def _conflict_resolution_node(state: State, config: RunnableConfig) -> Sta
         logger.error(f"Conflict resolution failed: {e}")
 
     return {**state, "has_conflicts": False}
-
-
-def build_graph_with_memory():
-    """Build and return the agent workflow graph with memory."""
-    # use persistent memory to save conversation history
-    # TODO: be compatible with SQLite / PostgreSQL
-    memory = MemorySaver()
-
-    # build state graph
-    builder = _build_base_graph()
-    logger.info("Built state graph with memory")
-
-    # Add safe callback handling
-    try:
-        logger.info("Registering safe default callback for state graph with memory")
-        from src.utils.system.callback_safety import global_callback_manager
-
-        def safe_default_callback(*args, **kwargs):
-            """Safe default callback that does nothing but prevents None errors"""
-            pass
-
-        global_callback_manager.register_default_callback(
-            "on_done", safe_default_callback
-        )
-        logger.debug("Registered safe default callback for LangGraph with memory")
-    except Exception as e:
-        logger.warning(f"Could not register safe callback for graph with memory: {e}")
-
-    return builder.compile(checkpointer=memory)
-
-
-@cached(ttl=3600, priority=3)  # Cache graph for 1 hour with high priority
-def build_graph():
-    """Build and return the agent workflow graph without memory with performance optimizations."""
-    logger.info("Building optimized workflow graph...")
-
-    # build state graph with enhanced configuration
-    builder = _build_base_graph()
-
-    # Add conditional nodes for enhanced collaboration
-    if ENHANCED_FEATURES_AVAILABLE:
-        try:
-            builder.add_node("role_bidding", _role_bidding_node)
-            builder.add_node("conflict_resolution", _conflict_resolution_node)
-            logger.info("Added enhanced collaboration nodes")
-        except NameError:
-            logger.warning("Enhanced collaboration nodes not available")
-
-    logger.info("Optimized workflow graph built successfully")
-
-    # Compile with safe callback handling
-    try:
-        from src.utils.system.callback_safety import global_callback_manager
-
-        # Register a default callback to prevent None callback errors
-        def safe_default_callback(*args, **kwargs):
-            """Safe default callback that does nothing but prevents None errors"""
-            pass
-
-        global_callback_manager.register_default_callback(
-            "on_done", safe_default_callback
-        )
-        logger.debug("Registered safe default callback for LangGraph")
-    except Exception as e:
-        logger.warning(f"Could not register safe callback: {e}")
-
-    return builder.compile()
-
-
-graph = build_graph()
-
-
-# Enhanced Graph Builder with Optimization Features
-class EnhancedState:
-    """Enhanced state class containing optimization feature state information"""
-
-    def __init__(self):
-        # Original state
-        self.messages: List[Dict[str, Any]] = []
-        self.current_plan: Optional[Dict[str, Any]] = None
-        self.observations: List[str] = []
-        self.final_report: str = ""
-        self.locale: str = "zh-CN"
-
-        # Collaboration mechanism state
-        self.active_agents: Dict[str, str] = {}  # task_id -> agent_id
-        self.conflict_claims: List = []
-        self.intervention_points: List[str] = []
-
-        # Report quality state
-        self.report_template_id: Optional[str] = None
-        self.critical_analysis: Optional[Dict[str, Any]] = None
-        self.interactive_elements: List[Dict[str, Any]] = []
 
 
 def enhanced_coordinator_node(
@@ -509,6 +433,138 @@ def enhanced_reporter_node(
     return result
 
 
+def _build_enhanced_graph():
+    """Build and return the enhanced state graph with all nodes and edges.
+
+    This version uses the refactored research nodes that decompose the
+    EnhancedResearcher's responsibilities into single-responsibility nodes.
+    """
+    builder = StateGraph(State)
+    builder.add_edge(START, "coordinator")
+    builder.add_node("coordinator", enhanced_coordinator_node)
+    builder.add_node("background_investigator", background_investigation_node)
+    builder.add_node("planner", enhanced_planner_node)
+    builder.add_node("reporter", enhanced_reporter_node)
+    builder.add_node("research_team", research_team_node)
+    builder.add_node("role_bidding", _role_bidding_node)
+    builder.add_node("conflict_resolution", _conflict_resolution_node)
+
+    # Refactored research workflow nodes (replacing researcher_node)
+    builder.add_node("prepare_research_step", prepare_research_step_node)
+    builder.add_node("researcher_agent", researcher_agent_node)
+    builder.add_node("research_reflection", reflection_node)
+    builder.add_node("update_plan", update_plan_node)
+
+    # Legacy researcher node (kept for backward compatibility)
+    builder.add_node("researcher", researcher_node)
+
+    builder.add_node("coder", coder_node)
+    builder.add_node("human_feedback", human_feedback_node)
+    builder.add_node("context_optimizer", context_optimizer_node)
+    builder.add_node("planning_context_optimizer", planning_context_optimizer_node)
+
+    # Basic edges
+    builder.add_edge("background_investigator", "planner")
+    builder.add_edge("planning_context_optimizer", "planner")
+
+    # Refactored research workflow edges
+    builder.add_edge("prepare_research_step", "researcher_agent")
+    builder.add_edge("researcher_agent", "research_reflection")
+    builder.add_edge("research_reflection", "update_plan")
+    builder.add_conditional_edges(
+        "update_plan",
+        check_research_completion_node,
+        {
+            "research_team": "prepare_research_step",  # Continue research loop
+            "planner": "context_optimizer",  # Research completed
+        },
+    )
+
+    # Research team routing (updated to use new workflow)
+    builder.add_conditional_edges(
+        "research_team",
+        continue_to_running_research_team,
+        {
+            "planner": "planner",
+            "prepare_research_step": "prepare_research_step",  # Use new research workflow
+            "researcher": "researcher",  # Legacy fallback
+            "coder": "coder",
+            "context_optimizer": "context_optimizer",
+            "planning_context_optimizer": "planning_context_optimizer",
+        },
+    )
+
+    return builder
+
+
+@cached(ttl=3600, priority=3)  # Cache graph for 1 hour with high priority
+def build_graph(with_memory=False):
+    """Build and return the agent workflow graph without memory with performance optimizations."""
+    logger.info("Building optimized workflow graph...")
+
+    if with_memory:
+        memory = MemorySaver()
+
+    # Choose graph builder based on enhanced features availability
+    if ENHANCED_FEATURES_AVAILABLE:
+        logger.info("Enhanced features available, building enhanced graph")
+        builder = _build_enhanced_graph()
+    else:
+        logger.info("Enhanced features not available, building base graph")
+        builder = _build_base_graph()
+
+    logger.info("Optimized workflow graph built successfully")
+
+    # Add unified reporter connections to ensure single report generation
+    builder.add_edge("context_optimizer", "reporter")
+    builder.add_edge("reporter", END)
+    logger.info("Added unified reporter connections")
+
+    # Compile with safe callback handling
+    try:
+        from src.utils.system.callback_safety import global_callback_manager
+
+        # Register a default callback to prevent None callback errors
+        def safe_default_callback(*args, **kwargs):
+            """Safe default callback that does nothing but prevents None errors"""
+            pass
+
+        global_callback_manager.register_default_callback(
+            "on_done", safe_default_callback
+        )
+        logger.debug("Registered safe default callback for LangGraph")
+    except Exception as e:
+        logger.warning(f"Could not register safe callback: {e}")
+
+    return builder.compile(checkpointer=memory if with_memory else None)
+
+
+graph = build_graph()
+
+
+# Enhanced Graph Builder with Optimization Features
+class EnhancedState:
+    """Enhanced state class containing optimization feature state information"""
+
+    def __init__(self):
+        # Original state
+        self.messages: List[Dict[str, Any]] = []
+        self.current_plan: Optional[Dict[str, Any]] = None
+        self.observations: List[str] = []
+        self.final_report: str = ""
+        self.locale: str = "zh-CN"
+
+        # Collaboration mechanism state
+        self.active_agents: Dict[str, str] = {}  # task_id -> agent_id
+        self.conflict_claims: List = []
+        self.intervention_points: List[str] = []
+
+        # Report quality state
+        self.report_template_id: Optional[str] = None
+        self.critical_analysis: Optional[Dict[str, Any]] = None
+        self.interactive_elements: List[Dict[str, Any]] = []
+
+
 def _detect_report_domain(user_message: str):
     """Detect report domain"""
     if not ENHANCED_FEATURES_AVAILABLE:
@@ -656,45 +712,16 @@ def _analyze_and_create_tasks(user_message: str) -> List:
     return tasks
 
 
-def _build_enhanced_graph():
-    """Build and return the enhanced state graph with all nodes and edges."""
-    builder = StateGraph(State)
-    builder.add_edge(START, "coordinator")
-    builder.add_node("coordinator", enhanced_coordinator_node)
-    builder.add_node("background_investigator", background_investigation_node)
-    builder.add_node("planner", enhanced_planner_node)
-    builder.add_node("reporter", enhanced_reporter_node)
-    builder.add_node("research_team", research_team_node)
-    builder.add_node("researcher", researcher_node)
-    builder.add_node("coder", coder_node)
-    builder.add_node("human_feedback", human_feedback_node)
-    builder.add_node("context_optimizer", context_optimizer_node)
-    builder.add_node("planning_context_optimizer", planning_context_optimizer_node)
-    builder.add_edge("background_investigator", "planner")
-    builder.add_edge("planning_context_optimizer", "planner")
-    builder.add_conditional_edges(
-        "research_team",
-        continue_to_running_research_team,
-        [
-            "planner",
-            "researcher",
-            "coder",
-            "context_optimizer",
-            "planning_context_optimizer",
-        ],
-    )
-    builder.add_edge("context_optimizer", "reporter")
-    builder.add_edge("reporter", END)
-    return builder
-
-
 def build_enhanced_graph():
     """Build and return the enhanced agent workflow graph without memory."""
     if not ENHANCED_FEATURES_AVAILABLE:
         logger.warning(
             "Enhanced features not available, falling back to standard graph"
         )
-        return build_graph()
+        builder = build_graph()
+        builder.add_edge("context_optimizer", "reporter")
+        builder.add_edge("reporter", END)
+        return builder.compile()
 
     # build enhanced state graph
     builder = _build_enhanced_graph()
@@ -719,47 +746,12 @@ def build_enhanced_graph():
     except Exception as e:
         logger.warning(f"Could not register safe callback for graph: {e}")
 
+    # Add unified reporter connections to ensure single report generation
+    builder.add_edge("context_optimizer", "reporter")
+    builder.add_edge("reporter", END)
+    logger.info("Added unified reporter connections to enhanced graph")
+
     return builder.compile()
-
-
-def build_enhanced_graph_with_memory():
-    """Build and return the enhanced agent workflow graph with memory."""
-    if not ENHANCED_FEATURES_AVAILABLE:
-        logger.warning(
-            "Enhanced features not available, falling back to standard graph with memory"
-        )
-        return build_graph_with_memory()
-
-    # use persistent memory to save conversation history
-    memory = MemorySaver()
-
-    # build enhanced state graph
-    builder = _build_enhanced_graph()
-    logger.info("Built enhanced state graph with memory")
-
-    # Add safe callback handling
-    try:
-        logger.info(
-            "Registering safe default callback for enhanced LangGraph with memory"
-        )
-        from src.utils.system.callback_safety import global_callback_manager
-
-        def safe_default_callback(*args, **kwargs):
-            """Safe default callback that does nothing but prevents None errors"""
-            pass
-
-        global_callback_manager.register_default_callback(
-            "on_done", safe_default_callback
-        )
-        logger.debug(
-            "Registered safe default callback for enhanced LangGraph with memory"
-        )
-    except Exception as e:
-        logger.warning(
-            f"Could not register safe callback for enhanced graph with memory: {e}"
-        )
-
-    return builder.compile(checkpointer=memory)
 
 
 # Create enhanced graph instance
