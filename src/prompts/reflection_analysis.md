@@ -45,8 +45,8 @@ Current Observations:
 Provide your reflection analysis in the specified JSON format with:
 - is_sufficient: Whether current research is adequate
 - comprehensive_report: A complete, well-structured research report that synthesizes ALL findings, analysis, insights, and conclusions from the research process. This should be a comprehensive document that can stand alone as the final research output. **IMPORTANT: This MUST be a single string, NOT a nested JSON object.**
-- knowledge_gaps: List of missing information areas (only if is_sufficient is false)
-- follow_up_queries: Specific questions to address gaps (MUST be empty array [] if is_sufficient is true)
+- primary_knowledge_gap: The single most critical missing information area (only if is_sufficient is false)
+- primary_follow_up_query: The single most important question to address the gap (MUST be null if is_sufficient is true)
 - confidence_score: Your confidence in the sufficiency assessment (0.0-1.0)
 - quality_assessment: Quality metrics for the research
 - recommendations: Actionable recommendations
@@ -72,8 +72,8 @@ IMPORTANT CONSTRAINTS:
 {
   "is_sufficient": false,
   "comprehensive_report": "# Research Report\n\n## Executive Summary\nKey findings and insights...\n\n## Analysis\nDetailed analysis of results...\n\n## Conclusions\nFinal conclusions and recommendations...",
-  "knowledge_gaps": ["Gap 1", "Gap 2"],
-  "follow_up_queries": ["Query 1", "Query 2"],
+  "primary_knowledge_gap": "The most critical missing information area",
+  "primary_follow_up_query": "The single most important question to address the gap",
   "confidence_score": float (0.0 to 1.0),
   "quality_assessment": {"completeness": float (0.0 to 1.0)},
   "recommendations": ["Recommendation 1"],
@@ -81,14 +81,14 @@ IMPORTANT CONSTRAINTS:
 }
 ```
 
-**CRITICAL RULE:** If is_sufficient is true, follow_up_queries MUST be an empty array [].
+**CRITICAL RULE:** If is_sufficient is true, primary_follow_up_query MUST be null.
 Example for sufficient research:
 ```json
 {
   "is_sufficient": true,
   "comprehensive_report": "Complete research report...",
-  "knowledge_gaps": [],
-  "follow_up_queries": [],
+  "primary_knowledge_gap": null,
+  "primary_follow_up_query": null,
   "confidence_score": 0.85,
   "quality_assessment": {"completeness": 0.9},
   "recommendations": ["Proceed to final report"],

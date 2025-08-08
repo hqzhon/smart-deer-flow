@@ -159,10 +159,13 @@ class ReflectionAnalyzer:
         gap_frequency = {}
 
         for session in sessions:
-            if session.reflection_result and session.reflection_result.knowledge_gaps:
-                for gap in session.reflection_result.knowledge_gaps:
-                    gap_lower = gap.lower().strip()
-                    gap_frequency[gap_lower] = gap_frequency.get(gap_lower, 0) + 1
+            if (
+                session.reflection_result
+                and session.reflection_result.primary_knowledge_gap
+            ):
+                gap = session.reflection_result.primary_knowledge_gap
+                gap_lower = gap.lower().strip()
+                gap_frequency[gap_lower] = gap_frequency.get(gap_lower, 0) + 1
 
         # Return gaps that appear in more than one session
         recurring_gaps = [gap for gap, freq in gap_frequency.items() if freq > 1]
@@ -205,18 +208,18 @@ class ReflectionAnalyzer:
                 )
 
         # Gap-based recommendations
-        if result.knowledge_gaps:
+        if result.primary_knowledge_gap:
             recurring_gaps = self.identify_recurring_gaps(history + [current_session])
-            for gap in result.knowledge_gaps[:3]:  # Top 3 gaps
-                if gap.lower() in [rg.lower() for rg in recurring_gaps]:
-                    recommendations.append(f"Priority: Address recurring gap - {gap}")
-                else:
-                    recommendations.append(f"Investigate: {gap}")
+            gap = result.primary_knowledge_gap
+            if gap.lower() in [rg.lower() for rg in recurring_gaps]:
+                recommendations.append(f"Priority: Address recurring gap - {gap}")
+            else:
+                recommendations.append(f"Investigate: {gap}")
 
         # Follow-up query recommendations
-        if result.follow_up_queries:
+        if result.primary_follow_up_query:
             recommendations.append(
-                f"Execute {len(result.follow_up_queries)} follow-up queries for comprehensive coverage"
+                "Execute primary follow-up query for comprehensive coverage"
             )
 
         # Trend-based recommendations
@@ -329,9 +332,11 @@ class ReflectionMetrics:
             if result.confidence_score is not None:
                 self.metrics_data["confidence_scores"].append(result.confidence_score)
 
-            self.metrics_data["gap_counts"].append(len(result.knowledge_gaps or []))
+            self.metrics_data["gap_counts"].append(
+                1 if result.primary_knowledge_gap else 0
+            )
             self.metrics_data["query_counts"].append(
-                len(result.follow_up_queries or [])
+                1 if result.primary_follow_up_query else 0
             )
 
         self.metrics_data["session_durations"].append(duration_ms)
@@ -415,8 +420,8 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
                 is_sufficient=data.get("is_sufficient", False),
                 confidence_score=data.get("confidence_score"),
                 comprehensive_report=data.get("comprehensive_report", ""),
-                knowledge_gaps=data.get("knowledge_gaps", []),
-                follow_up_queries=data.get("follow_up_queries", []),
+                primary_knowledge_gap=data.get("primary_knowledge_gap", ""),
+                primary_follow_up_query=data.get("primary_follow_up_query"),
                 quality_assessment=data.get("quality_assessment", {}),
                 recommendations=data.get("recommendations", []),
                 priority_areas=data.get("priority_areas", []),
@@ -424,7 +429,7 @@ def parse_reflection_result(raw_output: str) -> Optional[ReflectionResult]:
 
             # Log parsed result details
             logger.info(
-                f"Reflection result parsed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gaps={len(result.knowledge_gaps)}, queries={len(result.follow_up_queries)}"
+                f"Reflection result parsed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gap={result.primary_knowledge_gap}, query={result.primary_follow_up_query}"
             )
 
             return result

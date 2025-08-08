@@ -207,15 +207,10 @@ class TestReflectionIntegration:
 
                 # Mock reflection results indicating gaps
                 mock_reflection.return_value = ReflectionResult(
-                    knowledge_gaps=[
-                        "missing_recent_developments: Missing recent breakthrough information"
-                    ],
+                    primary_knowledge_gap="missing_recent_developments: Missing recent breakthrough information",
                     is_sufficient=False,
                     confidence_score=0.85,
-                    follow_up_queries=[
-                        "quantum computing recent advances",
-                        "quantum supremacy 2024",
-                    ],
+                    primary_follow_up_query="quantum computing recent advances",
                 )
 
                 # Perform research with reflection
@@ -237,7 +232,7 @@ class TestReflectionIntegration:
 
                 # Verify reflection influenced the research process
                 reflection_result = result["reflection_analysis"]
-                assert len(reflection_result.knowledge_gaps) == 1
+                assert reflection_result.primary_knowledge_gap is not None
                 assert reflection_result.is_sufficient is False
 
     @pytest.mark.asyncio
@@ -265,15 +260,10 @@ class TestReflectionIntegration:
 
                 # Mock reflection suggesting plan improvements
                 mock_reflection.return_value = ReflectionResult(
-                    knowledge_gaps=[
-                        "insufficient_commercial_focus: Plan lacks commercial application research"
-                    ],
+                    primary_knowledge_gap="insufficient_commercial_focus: Plan lacks commercial application research",
                     is_sufficient=False,
                     confidence_score=0.8,
-                    follow_up_queries=[
-                        "quantum computing startups",
-                        "quantum computing industry",
-                    ],
+                    primary_follow_up_query="quantum computing startups",
                 )
 
                 # Generate plan with reflection
@@ -333,10 +323,10 @@ class TestReflectionIntegration:
 
                         # Mock plan reflection
                         mock_plan_reflection.return_value = ReflectionResult(
-                            knowledge_gaps=[],
+                            primary_knowledge_gap=None,
                             is_sufficient=True,
                             confidence_score=0.85,
-                            follow_up_queries=[],
+                            primary_follow_up_query=None,
                         )
 
                         # Mock research phase
@@ -348,10 +338,10 @@ class TestReflectionIntegration:
 
                         # Mock research reflection
                         mock_research_reflection.return_value = ReflectionResult(
-                            knowledge_gaps=[],
+                            primary_knowledge_gap=None,
                             is_sufficient=True,
                             confidence_score=0.9,
-                            follow_up_queries=[],
+                            primary_follow_up_query=None,
                         )
 
                         # Execute complete workflow
@@ -397,12 +387,10 @@ class TestReflectionIntegration:
 
                 # Mock reflection that always finds gaps (to test loop termination)
                 mock_reflection.return_value = ReflectionResult(
-                    knowledge_gaps=[
-                        "always_insufficient: Always finds gaps for testing"
-                    ],
+                    primary_knowledge_gap="always_insufficient: Always finds gaps for testing",
                     is_sufficient=False,
                     confidence_score=0.8,
-                    follow_up_queries=["additional query"],
+                    primary_follow_up_query="additional query",
                 )
 
                 # Execute research with reflection
@@ -479,10 +467,10 @@ class TestReflectionIntegration:
                 }
 
                 mock_reflection.return_value = ReflectionResult(
-                    knowledge_gaps=[],
+                    primary_knowledge_gap=None,
                     is_sufficient=True,
                     confidence_score=0.9,
-                    follow_up_queries=[],
+                    primary_follow_up_query=None,
                 )
 
                 # Execute research with reflection
@@ -517,7 +505,7 @@ class TestReflectionIntegration:
                 knowledge_gaps=[],
                 is_sufficient=True,
                 confidence_score=0.9,
-                follow_up_queries=[],
+                primary_follow_up_query=None,
                 recommendations=[],
                 priority_areas=[],
                 quality_assessment={},

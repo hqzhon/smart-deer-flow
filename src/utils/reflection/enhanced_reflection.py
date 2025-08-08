@@ -20,17 +20,6 @@ from langchain_core.runnables import RunnableConfig
 from src.llms.error_handler import safe_llm_call_async
 
 
-class KnowledgeGap(BaseModel):
-    """Represents an identified knowledge gap in research."""
-
-    gap_type: str = Field(description="Type of knowledge gap")
-    description: str = Field(description="Description of the gap")
-    importance: float = Field(description="Importance score (0.0-1.0)", ge=0.0, le=1.0)
-    suggested_queries: List[str] = Field(
-        description="Suggested queries to fill the gap", default_factory=list
-    )
-
-
 class ReflectionConfig(BaseModel):
     """Configuration for reflection system."""
 
@@ -61,13 +50,13 @@ class ReflectionResult(BaseModel):
         description="Comprehensive research report that synthesizes all findings, analysis, and insights",
         default="",
     )
-    knowledge_gaps: List[str] = Field(
-        description="List of knowledge gaps or missing information areas",
-        default_factory=list,
+    primary_knowledge_gap: Optional[str] = Field(
+        description="The most critical knowledge gap or missing information area",
+        default=None,
     )
-    follow_up_queries: List[str] = Field(
-        description="List of specific follow-up queries to address the knowledge gaps",
-        default_factory=list,
+    primary_follow_up_query: Optional[str] = Field(
+        description="The most important follow-up query to address the primary knowledge gap",
+        default=None,
     )
     confidence_score: Optional[float] = Field(
         description="Confidence score for the sufficiency assessment (0.0-1.0)",
@@ -85,118 +74,6 @@ class ReflectionResult(BaseModel):
     priority_areas: List[str] = Field(
         description="Priority areas that need immediate attention", default_factory=list
     )
-
-    @field_validator("knowledge_gaps", mode="before")
-    @classmethod
-    def validate_knowledge_gaps(cls, v):
-        """Ensure knowledge_gaps is always a list of strings."""
-        if not v:
-            return []
-
-        result = []
-        for item in v:
-            # Skip slice objects and other invalid types
-            if isinstance(item, slice):
-                logger.warning(f"Skipping slice object in knowledge_gaps: {item}")
-                continue
-
-            if isinstance(item, str):
-                if item.strip() and "slice(" not in item and not item.startswith("<"):
-                    result.append(item)
-                else:
-                    logger.warning(
-                        f"Skipping invalid string in knowledge_gaps: '{item}'"
-                    )
-            elif isinstance(item, dict):
-                # Extract description or convert dict to string
-                if "description" in item:
-                    desc_str = str(item["description"])
-                    if desc_str.strip() and "slice(" not in desc_str:
-                        result.append(desc_str)
-                elif "gap_type" in item:
-                    gap_str = str(item["gap_type"])
-                    if gap_str.strip() and "slice(" not in gap_str:
-                        result.append(gap_str)
-                else:
-                    item_str = str(item)
-                    if (
-                        item_str.strip()
-                        and "slice(" not in item_str
-                        and not item_str.startswith("<")
-                    ):
-                        result.append(item_str)
-            else:
-                item_str = str(item)
-                if (
-                    item_str.strip()
-                    and "slice(" not in item_str
-                    and not item_str.startswith("<")
-                ):
-                    result.append(item_str)
-                else:
-                    logger.warning(
-                        f"Skipping invalid item in knowledge_gaps: '{item_str}'"
-                    )
-        return result
-
-    @field_validator("follow_up_queries", mode="before")
-    @classmethod
-    def validate_follow_up_queries(cls, v):
-        """Ensure follow_up_queries is always a list of strings."""
-        if not v:
-            return []
-
-        result = []
-        for item in v:
-            # Skip slice objects and other invalid types
-            if isinstance(item, slice):
-                logger.warning(f"Skipping slice object in follow_up_queries: {item}")
-                continue
-
-            if isinstance(item, str):
-                # Validate string content
-                if item.strip() and "slice(" not in item and not item.startswith("<"):
-                    result.append(item)
-                else:
-                    logger.warning(
-                        f"Skipping invalid string in follow_up_queries: '{item}'"
-                    )
-            elif isinstance(item, dict):
-                # Extract meaningful string representation from dictionary
-                if "query" in item:
-                    query_str = str(item["query"])
-                    if query_str.strip() and "slice(" not in query_str:
-                        result.append(query_str)
-                elif "description" in item:
-                    desc_str = str(item["description"])
-                    if desc_str.strip() and "slice(" not in desc_str:
-                        result.append(desc_str)
-                elif "gap_type" in item:
-                    gap_str = str(item["gap_type"])
-                    if gap_str.strip() and "slice(" not in gap_str:
-                        result.append(gap_str)
-                else:
-                    item_str = str(item)
-                    if (
-                        item_str.strip()
-                        and "slice(" not in item_str
-                        and not item_str.startswith("<")
-                    ):
-                        result.append(item_str)
-            else:
-                # Convert other types to string with validation
-                item_str = str(item)
-                if (
-                    item_str.strip()
-                    and "slice(" not in item_str
-                    and not item_str.startswith("<")
-                ):
-                    result.append(item_str)
-                else:
-                    logger.warning(
-                        f"Skipping invalid item in follow_up_queries: '{item_str}'"
-                    )
-        return result
 
     @field_validator("recommendations", mode="before")
     @classmethod
@@ -394,11 +271,13 @@ class EnhancedReflectionAgent:
                 else:
                     # Log detailed analysis results
                     logger.info(
-                        f"Knowledge gap analysis completed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gaps_found={len(result.knowledge_gaps)}"
+                        f"Knowledge gap analysis completed: sufficient={result.is_sufficient}, confidence={result.confidence_score}, gaps_found={1 if result.primary_knowledge_gap else 0}"
                     )
-                    logger.debug(f"Knowledge gaps identified: {result.knowledge_gaps}")
                     logger.debug(
-                        f"Follow-up queries generated: {result.follow_up_queries}"
+                        f"Knowledge gap identified: {result.primary_knowledge_gap}"
+                    )
+                    logger.debug(
+                        f"Follow-up query generated: {result.primary_follow_up_query}"
                     )
                     logger.debug(
                         f"Comprehensive report length: {len(result.comprehensive_report)}"
@@ -436,7 +315,7 @@ class EnhancedReflectionAgent:
 
             logger.info(
                 f"Reflection analysis completed: sufficient={result.is_sufficient}, "
-                f"confidence={result.confidence_score:.2f}, gaps_found={len(result.follow_up_queries)}"
+                f"confidence={result.confidence_score:.2f}, query_generated={bool(result.primary_follow_up_query)}"
             )
 
             return result
@@ -448,29 +327,29 @@ class EnhancedReflectionAgent:
     async def generate_follow_up_queries(
         self,
         research_topic: str,
-        knowledge_gaps: List[str],
+        primary_knowledge_gap: Optional[str],
         priority_areas: Optional[List[str]] = None,
         language: Language = Language.EN_US,
-    ) -> List[str]:
-        """Generate specific follow-up queries based on identified knowledge gaps.
+    ) -> Optional[str]:
+        """Generate specific follow-up query based on identified primary knowledge gap.
 
         Args:
             research_topic: The research topic
-            knowledge_gaps: List of identified knowledge gaps
+            primary_knowledge_gap: Primary identified knowledge gap
             priority_areas: Priority areas that need attention
             language: Target language for query generation
 
         Returns:
-            List of refined follow-up queries
+            Single refined follow-up query or None
         """
-        if not knowledge_gaps:
-            return []
+        if not primary_knowledge_gap:
+            return None
 
         try:
             # Use prompt manager for multilingual query generation
             prompt = self.prompt_manager.get_follow_up_queries_prompt(
                 research_topic=research_topic,
-                knowledge_gaps=knowledge_gaps,
+                primary_knowledge_gap=primary_knowledge_gap,
                 priority_areas=priority_areas or [],
                 language=language,
             )
@@ -480,14 +359,9 @@ class EnhancedReflectionAgent:
             if not model:
                 # Fallback to simple query generation
                 if language == Language.ZH_CN:
-                    return [
-                        f"关于{gap}的更多信息需要什么？" for gap in knowledge_gaps[:3]
-                    ]
+                    return f"关于{primary_knowledge_gap}的更多信息需要什么？"
                 else:
-                    return [
-                        f"What additional information is needed about {gap}?"
-                        for gap in knowledge_gaps[:3]
-                    ]
+                    return f"What additional information is needed about {primary_knowledge_gap}?"
 
             response = await self._call_reflection_model(model, prompt)
 
@@ -500,99 +374,71 @@ class EnhancedReflectionAgent:
 
             try:
                 result = json.loads(response.content)
-                raw_queries = result.get("follow_up_queries", [])
+                follow_up_query = result.get("follow_up_query", "")
 
-                # Ensure all queries are strings and filter out invalid objects
-                follow_up_queries = []
-                for query in raw_queries:
-                    # Skip slice objects and other invalid types
-                    if isinstance(query, slice):
-                        logger.warning(f"Skipping slice object in AI response: {query}")
-                        continue
-                    elif isinstance(query, str):
-                        if (
-                            query.strip()
-                            and "slice(" not in query
-                            and not query.startswith("<")
-                        ):
-                            follow_up_queries.append(query)
-                        else:
-                            logger.warning(f"Skipping invalid string query: '{query}'")
-                    elif isinstance(query, dict):
-                        # Extract meaningful string from dict
-                        if "query" in query:
-                            query_str = str(query["query"])
-                        elif "question" in query:
-                            query_str = str(query["question"])
-                        elif "description" in query:
-                            query_str = str(query["description"])
-                        else:
-                            query_str = str(query)
-
-                        if (
-                            query_str.strip()
-                            and "slice(" not in query_str
-                            and not query_str.startswith("<")
-                        ):
-                            follow_up_queries.append(query_str)
-                        else:
-                            logger.warning(f"Skipping invalid dict query: {query}")
+                # Validate and return the single query
+                if isinstance(follow_up_query, str):
+                    if (
+                        follow_up_query.strip()
+                        and "slice(" not in follow_up_query
+                        and not follow_up_query.startswith("<")
+                    ):
+                        return follow_up_query
                     else:
-                        query_str = str(query)
-                        if (
-                            query_str.strip()
-                            and "slice(" not in query_str
-                            and not query_str.startswith("<")
-                            and not query_str.startswith("{")
-                            and "object at" not in query_str
-                        ):
-                            follow_up_queries.append(query_str)
-                        else:
-                            logger.warning(
-                                f"Skipping invalid query object: {query} (type: {type(query)})"
-                            )
+                        logger.warning(f"Invalid follow-up query: '{follow_up_query}'")
+                elif isinstance(follow_up_query, dict):
+                    # Extract meaningful string from dict
+                    if "query" in follow_up_query:
+                        query_str = str(follow_up_query["query"])
+                    elif "question" in follow_up_query:
+                        query_str = str(follow_up_query["question"])
+                    elif "description" in follow_up_query:
+                        query_str = str(follow_up_query["description"])
+                    else:
+                        query_str = str(follow_up_query)
 
-                # Apply maximum limit to prevent excessive queries
-                MAX_FOLLOW_UP_QUERIES = 3
-                if len(follow_up_queries) > MAX_FOLLOW_UP_QUERIES:
-                    follow_up_queries = follow_up_queries[:MAX_FOLLOW_UP_QUERIES]
-                    logger.info(
-                        f"Limited follow-up queries to {MAX_FOLLOW_UP_QUERIES} (from {len(raw_queries)} generated)"
-                    )
+                    if (
+                        query_str.strip()
+                        and "slice(" not in query_str
+                        and not query_str.startswith("<")
+                    ):
+                        return query_str
+                    else:
+                        logger.warning(f"Invalid dict query: {follow_up_query}")
+                else:
+                    query_str = str(follow_up_query)
+                    if (
+                        query_str.strip()
+                        and "slice(" not in query_str
+                        and not query_str.startswith("<")
+                        and not query_str.startswith("{")
+                        and "object at" not in query_str
+                    ):
+                        return query_str
+                    else:
+                        logger.warning(
+                            f"Invalid query object: {follow_up_query} (type: {type(follow_up_query)})"
+                        )
 
-                # Log parsed results
-                logger.info(f"Generated {len(follow_up_queries)} follow-up queries")
-                logger.debug(f"Follow-up queries result: {follow_up_queries}")
-
-                return follow_up_queries
+                # No valid query found
+                logger.warning("No valid follow-up query found in AI response")
+                return None
             except (json.JSONDecodeError, AttributeError):
                 # Fallback
                 logger.warning(
                     "Failed to parse follow-up queries response, using fallback"
                 )
                 if language == Language.ZH_CN:
-                    return [
-                        f"What additional information is needed about {gap}?"
-                        for gap in knowledge_gaps[:3]
-                    ]
+                    return f"关于{primary_knowledge_gap}的更多信息需要什么？"
                 else:
-                    return [
-                        f"What additional information is needed about {gap}?"
-                        for gap in knowledge_gaps[:3]
-                    ]
+                    return f"What additional information is needed about {primary_knowledge_gap}?"
 
         except Exception as e:
             logger.error(f"Error generating follow-up queries: {e}")
             if language == Language.ZH_CN:
-                return [
-                    f"What additional information is needed about {gap}?"
-                    for gap in knowledge_gaps[:3]
-                ]
+                return f"关于{primary_knowledge_gap}的更多信息需要什么？"
             else:
-                return [
-                    f"What additional information is needed about {gap}?"
-                    for gap in knowledge_gaps[:3]
-                ]
+                return f"What additional information is needed about {primary_knowledge_gap}?"
 
     def assess_sufficiency(
         self, context: ReflectionContext, reflection_result: ReflectionResult
@@ -632,24 +478,12 @@ class EnhancedReflectionAgent:
                 f"Enhanced reflection confirms sufficiency (confidence: {reflection_result.confidence_score:.2f})"
             )
         if not is_sufficient:
-            # Ensure knowledge_gaps are all strings before joining
-            safe_gaps = []
-            for gap in reflection_result.knowledge_gaps or []:
-                if isinstance(gap, str):
-                    safe_gaps.append(gap)
-                elif isinstance(gap, dict):
-                    # Extract meaningful string from dict
-                    if "description" in gap:
-                        safe_gaps.append(str(gap["description"]))
-                    elif "gap_type" in gap:
-                        safe_gaps.append(str(gap["gap_type"]))
-                    else:
-                        safe_gaps.append(str(gap))
-                else:
-                    safe_gaps.append(str(gap))
-
-            gaps_text = ", ".join(safe_gaps) if safe_gaps else "general research gaps"
-            reasoning_parts.append(f"Knowledge gaps identified: {gaps_text}")
+            # Handle primary knowledge gap
+            if reflection_result.primary_knowledge_gap:
+                gaps_text = reflection_result.primary_knowledge_gap
+            else:
+                gaps_text = "general research gaps"
+            reasoning_parts.append(f"Knowledge gap identified: {gaps_text}")
 
         reasoning = "; ".join(reasoning_parts)
 
@@ -658,7 +492,7 @@ class EnhancedReflectionAgent:
             "basic_sufficient": basic_sufficient,
             "enhanced_sufficient": enhanced_sufficient,
             "confidence_score": reflection_result.confidence_score,
-            "knowledge_gaps_count": len(reflection_result.knowledge_gaps),
+            "knowledge_gaps_count": 1 if reflection_result.primary_knowledge_gap else 0,
             "reflection_loop": context.current_reflection_loop,
             "max_loops": getattr(self.config, "max_loops", 1),
         }
@@ -845,7 +679,7 @@ class EnhancedReflectionAgent:
             "is_sufficient": False,
             "comprehensive_report": "",
             "knowledge_gaps": [],
-            "follow_up_queries": [],
+            "primary_follow_up_query": None,
             "confidence_score": 0.5,
             "quality_assessment": {},
             "recommendations": [],
@@ -898,10 +732,9 @@ class EnhancedReflectionAgent:
             if confidence_match:
                 extracted_data["confidence_score"] = float(confidence_match.group(1))
 
-            # Extract arrays (knowledge_gaps, follow_up_queries, etc.)
+            # Extract arrays (knowledge_gaps, recommendations, etc.)
             for field in [
                 "knowledge_gaps",
-                "follow_up_queries",
                 "recommendations",
                 "priority_areas",
             ]:
@@ -1096,7 +929,7 @@ class EnhancedReflectionAgent:
                 def __init__(self, content):
                     self.content = content
 
-            return MockResponse('{"follow_up_queries": []}')
+            return MockResponse('{"primary_follow_up_query": null}')
 
     def _enhance_query_with_context(
         self, query: str, context: ReflectionContext
@@ -1124,22 +957,18 @@ class EnhancedReflectionAgent:
         is_sufficient = has_results and is_near_completion
         confidence = 0.6 if is_sufficient else 0.4
 
-        knowledge_gaps = []
-        follow_up_queries = []
+        primary_knowledge_gap = None
+        primary_follow_up_query = None
 
         if not is_sufficient:
             if not has_results:
-                knowledge_gaps = [
-                    "No execution results available yet, need to complete current research steps"
-                ]
+                primary_knowledge_gap = "No execution results available yet, need to complete current research steps"
             else:
-                knowledge_gaps = [
-                    "Research in progress, may need additional information to ensure completeness"
-                ]
-                follow_up_queries = [
+                primary_knowledge_gap = "Research in progress, may need additional information to ensure completeness"
+                primary_follow_up_query = (
                     f"Additional details about {context.research_topic}"
-                ]
-        # When is_sufficient is True, follow_up_queries remains empty []
+                )
+        # When is_sufficient is True, both fields remain None
 
         recommendations = (
             ["Continue with planned research steps"]
@@ -1151,8 +980,8 @@ class EnhancedReflectionAgent:
 
         return ReflectionResult(
             is_sufficient=is_sufficient,
-            knowledge_gaps=knowledge_gaps,
-            follow_up_queries=follow_up_queries,
+            primary_knowledge_gap=primary_knowledge_gap,
+            primary_follow_up_query=primary_follow_up_query,
             confidence_score=confidence,
             recommendations=recommendations,
         )
@@ -1176,8 +1005,8 @@ class EnhancedReflectionAgent:
             if confidence_scores
             else 0.0
         )
-        avg_follow_ups = (
-            sum(len(result.follow_up_queries) for _, result in self.reflection_history)
+        query_generation_rate = (
+            sum(1 for _, result in self.reflection_history if result.primary_follow_up_query)
             / total_reflections
         )
 
@@ -1185,7 +1014,7 @@ class EnhancedReflectionAgent:
             "total_reflections": total_reflections,
             "sufficient_rate": sufficient_count / total_reflections,
             "average_confidence": avg_confidence,
-            "average_follow_up_queries": avg_follow_ups,
+            "query_generation_rate": query_generation_rate,
             "reflection_enabled": getattr(self.config, "enabled", True),
         }
 

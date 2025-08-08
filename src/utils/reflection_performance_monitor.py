@@ -56,7 +56,7 @@ class ReflectionEvent:
     confidence: float = 0.0
     sufficiency_score: float = 0.0
     gaps_identified: int = 0
-    follow_up_queries_generated: int = 0
+    primary_follow_up_query_generated: bool = False
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 

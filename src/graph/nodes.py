@@ -437,9 +437,9 @@ def planner_node(
         reflection_context = f"""
         
 REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
-        - Knowledge Gaps Identified: {len(getattr(reflection_insights, 'knowledge_gaps', []))}
+        - Knowledge Gaps Identified: {1 if getattr(reflection_insights, 'primary_knowledge_gap', None) else 0}
         - Research Sufficiency: {'Sufficient' if getattr(reflection_insights, 'is_sufficient', False) else 'Insufficient'}
-        - Suggested Follow-up Queries: {getattr(reflection_insights, 'follow_up_queries', [])}
+        - Suggested Follow-up Query: {getattr(reflection_insights, 'primary_follow_up_query', 'None')}
         - Confidence Score: {getattr(reflection_insights, 'confidence_score', 'N/A')}
         
         Please adjust the research plan to address these knowledge gaps and incorporate the suggested follow-up queries.
@@ -468,7 +468,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 planner_reflection = None
 
                 # Add planner reflection to insights
-                if planner_reflection and planner_reflection.knowledge_gaps:
+                if planner_reflection and planner_reflection.primary_knowledge_gap:
                     reflection_context += f"""
 
 ## Planner Reflection Analysis
@@ -478,15 +478,12 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
 **Planning Gaps Identified**:
 {
-                        chr(10).join([
-                            f"- {gap if isinstance(gap, str) else str(gap.get('query', gap.get('question', gap.get('description', str(gap)))) if isinstance(gap, dict) else str(gap))}"
-                            for gap in planner_reflection.follow_up_queries
-                        ]) if planner_reflection.follow_up_queries else "- No planning gaps identified"
+                        f"- {planner_reflection.primary_follow_up_query}" if planner_reflection.primary_follow_up_query else "- No planning gaps identified"
                     }
                     """.strip()
 
                     logger.info(
-                        f"Planner reflection completed - Sufficient: {planner_reflection.is_sufficient}, Gaps: {len(planner_reflection.knowledge_gaps)}"
+                        f"Planner reflection completed - Sufficient: {planner_reflection.is_sufficient}, Gaps: {1 if planner_reflection.primary_knowledge_gap else 0}"
                     )
                 elif planner_reflection is None:
                     logger.info(
@@ -739,8 +736,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         if reflection_insights:
             reflection_metadata.update(
                 {
-                    "knowledge_gaps_count": len(
-                        getattr(reflection_insights, "knowledge_gaps", [])
+                    "knowledge_gaps_count": (
+                        1
+                        if getattr(reflection_insights, "primary_knowledge_gap", None)
+                        else 0
                     ),
                     "confidence": getattr(reflection_insights, "confidence_score", 0.0),
                     "is_sufficient": getattr(
@@ -775,8 +774,10 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
     if reflection_insights:
         reflection_metadata.update(
             {
-                "knowledge_gaps_count": len(
-                    getattr(reflection_insights, "knowledge_gaps", [])
+                "knowledge_gaps_count": (
+                    1
+                    if getattr(reflection_insights, "primary_knowledge_gap", None)
+                    else 0
                 ),
                 "confidence": getattr(reflection_insights, "confidence_score", 0.0),
                 "is_sufficient": getattr(reflection_insights, "is_sufficient", False),
@@ -2194,7 +2195,7 @@ async def reflection_node(state: State, config: RunnableConfig) -> dict:
             "reflection_insights": {
                 "is_sufficient": True,
                 "reason": reason,
-                "follow_up_queries": [],
+                "primary_follow_up_query": None,
             }
         }
 
@@ -2269,28 +2270,25 @@ async def update_plan_node(state: State, config: RunnableConfig) -> dict:
 
     if (
         reflection_insights
-        and hasattr(reflection_insights, "follow_up_queries")
-        and reflection_insights.follow_up_queries
+        and hasattr(reflection_insights, "primary_follow_up_query")
+        and reflection_insights.primary_follow_up_query
     ):
         logger.info(
-            f"Found {len(reflection_insights.follow_up_queries)} follow-up queries to add to the plan."
+            f"Found follow-up query to add to the plan: {reflection_insights.primary_follow_up_query}"
         )
 
-        new_steps = []
-        for query in reflection_insights.follow_up_queries:
-            new_step = Step(
-                need_search=True,
-                step_type=StepType.RESEARCH,
-                title=f"Follow-up Research: {query[:100]}",
-                description=f"Investigate the following query based on reflection analysis: {query}",
-                execution_res=None,
+        new_step = Step(
+            need_search=True,
+            step_type=StepType.RESEARCH,
+            title=f"Follow-up Research: {reflection_insights.primary_follow_up_query[:100]}",
+            description=f"Investigate the following query based on reflection analysis: {reflection_insights.primary_follow_up_query}",
+            execution_res=None,
             )
-            new_steps.append(new_step)
 
         if current_plan and hasattr(current_plan, "steps"):
-            updated_steps = current_plan.steps + new_steps
+            updated_steps = current_plan.steps + [new_step]
             updated_plan = current_plan.copy(update={"steps": updated_steps})
-            logger.info(f"Added {len(new_steps)} new steps to the plan.")
+            logger.info(f"Added 1 new step to the plan.")
         else:
             updated_plan = Plan(
                 title=state.get("research_topic", "Follow-up Research Plan"),

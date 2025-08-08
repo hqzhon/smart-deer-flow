@@ -73,7 +73,7 @@ class ReflectionPromptManager:
     def get_follow_up_queries_prompt(
         self,
         research_topic: str,
-        knowledge_gaps: list,
+        primary_knowledge_gap: Optional[str],
         priority_areas: list,
         language: Language = Language.EN_US,
     ) -> str:
@@ -81,7 +81,7 @@ class ReflectionPromptManager:
 
         Args:
             research_topic: Research topic
-            knowledge_gaps: List of knowledge gaps
+            primary_knowledge_gap: Primary knowledge gap to address
             priority_areas: Priority focus areas
             language: Target language
 
@@ -97,7 +97,7 @@ class ReflectionPromptManager:
             "locale": locale,
             "research_topic": research_topic,
             "current_date": datetime.now().strftime("%Y-%m-%d"),
-            "knowledge_gaps": knowledge_gaps,
+            "primary_knowledge_gap": primary_knowledge_gap,
             "priority_areas": priority_areas,
         }
 

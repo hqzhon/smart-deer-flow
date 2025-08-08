@@ -386,22 +386,19 @@ class ResearcherContextExtension:
 
                 if (
                     not reflection_result.is_sufficient
-                    and reflection_result.follow_up_queries
+                    and reflection_result.primary_follow_up_query
                 ):
                     guidance_content = "**Research Enhancement Suggestions:**\n\n"
                     guidance_content += (
-                        "Based on analysis, consider exploring these areas:\n\n"
+                        "Based on analysis, consider exploring this area:\n\n"
                     )
+                    guidance_content += f"1. {reflection_result.primary_follow_up_query}\n"
 
-                    for i, query in enumerate(
-                        reflection_result.follow_up_queries[:3], 1
-                    ):
-                        guidance_content += f"{i}. {query}\n"
-
-                    if reflection_result.knowledge_gaps:
-                        guidance_content += "\n**Identified Knowledge Gaps:**\n\n"
-                        for gap in reflection_result.knowledge_gaps[:3]:
-                            guidance_content += f"- {gap}\n"
+                    if reflection_result.primary_knowledge_gap:
+                        guidance_content += "\n**Identified Knowledge Gap:**\n\n"
+                        guidance_content += (
+                            f"- {reflection_result.primary_knowledge_gap}\n"
+                        )
 
                     # Add reflection guidance to agent state
                     agent_state["reflection_guidance"] = guidance_content

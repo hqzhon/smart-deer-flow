@@ -301,8 +301,10 @@ class ResearcherProgressiveEnabler:
                 )
                 decision_factors["reflection_insights"] = {
                     "is_sufficient": reflection_result.is_sufficient,
-                    "knowledge_gaps_count": len(reflection_result.knowledge_gaps),
-                    "follow_up_queries_count": len(reflection_result.follow_up_queries),
+                    "knowledge_gaps_count": (
+                        1 if reflection_result.primary_knowledge_gap else 0
+                    ),
+                    "follow_up_queries_count": 1 if reflection_result.primary_follow_up_query else 0,
                     "confidence_score": reflection_result.confidence_score or 0.0,
                 }
 
@@ -310,8 +312,8 @@ class ResearcherProgressiveEnabler:
                 if not reflection_result.is_sufficient:
                     decision_factors["trigger"] = "reflection_insufficient_knowledge"
                     decision_factors["suggested_queries"] = (
-                        reflection_result.follow_up_queries[:3]
-                    )  # Limit to top 3
+                        [reflection_result.primary_follow_up_query] if reflection_result.primary_follow_up_query else []
+                    )
                     return (
                         True,
                         "Reflection analysis indicates knowledge gaps requiring deep research",
