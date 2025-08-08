@@ -28,7 +28,7 @@ class TestPydanticSettingsConfig:
         assert settings.llm.temperature == 0.7
         assert settings.agents.max_plan_iterations == 1
         assert settings.research.enable_researcher_isolation is True
-        assert settings.reflection.reflection_enabled is True
+        assert settings.reflection.enabled is True
 
     def test_environment_variable_loading(self):
         """Test that environment variables are automatically loaded."""
@@ -70,7 +70,7 @@ class TestPydanticSettingsConfig:
             assert settings.research.researcher_isolation_level == "aggressive"
 
             # Test reflection settings
-            assert settings.reflection.reflection_max_loops == 5
+            assert settings.reflection.max_loops == 5
 
             # Test MCP settings
             assert settings.mcp.enabled is True

@@ -21,7 +21,7 @@ from src.utils.decorators import safe_background_task
 
 from src.models.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
-from src.graph.builder import build_graph_with_memory
+from src.graph.builder import build_graph
 from src.utils.performance.performance_optimizer import (
     AdvancedParallelExecutor,
     AdaptiveRateLimiter,
@@ -266,7 +266,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-graph = build_graph_with_memory()
+graph = build_graph(True)
 
 
 async def _enhanced_batch_processor():
@@ -879,6 +879,20 @@ async def _astream_workflow_generator(
                     # Other types of errors, log with proper error classification
                     logger.error(
                         f"Non-retryable error in workflow (type: {error_type}): {error_message}"
+                    )
+
+                    # Add detailed logging for graph routing errors
+                    if "prepare_research_step" in str(error_message):
+                        logger.error(
+                            "Graph routing error detected: Node 'prepare_research_step' not found. "
+                            "This indicates a mismatch between routing logic and graph configuration. "
+                            "Check ENHANCED_FEATURES_AVAILABLE flag and graph builder selection."
+                        )
+
+                    # Log additional context for debugging
+                    logger.debug(f"Full error context: {repr(e)}")
+                    logger.debug(
+                        f"Error occurred during workflow execution for thread: {thread_id}"
                     )
                     # Send appropriate error message based on error type
                     if error_type in ["AUTHENTICATION_ERROR", "PERMISSION_ERROR"]:

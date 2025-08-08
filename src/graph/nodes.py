@@ -18,11 +18,9 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from src.agents import create_agent, create_agent_with_managed_prompt
 from src.tools.search import LoggedTavilySearch
 from src.tools import (
-    crawl_tool,
     python_repl_tool,
 )
 from src.tools.search import get_web_search_tool
-from src.tools.retriever import get_retriever_tool
 
 from src.config.config_loader import get_settings
 from src.config.models import SearchEngine
@@ -634,7 +632,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 "research_topic": state.get("research_topic", ""),
                 "resources": state.get("resources", []),
             },
-            goto="reporter",
+            goto="context_optimizer",
         )
 
     # Context evaluation will be handled automatically by safe_llm_call
@@ -689,7 +687,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                     "resources": state.get("resources", []),
                     "locale": state.get("locale", "en-US"),
                 },
-                goto="reporter",
+                goto="context_optimizer",
             )
         else:
             return Command(
@@ -716,7 +714,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                         "resources": state.get("resources", []),
                         "locale": state.get("locale", "en-US"),
                     },
-                    goto="reporter",
+                    goto="context_optimizer",
                 )
             else:
                 return Command(
@@ -761,7 +759,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 "resources": state.get("resources", []),
                 "locale": state.get("locale", "en-US"),
             },
-            goto="reporter",
+            goto="context_optimizer",
         )
 
     # Phase 5: Add reflection metadata for human feedback path as well
@@ -836,7 +834,7 @@ def human_feedback_node(
         # parse the plan
         new_plan = json.loads(current_plan)
         if new_plan["has_enough_context"]:
-            goto = "reporter"
+            goto = "context_optimizer"
     except json.JSONDecodeError as e:
         logger.warning(f"Planner response is not a valid JSON: {e}")
         logger.warning(f"Full traceback: {traceback.format_exc()}")
@@ -847,7 +845,7 @@ def human_feedback_node(
                     "resources": state.get("resources", []),
                     "locale": state.get("locale", "en-US"),
                 },
-                goto="reporter",
+                goto="context_optimizer",
             )
         else:
             return Command(
@@ -873,7 +871,7 @@ def human_feedback_node(
                     "resources": state.get("resources", []),
                     "locale": state.get("locale", "en-US"),
                 },
-                goto="reporter",
+                goto="context_optimizer",
             )
         else:
             return Command(
@@ -1020,8 +1018,8 @@ async def research_team_node(state: State, config: RunnableConfig):
 
     # Check if all steps are completed
     if all(step.execution_res for step in current_plan.steps):
-        logger.info("All steps completed, moving to planner")
-        return Command(goto="planner")
+        logger.info("All steps completed, moving to context_optimizer")
+        return Command(goto="context_optimizer")
 
     # Phase 1 Simplification: Use unified config for parallel execution
     configurable = get_configuration_from_config(config)
@@ -1124,9 +1122,12 @@ def _get_executable_steps(
 async def _execute_steps_parallel(
     state: State, config: RunnableConfig, max_parallel_tasks: int
 ) -> Command:
-    """Execute steps in parallel using the ParallelExecutor with rate limiting."""
+    """
+    Executes research steps in parallel, correctly handling and merging state updates from each step,
+    especially dynamically added steps from the reflection process.
+    """
     logger.info(
-        f"Starting parallel execution with max {max_parallel_tasks} concurrent tasks"
+        f"Starting parallel execution with max {max_parallel_tasks} concurrent tasks."
     )
 
     from src.utils.performance.parallel_executor import (
@@ -1136,253 +1137,185 @@ async def _execute_steps_parallel(
     )
 
     current_plan = state.get("current_plan")
-    steps = current_plan.steps
+    executable_steps = [step for step in current_plan.steps if not step.execution_res]
 
-    # Analyze dependencies
-    dependencies = _analyze_step_dependencies(steps)
-    logger.info(f"Step dependencies: {dependencies}")
+    if not executable_steps:
+        logger.info("No executable steps found, proceeding to planner.")
+        return Command(goto="planner")
 
-    observations = list(state.get("observations", []))
-    all_messages = []
-
-    # Create parallel executor with rate limiting and shared context
-    from src.utils.performance.parallel_executor import SharedTaskContext
-
-    shared_context = SharedTaskContext()
-    executor = create_parallel_executor(
-        max_concurrent_tasks=max_parallel_tasks,
-        enable_rate_limiting=True,
-        enable_adaptive_scheduling=True,
-        shared_context=shared_context,
-    )
-
-    # Convert steps to parallel tasks
+    # Prepare tasks for parallel execution
     parallel_tasks = []
-    for step in steps:
-        if step.execution_res:  # Skip already completed steps
-            continue
-
-        # Determine agent type and priority
-        if step.step_type == StepType.RESEARCH:
-            agent_type = "researcher"
-            priority = TaskPriority.NORMAL
-        elif step.step_type == StepType.PROCESSING:
-            agent_type = "coder"
-            priority = TaskPriority.HIGH  # Processing steps often depend on research
-        else:
-            agent_type = "researcher"
-            priority = TaskPriority.NORMAL
-
-        # Map dependencies to task IDs
-        task_dependencies = []
-        for dep_title in dependencies.get(step.title, set()):
-            task_dependencies.append(dep_title)
-
+    for step in executable_steps:
+        agent_type = "coder" if step.step_type == StepType.PROCESSING else "researcher"
         task = ParallelTask(
             task_id=step.title,
             func=_execute_single_step_parallel,
             args=(state, config, step, agent_type),
-            priority=priority,
-            max_retries=2,  # Allow retries for failed steps
-            timeout=500.0,  # 5 minutes timeout per step
-            dependencies=task_dependencies,
+            priority=TaskPriority.NORMAL,
         )
         parallel_tasks.append(task)
 
-    if not parallel_tasks:
-        logger.info("No tasks to execute, all steps completed")
-        return Command(goto="planner")
-
-    # Add tasks to executor
+    # Execute tasks and process results
+    executor = create_parallel_executor(max_concurrent_tasks=max_parallel_tasks)
     executor.add_tasks(parallel_tasks)
+    results = await executor.execute_all()
 
-    # Execute all tasks
-    try:
-        results = await executor.execute_all()
+    # --- State Synchronization Logic ---
+    # Start with the original plan and observations
+    final_plan = current_plan.copy()
+    final_observations = list(state.get("observations", []))
+    all_messages = list(state.get("messages", []))
+    newly_added_steps = []
 
-        # Process results and create updated steps list
-        updated_steps = list(steps)  # Create a copy of the steps list
-        for task_id, task_result in results.items():
-            step_index = next(
-                (i for i, s in enumerate(steps) if s.title == task_id), None
+    for task_id, task_result in results.items():
+        if task_result.status.value == "completed":
+            result_data = task_result.result
+            original_step_title = result_data.get("original_step_title")
+
+            # Find the step in our final_plan to update its execution result
+            step_to_update = next(
+                (s for s in final_plan.steps if s.title == original_step_title), None
             )
-            if step_index is None:
+            if not step_to_update:
                 continue
 
-            step = steps[step_index]
-            if task_result.status.value == "completed":
-                logger.info(f"Step '{task_id}' completed successfully")
-                if task_result.result and hasattr(task_result.result, "content"):
-                    observations.append(task_result.result.content)
-                    # Get the agent type from the step
-                    agent_type = (
-                        "researcher" if step.step_type == StepType.RESEARCH else "coder"
-                    )
+            # Update the execution result of the original step
+            if result_data.get("status") != "failed":
+                updated_plan = result_data.get("updated_plan")
+                if updated_plan and updated_plan.steps:
+                    updated_step_in_plan = updated_plan.steps[0]
+                    step_to_update.execution_res = updated_step_in_plan.execution_res
                     all_messages.append(
-                        AIMessage(content=task_result.result.content, name=agent_type)
+                        AIMessage(
+                            content=step_to_update.execution_res, name="researcher"
+                        )
                     )
-
-                    # Update the step with the new one containing execution result
-                    if hasattr(task_result.result, "updated_step"):
-                        updated_steps[step_index] = task_result.result.updated_step
+                else:
+                    step_to_update.execution_res = (
+                        "Execution completed but no result available"
+                    )
             else:
-                logger.error(
-                    f"Step '{task_id}' failed with status: {task_result.status.value}"
-                )
-                if task_result.error:
-                    logger.error(f"Error details: {task_result.error}")
-                # Ensure step has some result to prevent infinite loop
-                if not step.execution_res:
-                    error_msg = (
-                        str(task_result.error)
-                        if task_result.error
-                        else "Execution failed"
-                    )
-                    # Create updated step with error message (immutable pattern)
-                    updated_steps[step_index] = step.copy(
-                        update={"execution_res": f"Execution failed: {error_msg}"}
-                    )
-
-        # Log execution statistics
-        stats = executor.get_stats()
-        logger.info(f"Parallel execution stats: {stats}")
-
-    except Exception as e:
-        logger.error(f"Parallel executor failed: {e}")
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        # Mark all unexecuted steps as failed (immutable pattern)
-        if "updated_steps" not in locals():
-            updated_steps = list(steps)  # Create copy if not already created
-        for i, step in enumerate(steps):
-            if not step.execution_res:
-                updated_steps[i] = step.copy(
-                    update={"execution_res": f"Parallel Executor failed: {str(e)}"}
+                step_to_update.execution_res = (
+                    f"Execution failed: {result_data.get('error')}"
                 )
 
-    # Create updated plan with new steps
-    updated_plan = current_plan.copy(update={"steps": updated_steps})
+            # Add any new observations
+            final_observations.extend(result_data.get("new_observations", []))
 
-    # Check if all steps are completed
-    if all(step.execution_res for step in updated_steps):
-        logger.info("All steps completed via parallel execution")
-        return Command(
-            update={
-                "messages": all_messages,
-                "observations": observations,
-                "current_plan": updated_plan,
-                # Preserve research_topic and resources from coordinator_node
-                "research_topic": state.get("research_topic", ""),
-                "resources": state.get("resources", []),
-            },
-            goto="planner",
+            # If the step generated a new plan, collect the *new* steps
+            if result_data.get("status") == "completed_with_update":
+                extended_plan = result_data.get("updated_plan")
+                if extended_plan and extended_plan.steps:
+                    # Identify only the steps that are genuinely new
+                    original_titles = {s.title for s in current_plan.steps}
+                    for step in extended_plan.steps:
+                        if step.title not in original_titles:
+                            newly_added_steps.append(step)
+                            logger.info(
+                                f"Collected new step '{step.title}' from reflection."
+                            )
+                else:
+                    logger.warning(
+                        "Step marked as 'completed_with_update' but no valid updated_plan found"
+                    )
+
+    # Merge newly added steps into the final plan
+    if newly_added_steps:
+        final_plan.steps.extend(newly_added_steps)
+        logger.info(f"Added {len(newly_added_steps)} new steps to the plan.")
+
+    # --- Final Decision Logic ---
+    # Decide the next action based on the fully synchronized and updated plan
+    if all(step.execution_res for step in final_plan.steps):
+        logger.info(
+            "All steps in the synchronized plan are completed. Moving to planner."
         )
+        next_node = "planner"
     else:
-        # Some steps still pending, continue
-        return Command(
-            update={
-                "messages": all_messages,
-                "observations": observations,
-                "current_plan": updated_plan,
-                # Preserve research_topic and resources from coordinator_node
-                "research_topic": state.get("research_topic", ""),
-                "resources": state.get("resources", []),
-            },
-            goto="research_team",
+        remaining_steps = [s.title for s in final_plan.steps if not s.execution_res]
+        logger.info(
+            f"There are still {len(remaining_steps)} uncompleted steps: {remaining_steps}. Continuing research."
         )
+        next_node = "research_team"
+
+    return Command(
+        goto=next_node,
+        update={
+            "current_plan": final_plan,
+            "observations": final_observations,
+            "messages": all_messages,
+        },
+    )
 
 
 async def _execute_single_step_parallel(
     state: State, config: RunnableConfig, step: Step, agent_type: str
-) -> Any:
-    """Execute a single step in parallel context through researcher_node or coder_node.
-
-    This function now routes through the appropriate node functions to ensure
-    consistent behavior between parallel and serial execution, including
-    context isolation, reflection integration, and other advanced features.
+) -> Dict[str, Any]:
+    """
+    Executes a single step in a parallel context, ensuring that any state updates
+    (like plan modifications from reflection) are properly captured and returned in a structured format.
     """
     logger.info(f"Executing step in parallel: {step.title} with {agent_type}")
 
-    # Create a temporary state that contains only the current step to execute
+    # Create a temporary, isolated state for this specific step execution.
+    # This prevents concurrent steps from interfering with each other.
     current_plan = state.get("current_plan")
-
-    # Create a new plan with only the current step as the first unexecuted step
-    temp_steps = []
-    for s in current_plan.steps:
-        if s.title == step.title:
-            # This is the step we want to execute - make sure it's not marked as executed
-            temp_steps.append(s.copy(update={"execution_res": None}))
-        elif s.execution_res:
-            # Keep completed steps as they are for context
-            temp_steps.append(s)
-        else:
-            # Mark other unexecuted steps as completed to avoid execution
-            temp_steps.append(
-                s.copy(update={"execution_res": "Pending parallel execution"})
-            )
-
-    temp_plan = current_plan.copy(update={"steps": temp_steps})
     temp_state = state.copy()
-    temp_state["current_plan"] = temp_plan
+    # The plan for the sub-task only contains the single step to be executed.
+    temp_state["current_plan"] = current_plan.copy(update={"steps": [step]})
 
-    # Route to appropriate node based on agent type
     try:
+        # Route to the appropriate node based on the agent type.
         if agent_type == "researcher":
-            result = await researcher_node(temp_state, config)
+            result_command = await researcher_node(temp_state, config)
         elif agent_type == "coder":
-            result = await coder_node(temp_state, config)
+            result_command = await coder_node(temp_state, config)
         else:
-            # Default to researcher for unknown types
-            result = await researcher_node(temp_state, config)
+            result_command = await researcher_node(temp_state, config)
 
-        # Extract the execution result from the node's response
-        if hasattr(result, "update") and result.update:
-            updated_plan = result.update.get("current_plan")
+        # Process the result, which is expected to be a Command object.
+        if isinstance(result_command, Command) and result_command.update:
+            updated_plan = result_command.update.get("current_plan")
+            new_observations = result_command.update.get("observations", [])
+
             if updated_plan:
-                # Find the executed step in the updated plan
-                for updated_step in updated_plan.steps:
-                    if updated_step.title == step.title and updated_step.execution_res:
-                        # Create the result object expected by parallel executor
-                        response_content = updated_step.execution_res
-                        final_step = step.copy(
-                            update={"execution_res": response_content}
-                        )
+                # Find the result of the specific step that was executed.
+                executed_step = next(
+                    (s for s in updated_plan.steps if s.title == step.title), None
+                )
+                if executed_step and executed_step.execution_res:
+                    plan_was_extended = len(updated_plan.steps) > 1
+                    logger.info(f"Step '{step.title}' completed successfully.")
+                    return {
+                        "status": (
+                            "completed_with_update"
+                            if plan_was_extended
+                            else "completed"
+                        ),
+                        "original_step_title": step.title,
+                        "updated_plan": updated_plan,
+                        "new_observations": new_observations,
+                    }
 
-                        logger.info(
-                            f"Parallel step '{step.title}' completed by {agent_type} through node"
-                        )
-
-                        return type(
-                            "StepResult",
-                            (),
-                            {"content": response_content, "updated_step": final_step},
-                        )()
-
-        # Fallback: if we can't extract the result properly, mark as completed with basic info
+        # This block is reached if the result was not a valid Command or the step result was missing.
         logger.warning(
-            f"Could not extract proper result for step '{step.title}', using fallback"
+            f"Could not extract proper result for step '{step.title}', using fallback."
         )
-        fallback_content = f"Step completed by {agent_type} (result extraction failed)"
-        fallback_step = step.copy(update={"execution_res": fallback_content})
-
-        return type(
-            "StepResult",
-            (),
-            {"content": fallback_content, "updated_step": fallback_step},
-        )()
+        return {
+            "status": "failed",
+            "original_step_title": step.title,
+            "error": "Result extraction failed.",
+        }
 
     except Exception as e:
         logger.error(
-            f"Error executing step '{step.title}' through {agent_type} node: {e}"
+            f"Error executing step '{step.title}' in parallel: {e}", exc_info=True
         )
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-
-        # Create error result
-        error_content = f"Execution failed: {str(e)}"
-        error_step = step.copy(update={"execution_res": error_content})
-
-        return type(
-            "StepResult", (), {"content": error_content, "updated_step": error_step}
-        )()
+        return {
+            "status": "failed",
+            "original_step_title": step.title,
+            "error": str(e),
+        }
 
 
 async def _execute_steps_serial(state: State, config: RunnableConfig) -> Command:
@@ -1669,107 +1602,80 @@ async def _setup_and_execute_agent_step(
         return await _execute_agent_step(state, config, agent, agent_type)
 
 
-async def _fallback_research_logic(
-    state: State, config: RunnableConfig
-) -> Command[Literal["research_team"]]:
-    """Fallback research logic to avoid recursion in error handling.
-
-    This implements the standard researcher node logic directly without
-    calling researcher_node to prevent infinite recursion.
-    """
-    logger.info("Executing fallback research logic")
-
-    try:
-        configurable = get_configuration_from_config(config)
-
-        # Set up standard research tools
-        tools = [
-            get_web_search_tool(
-                configurable.agents.max_search_results,
-                configurable.content.enable_smart_filtering,
-            ),
-            crawl_tool,
-        ]
-
-        # Add retriever tool if resources are available
-        retriever_tool = get_retriever_tool(state.get("resources", []))
-        if retriever_tool:
-            tools.insert(0, retriever_tool)
-
-        logger.info(f"Fallback researcher tools: {tools}")
-
-        # Execute standard agent step
-        return await _setup_and_execute_agent_step(
-            state,
-            config,
-            "researcher",
-            tools,
-        )
-
-    except Exception as fallback_error:
-        logger.error(f"Fallback research logic also failed: {fallback_error}")
-        # Return a minimal command to prevent complete failure
-        return Command(
-            update={
-                "observations": [
-                    {"error": "Research failed", "details": str(fallback_error)}
-                ],
-                # Preserve research_topic and resources from coordinator_node
-                "research_topic": state.get("research_topic", ""),
-                "resources": state.get("resources", []),
-            },
-            goto="research_team",
-        )
-
-
 async def researcher_node(
     state: State, config: RunnableConfig
-) -> Command[Literal["research_team"]]:
-    """Researcher node that do research with unified EnhancedResearcher.
-
-    Refactored Implementation: Uses EnhancedResearcher as the unified entry point
-    for all research execution, with observations count control.
+) -> Command[Literal["research_team", "planner"]]:
     """
-    logger.info("Researcher node is researching.")
-
+    Orchestrates the research workflow.
+    """
+    logger.info("Executing research workflow.")
     try:
-        # Use EnhancedResearcher as the unified entry point
-        from src.utils.researcher.enhanced_researcher import EnhancedResearcher
+        # Create a copy of the state to avoid side effects during the process
+        current_state = state.copy()
 
-        enhanced_researcher = EnhancedResearcher(state, config)
+        # Step 1: Prepare research step
+        prepare_result = await prepare_research_step_node(current_state, config)
+        current_state.update(prepare_result)
 
-        # Get the configurable settings to access max_total_observations
-        configurable = get_configuration_from_config(config)
-        max_total_obs = getattr(configurable.agents, "max_total_observations", 10)
+        # Step 2: Execute research agent
+        agent_result = await researcher_agent_node(current_state, config)
+        current_state.update(agent_result)
 
-        # Execute the research
-        result_command = await enhanced_researcher.execute()
+        # Step 3: Reflection
+        reflection_result = await reflection_node(current_state, config)
+        current_state.update(reflection_result)
 
-        # Apply observations count control if the command has observations
-        if result_command.update and "observations" in result_command.update:
-            observations = result_command.update["observations"]
+        # Step 4: Update plan based on research and reflection
+        plan_update_result = await update_plan_node(current_state, config)
+        current_state.update(plan_update_result)
 
-            # Apply max_total_observations limit
-            if max_total_obs > 0 and len(observations) > max_total_obs:
-                # Keep only the most recent observations
-                optimized_observations = observations[-max_total_obs:]
-                result_command.update["observations"] = optimized_observations
-                logger.info(
-                    f"Applied observations limit: {len(observations)} -> {len(optimized_observations)} observations"
-                )
-            elif max_total_obs == 0:
-                # If limit is 0, clear all observations
-                result_command.update["observations"] = []
-                logger.info("Cleared all observations due to max_total_observations=0")
+        # **CRITICAL FIX: Set execution_res for the current step**
+        # This ensures that _execute_single_step_parallel can find the executed step
+        current_plan = current_state.get("current_plan")
+        current_step = current_state.get("current_step")
+        research_result = current_state.get("research_result")
 
-        return result_command
+        if current_plan and current_step and research_result:
+            # Find and update the current step with execution result
+            updated_steps = []
+            for step in current_plan.steps:
+                if step.title == current_step.title:
+                    # Create updated step with execution result
+                    updated_step = step.model_copy(
+                        update={"execution_res": research_result, "completed": True}
+                    )
+                    updated_steps.append(updated_step)
+                    logger.info(f"Set execution_res for step '{step.title}'")
+                else:
+                    updated_steps.append(step)
+
+            # Update the plan with the modified steps
+            updated_plan = current_plan.model_copy(update={"steps": updated_steps})
+            current_state["current_plan"] = updated_plan
+
+        # Step 5: Check if the research is complete
+        completion_status = check_research_completion_node(current_state)
+
+        # **THE CRITICAL FIX IS HERE**
+        # Return a Command object that contains the *full*, potentially modified state.
+        # This ensures that any updates to the plan (e.g., new steps from reflection)
+        # are propagated back to the main graph state.
+        return Command(
+            goto=completion_status,
+            update={
+                "current_plan": current_state.get("current_plan"),
+                "observations": current_state.get("observations"),
+                "reflection": current_state.get("reflection"),
+                # Preserve other essential state keys from the original state
+                "research_topic": state.get("research_topic", ""),
+                "resources": state.get("resources", []),
+                "messages": state.get("messages", []),
+            },
+        )
 
     except Exception as e:
-        logger.error(f"Enhanced researcher execution failed: {e}")
-        logger.info("Falling back to standard research logic")
-
-        # Fallback to standard logic if enhanced researcher fails
-        return await _fallback_research_logic(state, config)
+        logger.error(f"Research workflow failed: {e}", exc_info=True)
+        raise
 
 
 async def coder_node(
@@ -2036,4 +1942,432 @@ __all__ = [
     "create_agent",
     "create_agent_with_managed_prompt",
     "handoff_to_planner",
+    # New refactored nodes for EnhancedResearcher decomposition
+    "prepare_research_step_node",
+    "researcher_agent_node",
+    "reflection_node",
+    "update_plan_node",
+    "check_research_completion_node",
 ]
+
+
+# ============================================================================
+# REFACTORED NODES: EnhancedResearcher Decomposition
+# ============================================================================
+# The following nodes replace the monolithic EnhancedResearcher.execute() method
+# with single-responsibility graph nodes for better testability and maintainability.
+
+
+async def prepare_research_step_node(state: State, config: RunnableConfig) -> State:
+    """Prepare context and tools for the next research step.
+
+    This node replaces the preparation logic from EnhancedResearcher.__init__
+    and the early parts of execute() method.
+
+    Args:
+        state: Current graph state
+        config: Runnable configuration
+
+    Returns:
+        Updated state with agent_input prepared for researcher_agent_node
+    """
+    logger.info("--- ENTERING PREPARE_RESEARCH_STEP_NODE ---")
+    logger.debug(f"Initial state keys: {state.keys()}")
+
+    try:
+        # 1. Find current step to execute
+        current_plan = state.get("current_plan")
+        if not current_plan or not hasattr(current_plan, "steps"):
+            logger.warning("No current plan found in state.")
+            return_value = {
+                "agent_input": None,
+                "preparation_error": "No current plan found",
+            }
+            logger.debug(f"Returning from prepare_research_step_node: {return_value}")
+            logger.info("--- EXITING PREPARE_RESEARCH_STEP_NODE ---")
+            return return_value
+
+        if not current_plan.steps:
+            logger.warning("No steps in current plan.")
+            return_value = {
+                "agent_input": None,
+                "preparation_error": "No steps in current plan",
+            }
+            logger.debug(f"Returning from prepare_research_step_node: {return_value}")
+            logger.info("--- EXITING PREPARE_RESEARCH_STEP_NODE ---")
+            return return_value
+
+        current_step = None
+        for step in current_plan.steps:
+            if not step.execution_res:
+                current_step = step
+                break
+
+        logger.debug(
+            f"Found current step to execute: {current_step.title if current_step else 'None'}"
+        )
+
+        if not current_step:
+            logger.info("All research steps are completed.")
+            return_value = {"agent_input": None, "all_steps_completed": True}
+            logger.debug(f"Returning from prepare_research_step_node: {return_value}")
+            logger.info("--- EXITING PREPARE_RESEARCH_STEP_NODE ---")
+            return return_value
+
+        # 2. Prepare research tools (migrated from EnhancedResearcher._prepare_research_tools)
+        from src.tools.search import get_web_search_tool
+        from src.tools.crawl import crawl_tool
+        from src.tools.retriever import get_retriever_tool
+
+        configurable = get_configuration_from_config(config)
+        tools = [
+            get_web_search_tool(
+                configurable.agents.max_search_results,
+                configurable.content.enable_smart_filtering,
+            ),
+            crawl_tool,
+        ]
+
+        # Add retriever tool if resources are available
+        resources = state.get("resources")
+        if resources:
+            tools.insert(0, get_retriever_tool(resources))
+
+        logger.debug(f"Prepared {len(tools)} tools for the agent.")
+
+        # 3. Build agent input (migrated from EnhancedResearcher._build_agent_state)
+        from langchain_core.messages import HumanMessage
+
+        agent_input = {
+            "messages": [HumanMessage(content=current_step.description)],
+            "tools": tools,
+            "current_step": current_step,
+            "current_plan": current_plan,
+        }
+
+        logger.debug(f"Constructed agent_input for step: '{current_step.title}'")
+
+        return_value = {
+            "agent_input": agent_input,
+            "tools": tools,
+            "current_step": current_step,
+        }
+        logger.debug(
+            f"Returning from prepare_research_step_node: {return_value.keys()}"
+        )
+        logger.info("--- EXITING PREPARE_RESEARCH_STEP_NODE ---")
+        return return_value
+
+    except Exception as e:
+        logger.error(f"Error in prepare_research_step_node: {e}", exc_info=True)
+        return_value = {
+            "agent_input": None,
+            "preparation_error": f"An unexpected error occurred: {e}",
+        }
+        logger.debug(
+            f"Returning from prepare_research_step_node on error: {return_value}"
+        )
+        logger.info("--- EXITING PREPARE_RESEARCH_STEP_NODE ---")
+        return return_value
+
+
+async def researcher_agent_node(state: State, config: RunnableConfig) -> State:
+    """Execute the researcher agent with prepared input.
+
+    This node replaces the agent execution logic from EnhancedResearcher.execute().
+
+    Args:
+        state: Current graph state with agent_input
+        config: Runnable configuration
+
+    Returns:
+        Updated state with research_result
+    """
+    logger.info("Invoking the researcher agent.")
+
+    try:
+        agent_input = state.get("agent_input")
+        if not agent_input:
+            error_msg = state.get("preparation_error", "Agent input not prepared")
+            logger.error(f"Cannot execute agent: {error_msg}")
+            return {"research_result": None, "agent_error": error_msg}
+
+        # Create and execute researcher agent
+        configurable = get_configuration_from_config(config)
+        agent = create_agent(
+            agent_name="researcher",
+            agent_type="researcher",
+            tools=agent_input["tools"],
+            prompt_template="researcher",
+            configurable=configurable,
+        )
+
+        # Execute with recursion limit
+        import os
+
+        default_recursion_limit = 10
+        try:
+            env_value_str = os.getenv(
+                "AGENT_RECURSION_LIMIT", str(default_recursion_limit)
+            )
+            recursion_limit = (
+                int(env_value_str)
+                if int(env_value_str) > 0
+                else default_recursion_limit
+            )
+        except (ValueError, TypeError):
+            recursion_limit = default_recursion_limit
+
+        logger.info(f"Executing agent with recursion limit: {recursion_limit}")
+
+        from src.llms.error_handler import safe_llm_call_async
+
+        # Create clean input without tools (tools are already bound to agent)
+        clean_input = {k: v for k, v in agent_input.items() if k != "tools"}
+
+        result = await safe_llm_call_async(
+            agent.ainvoke,
+            input=clean_input,
+            config={"recursion_limit": recursion_limit},
+            operation_name="researcher executor",
+            context=f"Execute step: {agent_input.get('current_step_title', 'Unknown')}",
+            enable_smart_processing=True,
+            max_retries=3,
+        )
+
+        # Extract response content
+        if hasattr(result, "get") and "messages" in result:
+            response_content = result["messages"][-1].content
+        else:
+            response_content = (
+                result.content if hasattr(result, "content") else str(result)
+            )
+
+        logger.info(
+            f"Agent execution completed for step: {agent_input.get('current_step_title')}"
+        )
+        return {"research_result": response_content}
+
+    except Exception as e:
+        logger.error(f"Error in researcher agent execution: {e}", exc_info=True)
+        return {"research_result": None, "agent_error": str(e)}
+
+
+async def reflection_node(state: State, config: RunnableConfig) -> dict:
+    """
+    Analyzes the research results for knowledge gaps and determines if the research is sufficient.
+    This node uses an EnhancedReflectionAgent to perform the analysis.
+    """
+    logger.info("--- ENTERING REFLECTION_NODE ---")
+
+    # 1. Get configuration and initialize reflection agent
+    configurable = get_configuration_from_config(config)
+    from src.utils.reflection.enhanced_reflection import EnhancedReflectionAgent
+    from src.utils.reflection.reflection_manager import get_reflection_manager
+
+    # Get session_id for session-specific reflection tracking
+    session_id = (
+        config.get("configurable", {}).get("thread_id")
+        if isinstance(config, dict) and "configurable" in config
+        else state.get("thread_id", "default")
+    )
+
+    # Get the reflection manager instance, configured with max_loops
+    max_reflection_loops = getattr(configurable.reflection, "max_loops", 2)
+    reflection_manager = get_reflection_manager(max_reflections=max_reflection_loops)
+
+    # Log the current reflection count check
+    logger.info(
+        f"Reflection check - Session: {session_id}, "
+        f"Current count: {reflection_manager.get_session_stats(session_id).total_reflections}, "
+        f"Max allowed: {max_reflection_loops}"
+    )
+
+    # Pre-execution check to see if reflection is allowed
+    can_execute, reason = reflection_manager.can_execute_reflection(
+        session_id=session_id, reflection_type="iteration"
+    )
+
+    if not can_execute:
+        logger.info(f"Reflection execution blocked: {reason}")
+        return {
+            "reflection_insights": {
+                "is_sufficient": True,
+                "reason": reason,
+                "follow_up_queries": [],
+            }
+        }
+
+    reflection_agent = EnhancedReflectionAgent(config=configurable)
+
+    # 2. Prepare context for reflection
+    from src.utils.reflection.enhanced_reflection import ReflectionContext
+
+    research_result = state.get("research_result", "")
+    research_topic = state.get("research_topic", "")
+    observations = state.get("observations", [])
+    current_step = state.get("current_step", None)
+    current_plan = state.get("current_plan")
+
+    context = ReflectionContext(
+        research_topic=research_topic,
+        completed_steps=[
+            step.model_dump()
+            for step in current_plan.steps
+            if step.execution_res is not None
+        ],
+        current_step=current_step.model_dump() if current_step else None,
+        execution_results=[research_result],
+        observations=observations,
+        locale=state.get("locale", "en-US"),
+        total_steps=len(current_plan.steps) if current_plan else 0,
+        current_step_index=(
+            current_plan.steps.index(current_step)
+            if current_step and current_plan
+            else 0
+        ),
+    )
+
+    # 3. Analyze for knowledge gaps
+    logger.info("Analyzing knowledge gaps with EnhancedReflectionAgent.")
+    reflection_insights = await reflection_agent.analyze_knowledge_gaps(context)
+
+    # 4. Record the reflection execution
+    reflection_manager.record_reflection(
+        session_id=session_id, reflection_type="iteration"
+    )
+    logger.info(
+        f"Reflection recorded. Session: {session_id}, "
+        f"Count: {reflection_manager.get_session_stats(session_id).total_reflections}"
+    )
+
+    # 5. Log the results
+    if reflection_insights:
+        logger.info(
+            f"Reflection complete. Sufficient: {reflection_insights.is_sufficient}"
+        )
+        logger.debug(
+            f"Reflection insights: {reflection_insights.model_dump_json(indent=2)}"
+        )
+    else:
+        logger.warning("Reflection analysis did not return any insights.")
+
+    logger.info("--- EXITING REFLECTION_NODE ---")
+    return {"reflection_insights": reflection_insights}
+
+
+async def update_plan_node(state: State, config: RunnableConfig) -> dict:
+    """
+    Updates the research plan based on the reflection insights.
+    If new queries are suggested, they are added as new steps to the plan.
+    The reflection count is now managed by ReflectionManager and is no longer handled here.
+    """
+    logger.info("--- ENTERING UPDATE_PLAN_NODE ---")
+
+    current_plan = state.get("current_plan")
+    reflection_insights = state.get("reflection_insights")
+
+    if (
+        reflection_insights
+        and hasattr(reflection_insights, "follow_up_queries")
+        and reflection_insights.follow_up_queries
+    ):
+        logger.info(
+            f"Found {len(reflection_insights.follow_up_queries)} follow-up queries to add to the plan."
+        )
+
+        new_steps = []
+        for query in reflection_insights.follow_up_queries:
+            new_step = Step(
+                need_search=True,
+                step_type=StepType.RESEARCH,
+                title=f"Follow-up Research: {query[:100]}",
+                description=f"Investigate the following query based on reflection analysis: {query}",
+                execution_res=None,
+            )
+            new_steps.append(new_step)
+
+        if current_plan and hasattr(current_plan, "steps"):
+            updated_steps = current_plan.steps + new_steps
+            updated_plan = current_plan.copy(update={"steps": updated_steps})
+            logger.info(f"Added {len(new_steps)} new steps to the plan.")
+        else:
+            updated_plan = Plan(
+                title=state.get("research_topic", "Follow-up Research Plan"),
+                thought="This plan was generated to address knowledge gaps identified during reflection.",
+                steps=new_steps,
+            )
+            logger.info("Created a new plan with follow-up steps.")
+
+        # The reflection state is preserved but the count is no longer managed here.
+        updated_reflection_state = state.get("reflection", {})
+
+        logger.info("--- EXITING UPDATE_PLAN_NODE (with plan update) ---")
+        return {
+            "current_plan": updated_plan,
+            "reflection": updated_reflection_state,
+        }
+
+    logger.info("No follow-up queries needed. Plan remains unchanged.")
+    logger.info("--- EXITING UPDATE_PLAN_NODE (no update) ---")
+    return {}
+
+
+def check_research_completion_node(state: State) -> Literal["research_team", "planner"]:
+    """Check if all research steps are completed and decide next action.
+
+    This node replaces the completion check logic from the original workflow.
+
+    Args:
+        state: Current graph state
+
+    Returns:
+        Next node to execute: "research_team" for more research, "planner" if done
+    """
+    logger.info("Checking research completion status.")
+
+    try:
+        # Check for errors first
+        if (
+            state.get("preparation_error")
+            or state.get("agent_error")
+            or state.get("update_error")
+        ):
+            logger.warning(
+                "Error detected, continuing to research_team for error handling"
+            )
+            return "research_team"
+
+        # Check if all steps are completed
+        if state.get("all_steps_completed"):
+            logger.info("All research steps completed, proceeding to planner")
+            return "planner"
+
+        # Check if more research is needed based on reflection
+        if state.get("needs_more_research"):
+            logger.info(
+                "Reflection indicates more research needed, continuing research loop"
+            )
+            return "research_team"
+
+        # Check current plan status
+        current_plan = state.get("current_plan")
+        if current_plan and hasattr(current_plan, "steps"):
+            remaining_steps = [
+                step for step in current_plan.steps if not step.execution_res
+            ]
+            if remaining_steps:
+                logger.info(
+                    f"{len(remaining_steps)} steps remaining, continuing research"
+                )
+                return "research_team"
+            else:
+                logger.info("All plan steps completed, proceeding to planner")
+                return "planner"
+        else:
+            logger.warning("No current plan found, proceeding to planner")
+            return "planner"
+
+    except Exception as e:
+        logger.error(f"Error checking research completion: {e}", exc_info=True)
+        return "research_team"  # Safe fallback

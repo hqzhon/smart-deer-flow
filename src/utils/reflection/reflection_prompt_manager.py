@@ -62,7 +62,9 @@ class ReflectionPromptManager:
         # Apply template using the project's template system
         # Convert template_vars to AgentState format
         agent_state = {**template_vars, "messages": []}
-        result = apply_prompt_template("reflection_analysis", agent_state)
+        # Always use the same template file, language is controlled by locale variable
+        template_name = "reflection_analysis"
+        result = apply_prompt_template(template_name, agent_state)
         # Extract the system prompt content
         if result and len(result) > 0 and "content" in result[0]:
             return result[0]["content"]

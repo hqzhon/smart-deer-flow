@@ -23,6 +23,9 @@ class Step(BaseModel):
     execution_res: Optional[str] = Field(
         default=None, description="The Step execution result", max_length=50000
     )
+    completed: bool = Field(
+        default=False, description="Whether the step has been completed"
+    )
 
     @field_validator("title")
     @classmethod

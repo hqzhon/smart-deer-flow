@@ -376,7 +376,7 @@ class ResearcherContextExtension:
                     observations=observations,
                     total_steps=len(current_plan.steps) if current_plan else 0,
                     current_step_index=len(completed_steps),
-                    locale=state.get("locale", "en-US"),
+                    locale=agent_state.get("locale", "en-US"),
                 )
 
                 # Get reflection insights - need to await the coroutine

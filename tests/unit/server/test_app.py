@@ -57,7 +57,8 @@ class TestTTSEndpoint:
         },
     )
     @patch("src.server.app.VolcengineTTS")
-    def test_tts_success(self, mock_tts_class, client):
+    @pytest.mark.asyncio
+    async def test_tts_success(self, mock_tts_class, client):
         mock_tts_instance = MagicMock()
         mock_tts_class.return_value = mock_tts_instance
 
@@ -86,7 +87,8 @@ class TestTTSEndpoint:
         assert b"fake_audio_data" in response.content
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_tts_missing_app_id(self, client):
+    @pytest.mark.asyncio
+    async def test_tts_missing_app_id(self, client):
         request_data = {"text": "Hello world", "encoding": "mp3"}
 
         response = client.post("/api/tts", json=request_data)
@@ -98,7 +100,8 @@ class TestTTSEndpoint:
         os.environ,
         {"VOLCENGINE_TTS_APPID": "test_app_id", "VOLCENGINE_TTS_ACCESS_TOKEN": ""},
     )
-    def test_tts_missing_access_token(self, client):
+    @pytest.mark.asyncio
+    async def test_tts_missing_access_token(self, client):
         request_data = {"text": "Hello world", "encoding": "mp3"}
 
         response = client.post("/api/tts", json=request_data)
@@ -114,7 +117,8 @@ class TestTTSEndpoint:
         },
     )
     @patch("src.server.app.VolcengineTTS")
-    def test_tts_api_error(self, mock_tts_class, client):
+    @pytest.mark.asyncio
+    async def test_tts_api_error(self, mock_tts_class, client):
         mock_tts_instance = MagicMock()
         mock_tts_class.return_value = mock_tts_instance
 
@@ -131,9 +135,9 @@ class TestTTSEndpoint:
         assert response.status_code == 500
         assert "Internal Server Error" in response.json()["detail"]
 
+    @pytest.mark.asyncio
     @pytest.mark.skip(reason="TTS server exception is catched")
-    @patch("src.server.app.VolcengineTTS")
-    def test_tts_api_exception(self, mock_tts_class, client):
+    async def test_tts_api_exception(self, mock_tts_class, client):
         mock_tts_instance = MagicMock()
         mock_tts_class.return_value = mock_tts_instance
 
@@ -150,7 +154,7 @@ class TestTTSEndpoint:
 
 class TestPodcastEndpoint:
     @patch("src.server.app.build_podcast_graph")
-    def test_generate_podcast_success(self, mock_build_graph, client):
+    async def test_generate_podcast_success(self, mock_build_graph, client):
         mock_workflow = MagicMock()
         mock_build_graph.return_value = mock_workflow
         mock_workflow.invoke.return_value = {"output": b"fake_audio_data"}
@@ -164,7 +168,7 @@ class TestPodcastEndpoint:
         assert response.content == b"fake_audio_data"
 
     @patch("src.server.app.build_podcast_graph")
-    def test_generate_podcast_error(self, mock_build_graph, client):
+    async def test_generate_podcast_error(self, mock_build_graph, client):
         mock_build_graph.side_effect = Exception("Podcast generation failed")
 
         request_data = {"content": "Test content"}
@@ -178,7 +182,7 @@ class TestPodcastEndpoint:
 class TestPPTEndpoint:
     @patch("src.server.app.build_ppt_graph")
     @patch("builtins.open", new_callable=mock_open, read_data=b"fake_ppt_data")
-    def test_generate_ppt_success(self, mock_file, mock_build_graph, client):
+    async def test_generate_ppt_success(self, mock_file, mock_build_graph, client):
         mock_workflow = MagicMock()
         mock_build_graph.return_value = mock_workflow
         mock_workflow.invoke.return_value = {
@@ -197,7 +201,7 @@ class TestPPTEndpoint:
         assert response.content == b"fake_ppt_data"
 
     @patch("src.server.app.build_ppt_graph")
-    def test_generate_ppt_error(self, mock_build_graph, client):
+    async def test_generate_ppt_error(self, mock_build_graph, client):
         mock_build_graph.side_effect = Exception("PPT generation failed")
 
         request_data = {"content": "Test content"}
@@ -381,6 +385,7 @@ class TestChatStreamEndpoint:
 class TestAstreamWorkflowGenerator:
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_basic_flow(self, mock_graph):
         # Mock AI message chunk
         mock_message = AIMessageChunk(content="Hello world")
@@ -430,6 +435,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_with_interrupt_feedback(self, mock_graph):
 
         # Mock the async stream
@@ -467,6 +473,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_interrupt_event(self, mock_graph):
         # Mock interrupt data
         mock_interrupt = MagicMock()
@@ -509,6 +516,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_tool_message(self, mock_graph):
 
         # Mock tool message
@@ -549,6 +557,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_ai_message_with_tool_calls(
         self, mock_graph
     ):
@@ -594,6 +603,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_ai_message_with_tool_call_chunks(
         self, mock_graph
     ):
@@ -638,6 +648,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_with_finish_reason(self, mock_graph):
 
         # Mock AI message with finish reason
@@ -681,6 +692,7 @@ class TestAstreamWorkflowGenerator:
 
     @pytest.mark.asyncio
     @patch("src.server.app.graph")
+    @pytest.mark.asyncio
     async def test_astream_workflow_generator_config_passed_correctly(self, mock_graph):
 
         mock_ai_message = AIMessageChunk(content="Test")

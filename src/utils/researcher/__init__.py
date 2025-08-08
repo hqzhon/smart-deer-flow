@@ -28,7 +28,10 @@ from .mcp_client_manager import MCPClientManager
 from .reflection_system_manager import ReflectionSystemManager
 from .iterative_research_engine import IterativeResearchEngine
 from .research_result_processor import ResearchResultProcessor
-from .enhanced_researcher import EnhancedResearcher
+
+# Note: EnhancedResearcher has been successfully refactored into single-responsibility graph nodes
+# The new nodes are: prepare_research_step_node, researcher_agent_node, reflection_node, update_plan_node
+# See src/graph/nodes.py for the implementation
 
 # Phase 5 Performance Optimization
 from .performance_monitor import (
@@ -71,7 +74,6 @@ __all__ = [
     "ReflectionSystemManager",
     "IterativeResearchEngine",
     "ResearchResultProcessor",
-    "EnhancedResearcher",
     # Phase 5 Performance Optimization exports
     "PerformanceMonitor",
     "PerformanceMetrics",
