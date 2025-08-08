@@ -94,7 +94,7 @@ export interface ReflectionInsightsEvent {
     insights: {
       comprehensive_report?: string
       knowledge_gaps?: string[]
-      follow_up_queries?: string[]
+      primary_follow_up_query?: string
       confidence_score?: number
     }
   }

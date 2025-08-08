@@ -13,7 +13,7 @@ class TestIterativeResearchEngineFixes(unittest.TestCase):
         self.mock_unified_config = MagicMock()
         self.mock_unified_config.max_follow_up_iterations = 3
         self.mock_unified_config.max_research_time_minutes = 30
-        self.mock_unified_config.max_follow_up_queries = 3
+        self.mock_unified_config.max_follow_up_iterations = 3
 
     def test_execute_iterative_research_method_exists(self):
         """Test that execute_iterative_research method exists"""
@@ -37,7 +37,7 @@ class TestIterativeResearchEngineFixes(unittest.TestCase):
 
         # Test basic execution
         query = "Test research query"
-        state = {"follow_up_queries": ["query1", "query2"]}
+        state = {"primary_follow_up_query": "query1"}
 
         result = await engine.execute_iterative_research(query, state)
 
@@ -64,7 +64,7 @@ class TestIterativeResearchEngineFixes(unittest.TestCase):
         engine = IterativeResearchEngine(self.mock_unified_config)
 
         query = "Test research query"
-        state = {"follow_up_queries": ["query1"]}
+        state = {"primary_follow_up_query": "query1"}
 
         # First execution should not terminate
         result1 = await engine.execute_iterative_research(query, state)
@@ -87,19 +87,17 @@ class TestIterativeResearchEngineFixes(unittest.TestCase):
         # Mock reflection result
         mock_reflection = MagicMock()
         mock_reflection.is_sufficient = False
-        mock_reflection.knowledge_gaps = [
-            MagicMock(suggested_query="Follow-up query 1"),
-            MagicMock(description="Knowledge gap 2"),
-        ]
+        mock_reflection.primary_knowledge_gap = "Primary knowledge gap"
+        mock_reflection.primary_follow_up_query = "Follow-up query 1"
 
         query = "Test research query"
-        state = {"follow_up_queries": ["existing_query"]}
+        state = {"primary_follow_up_query": "existing_query"}
 
         result = await engine.execute_iterative_research(query, state, mock_reflection)
 
         # Verify reflection was processed
-        self.assertIn("follow_up_queries", result)
-        self.assertIsInstance(result["follow_up_queries"], list)
+        self.assertIn("primary_follow_up_query", result)
+        self.assertIsInstance(result["primary_follow_up_query"], (str, type(None)))
 
     def test_unified_config_attributes_fixed(self):
         """Test that unified config attributes are correctly referenced"""
@@ -110,7 +108,7 @@ class TestIterativeResearchEngineFixes(unittest.TestCase):
         engine = IterativeResearchEngine(self.mock_unified_config)
 
         # Test check_termination_conditions uses correct attribute
-        state = {"follow_up_queries": ["query1"]}
+        state = {"primary_follow_up_query": "query1"}
         should_terminate, reason, factors = engine.check_termination_conditions(state)
 
         # Should reference max_follow_up_iterations, not max_research_iterations

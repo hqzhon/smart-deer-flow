@@ -105,19 +105,15 @@ function ReflectionInsightsCard({
           </div>
         )}
         
-        {insights.follow_up_queries && insights.follow_up_queries.length > 0 && (
+        {insights.primary_follow_up_query && (
           <div>
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <Lightbulb size={14} />
-              Follow-up Queries
+              Primary Follow-up Query
             </div>
-            <ul className="space-y-1">
-              {insights.follow_up_queries.map((query, index) => (
-                <li key={index} className="text-sm text-muted-foreground">
-                  • {query}
-                </li>
-              ))}
-            </ul>
+            <div className="text-sm text-muted-foreground bg-gray-50 dark:bg-gray-800 p-2 rounded">
+              {insights.primary_follow_up_query}
+            </div>
           </div>
         )}
         

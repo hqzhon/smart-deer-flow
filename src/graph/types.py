@@ -38,11 +38,11 @@ class ReflectionState(BaseModel):
         default="",
         description="Comprehensive research report synthesizing all findings",
     )
-    knowledge_gaps: List[str] = Field(
-        default_factory=list, description="Identified knowledge gaps"
+    primary_knowledge_gap: str = Field(
+        default="", description="Primary identified knowledge gap"
     )
-    follow_up_queries: List[str] = Field(
-        default_factory=list, description="Generated follow-up queries"
+    primary_follow_up_query: str = Field(
+        default="", description="Primary follow-up query"
     )
 
     # Assessment metrics
@@ -124,23 +124,31 @@ class State(MessagesState):
 
     @property
     def knowledge_gaps(self) -> List[str]:
-        """Backward compatibility: access reflection.knowledge_gaps"""
-        return self.reflection.knowledge_gaps
+        """Backward compatibility: access reflection.primary_knowledge_gap as list"""
+        return (
+            [self.reflection.primary_knowledge_gap]
+            if self.reflection.primary_knowledge_gap
+            else []
+        )
 
     @knowledge_gaps.setter
     def knowledge_gaps(self, value: List[str]):
-        """Backward compatibility: set reflection.knowledge_gaps"""
-        self.reflection.knowledge_gaps = value
+        """Backward compatibility: set reflection.primary_knowledge_gap from list"""
+        self.reflection.primary_knowledge_gap = value[0] if value else ""
 
     @property
     def follow_up_queries(self) -> List[str]:
-        """Backward compatibility: access reflection.follow_up_queries"""
-        return self.reflection.follow_up_queries
+        """Backward compatibility: access reflection.primary_follow_up_query as list"""
+        return (
+            [self.reflection.primary_follow_up_query]
+            if self.reflection.primary_follow_up_query
+            else []
+        )
 
     @follow_up_queries.setter
     def follow_up_queries(self, value: List[str]):
-        """Backward compatibility: set reflection.follow_up_queries"""
-        self.reflection.follow_up_queries = value
+        """Backward compatibility: set reflection.primary_follow_up_query from list"""
+        self.reflection.primary_follow_up_query = value[0] if value else ""
 
     @property
     def research_sufficiency_score(self) -> float:

@@ -394,7 +394,7 @@ class ReflectionWorkflow:
             "success": True,
             "knowledge_gaps": knowledge_gaps,
             "context_analyzed": True,
-            "gap_count": len(knowledge_gaps.get("gaps", [])),
+            "gap_count": 1 if knowledge_gaps.primary_knowledge_gap else 0,
         }
 
     async def _execute_research_planning_stage(self) -> Dict[str, Any]:
@@ -403,7 +403,7 @@ class ReflectionWorkflow:
         context_analysis = (
             self.execution_history[-1]["result"] if self.execution_history else {}
         )
-        knowledge_gaps = context_analysis.get("knowledge_gaps", {})
+        knowledge_gaps = context_analysis.get("knowledge_gaps", None)
 
         # Check if progressive enablement should be applied
         enablement_decision = await self.progressive_enabler.should_enable_isolation(
@@ -413,8 +413,14 @@ class ReflectionWorkflow:
         return {
             "success": True,
             "research_plan": {
-                "gaps_to_address": knowledge_gaps.get("gaps", []),
-                "suggested_queries": knowledge_gaps.get("suggested_queries", []),
+                "gaps_to_address": (
+                    [knowledge_gaps.primary_knowledge_gap]
+                    if knowledge_gaps and knowledge_gaps.primary_knowledge_gap
+                    else []
+                ),
+                "suggested_queries": (
+                    [knowledge_gaps.primary_follow_up_query] if knowledge_gaps and knowledge_gaps.primary_follow_up_query else []
+                ),
                 "enablement_decision": enablement_decision,
             },
             "plan_created": True,
@@ -518,15 +524,15 @@ class ReflectionWorkflow:
             logger.debug(f"Reflection insights: {reflection_insights}")
 
             # Log specific insight details
-            if reflection_insights.get("knowledge_gaps"):
-                gaps_count = len(reflection_insights["knowledge_gaps"])
-                logger.info(f"Reflection identified {gaps_count} knowledge gaps")
+            if reflection_insights.primary_knowledge_gap:
+                logger.info("Reflection identified 1 knowledge gap")
+            else:
+                logger.info("Reflection identified 0 knowledge gaps")
 
-            if reflection_insights.get("follow_up_queries"):
-                queries_count = len(reflection_insights["follow_up_queries"])
-                logger.info(f"Reflection generated {queries_count} follow-up queries")
+            if reflection_insights.primary_follow_up_query:
+                logger.info(f"Reflection generated follow-up query: {reflection_insights.primary_follow_up_query}")
 
-            confidence = reflection_insights.get("confidence_score", 0.5)
+            confidence = reflection_insights.confidence_score
             logger.info(f"Reflection confidence score: {confidence}")
 
             return {

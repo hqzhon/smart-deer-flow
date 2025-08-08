@@ -69,7 +69,7 @@ class TestReflectionWorkflowIntegration:
         mock_agent_instance.analyze_knowledge_gaps = AsyncMock(
             return_value={
                 "is_sufficient": False,
-                "follow_up_queries": ["What about edge cases?"],
+                "primary_follow_up_query": "What about edge cases?",
                 "reason": "Need more analysis",
             }
         )
@@ -112,7 +112,7 @@ class TestReflectionWorkflowIntegration:
         mock_agent_instance.analyze_knowledge_gaps = AsyncMock(
             return_value={
                 "is_sufficient": False,
-                "follow_up_queries": ["More questions"],
+                "primary_follow_up_query": "More questions",
                 "reason": "Need deeper analysis",
             }
         )
@@ -172,9 +172,9 @@ class TestReflectionWorkflowIntegration:
         ]
         mock_context_manager.return_value = mock_context_instance
 
-        # Create reflection insights with follow_up_queries
+        # Create reflection insights with primary_follow_up_query
         reflection_insights = Mock()
-        reflection_insights.follow_up_queries = ["Follow up question"]
+        reflection_insights.primary_follow_up_query = "Follow up question"
         reflection_insights.is_sufficient = False
 
         # Prepare state for update_plan_node
@@ -263,7 +263,7 @@ class TestReflectionWorkflowIntegration:
         mock_system_instance.execute_reflection_analysis = AsyncMock(
             return_value={
                 "is_sufficient": False,
-                "follow_up_queries": ["Question"],
+                "primary_follow_up_query": "Question",
                 "reason": "More analysis needed",
             }
         )

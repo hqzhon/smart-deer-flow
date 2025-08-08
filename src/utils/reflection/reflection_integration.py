@@ -192,7 +192,7 @@ class ReflectionIntegrator:
                 self.metrics.update_session_context(
                     session_id=f"reflection_{session_id}",
                     original_size=len(str(state)),
-                    compressed_size=len(str(reflection_result.knowledge_gaps)),
+                    compressed_size=len(str(reflection_result.primary_knowledge_gap)),
                 )
 
             logger.info(
@@ -238,9 +238,10 @@ class ReflectionIntegrator:
             )
             return current_plan
 
-        # Create new steps based on follow-up queries
+        # Create new step based on primary follow-up query
         new_steps = []
-        for i, query in enumerate(reflection_result.follow_up_queries):
+        if reflection_result.primary_follow_up_query:
+            query = reflection_result.primary_follow_up_query
             new_step = Step(
                 need_search=True,
                 title=f"Follow-up Research: {query[:50]}...",
@@ -273,23 +274,9 @@ class ReflectionIntegrator:
                     safe_recommendations.append(str(rec))
 
         reflection_insight = f"\n\nReflection Analysis: {', '.join(safe_recommendations) if safe_recommendations else 'No specific recommendations'}"
-        if reflection_result.knowledge_gaps:
-            # Ensure knowledge_gaps are all strings before joining
-            safe_gaps = []
-            for gap in reflection_result.knowledge_gaps:
-                if isinstance(gap, str):
-                    safe_gaps.append(gap)
-                elif isinstance(gap, dict):
-                    # Extract meaningful string from dict
-                    if "description" in gap:
-                        safe_gaps.append(str(gap["description"]))
-                    elif "gap_type" in gap:
-                        safe_gaps.append(str(gap["gap_type"]))
-                    else:
-                        safe_gaps.append(str(gap))
-                else:
-                    safe_gaps.append(str(gap))
-            reflection_insight += f"\nIdentified Knowledge Gaps: {', '.join(safe_gaps)}"
+        if reflection_result.primary_knowledge_gap:
+            gap = reflection_result.primary_knowledge_gap
+            reflection_insight += f"\nIdentified Primary Knowledge Gap: {gap}"
 
         updated_plan = Plan(
             locale=current_plan.locale,

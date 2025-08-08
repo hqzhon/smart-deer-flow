@@ -37,7 +37,7 @@ class IsolationSession:
     reflection_enabled: bool = False
     reflection_insights_count: int = 0
     knowledge_gaps_identified: int = 0
-    follow_up_queries_generated: int = 0
+    primary_follow_up_query_generated: bool = False
     reflection_processing_time: float = 0.0
 
     @property
@@ -96,7 +96,7 @@ class ResearcherIsolationMetrics:
         # Phase 2 - GFLQ Integration: Reflection metrics tracking
         self.reflection_sessions = 0
         self.total_knowledge_gaps = 0
-        self.total_follow_up_queries = 0
+        self.total_primary_queries = 0
         self.average_reflection_time = 0.0
 
         logger.info(
@@ -176,7 +176,7 @@ class ResearcherIsolationMetrics:
         session_id: str,
         insights_count: int = 0,
         knowledge_gaps: int = 0,
-        follow_up_queries: int = 0,
+        primary_follow_up_query: bool = False,
         processing_time: float = 0.0,
     ):
         """Update reflection-related metrics for a session"""
@@ -186,12 +186,12 @@ class ResearcherIsolationMetrics:
                 session.reflection_enabled = True
                 session.reflection_insights_count = insights_count
                 session.knowledge_gaps_identified = knowledge_gaps
-                session.follow_up_queries_generated = follow_up_queries
+                session.primary_follow_up_query_generated = primary_follow_up_query
                 session.reflection_processing_time = processing_time
 
                 logger.debug(
                     f"Updated reflection metrics for session {session_id}: "
-                    f"insights={insights_count}, gaps={knowledge_gaps}, queries={follow_up_queries}"
+                    f"insights={insights_count}, gaps={knowledge_gaps}, primary_query={primary_follow_up_query}"
                 )
 
     def get_reflection_metrics_summary(self) -> Dict[str, Any]:
@@ -206,7 +206,7 @@ class ResearcherIsolationMetrics:
                     "total_reflection_sessions": 0,
                     "average_insights_per_session": 0.0,
                     "average_knowledge_gaps": 0.0,
-                    "average_follow_up_queries": 0.0,
+                    "primary_query_generation_rate": 0.0,
                     "average_processing_time": 0.0,
                     "reflection_effectiveness": 0.0,
                 }
@@ -215,9 +215,9 @@ class ResearcherIsolationMetrics:
                 s.reflection_insights_count for s in reflection_sessions
             )
             total_gaps = sum(s.knowledge_gaps_identified for s in reflection_sessions)
-            total_queries = sum(
-                s.follow_up_queries_generated for s in reflection_sessions
-            )
+            total_primary_queries = sum(
+            1 for s in reflection_sessions if s.primary_follow_up_query_generated
+        )
             total_time = sum(s.reflection_processing_time for s in reflection_sessions)
 
             return {
@@ -226,13 +226,13 @@ class ResearcherIsolationMetrics:
                     total_insights / len(reflection_sessions)
                 ),
                 "average_knowledge_gaps": total_gaps / len(reflection_sessions),
-                "average_follow_up_queries": total_queries / len(reflection_sessions),
+                "primary_query_generation_rate": total_primary_queries / len(reflection_sessions),
                 "average_processing_time": total_time / len(reflection_sessions),
                 "reflection_effectiveness": (
                     total_queries / max(1, total_gaps)
                 ),  # Queries generated per gap
                 "total_knowledge_gaps_identified": total_gaps,
-                "total_follow_up_queries_generated": total_queries,
+                "total_primary_queries_generated": total_primary_queries,
             }
 
     def _update_aggregate_metrics(self, session: IsolationSession):
@@ -258,7 +258,7 @@ class ResearcherIsolationMetrics:
             if session.reflection_enabled:
                 self.reflection_sessions += 1
                 self.total_knowledge_gaps += session.knowledge_gaps_identified
-                self.total_follow_up_queries += session.follow_up_queries_generated
+                self.total_primary_queries += 1 if session.primary_follow_up_query_generated else 0
 
                 # Update average reflection time (running average)
                 self.average_reflection_time = (

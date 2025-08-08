@@ -28,7 +28,7 @@ export interface Message {
   reflectionInsights?: {
     comprehensive_report?: string;
     knowledge_gaps?: string[];
-    follow_up_queries?: string[];
+    primary_follow_up_query?: string;
     is_sufficient?: boolean;
     confidence_score?: number;
   };

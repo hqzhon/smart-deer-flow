@@ -29,7 +29,7 @@ Provide your analysis as a JSON object with the following structure:
     "is_sufficient": boolean,
     "confidence_score": float (0.0 to 1.0),
     "knowledge_gaps": ["gap1", "gap2", ...],
-    "follow_up_queries": ["query1", "query2", ...],
+    "primary_follow_up_query": "most important follow-up query",
     "quality_assessment": {
         "completeness": float (0.0 to 1.0),
         "accuracy": float (0.0 to 1.0),

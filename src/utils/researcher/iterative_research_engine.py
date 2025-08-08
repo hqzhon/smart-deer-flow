@@ -108,19 +108,21 @@ class IterativeResearchEngine:
                 return True, reason, decision_factors
             else:
                 decision_factors["reflection_sufficient"] = False
-                decision_factors["knowledge_gaps"] = len(
-                    getattr(reflection_result, "knowledge_gaps", [])
+                decision_factors["knowledge_gaps"] = (
+                    1
+                    if getattr(reflection_result, "primary_knowledge_gap", None)
+                    else 0
                 )
 
-        # Check if there are valid follow-up queries
-        follow_up_queries = state.get("follow_up_queries", [])
-        if not follow_up_queries:
-            reason = "No follow-up queries available"
+        # Check if there is a valid follow-up query
+        primary_follow_up_query = state.get("primary_follow_up_query")
+        if not primary_follow_up_query:
+            reason = "No follow-up query available"
             logger.info(f"Termination condition met: {reason}")
             decision_factors["follow_up_queries_count"] = 0
             return True, reason, decision_factors
 
-        decision_factors["follow_up_queries_count"] = len(follow_up_queries)
+        decision_factors["follow_up_queries_count"] = 1
 
         # Continue research
         logger.debug(
@@ -131,41 +133,39 @@ class IterativeResearchEngine:
     def generate_follow_up_queries(
         self, reflection_result: Any, state: Dict[str, Any]
     ) -> List[str]:
-        """Generate follow-up queries based on reflection result
+        """Generate follow-up query based on reflection result
 
         Args:
             reflection_result: Reflection result
             state: Current state
 
         Returns:
-            List of follow-up queries
+            List containing single follow-up query for backward compatibility
         """
-        if not reflection_result or not hasattr(reflection_result, "knowledge_gaps"):
-            logger.warning("No reflection result or knowledge gaps available")
+        if not reflection_result or not hasattr(
+            reflection_result, "primary_knowledge_gap"
+        ):
+            logger.warning("No reflection result or primary knowledge gap available")
             return []
 
-        knowledge_gaps = reflection_result.knowledge_gaps or []
-        if not knowledge_gaps:
-            logger.info("No knowledge gaps identified")
+        primary_gap = reflection_result.primary_knowledge_gap
+        primary_query = reflection_result.primary_follow_up_query
+
+        if not primary_gap:
+            logger.info("No primary knowledge gap identified")
             return []
 
-        # Generate queries based on knowledge gaps
-        follow_up_queries = []
-        for gap in knowledge_gaps:
-            if hasattr(gap, "suggested_query") and gap.suggested_query:
-                follow_up_queries.append(gap.suggested_query)
-            elif hasattr(gap, "description") and gap.description:
-                # If no suggested query, generate query based on description
-                follow_up_queries.append(f"Research more about: {gap.description}")
-
-        # Limit number of queries
-        max_queries = getattr(self.unified_config, "max_follow_up_queries", 3)
-        follow_up_queries = follow_up_queries[:max_queries]
+        # Generate single follow-up query based on primary gap and query
+        if primary_query:
+            follow_up_query = primary_query
+        else:
+            # If no primary query, generate one based on the gap
+            follow_up_query = f"Research more about: {primary_gap}"
 
         logger.info(
-            f"Generated {len(follow_up_queries)} follow-up queries from {len(knowledge_gaps)} knowledge gaps"
+            f"Generated follow-up query from primary knowledge gap: {follow_up_query}"
         )
-        return follow_up_queries
+        return [follow_up_query]
 
     def filter_valid_queries(
         self, queries: List[str], state: Dict[str, Any]
@@ -300,20 +300,22 @@ class IterativeResearchEngine:
                 "research_summary": self.get_research_summary(),
             }
 
-        # Generate follow-up queries if reflection result is available
-        follow_up_queries = []
+        # Generate follow-up query if reflection result is available
+        primary_follow_up_query = None
         if reflection_result:
             follow_up_queries = self.generate_follow_up_queries(
                 reflection_result, state
             )
             follow_up_queries = self.filter_valid_queries(follow_up_queries, state)
+            # Take the first valid query as the primary follow-up query
+            primary_follow_up_query = follow_up_queries[0] if follow_up_queries else None
 
         # Execute research iteration
         execution_result = {
             "terminated": False,
             "iteration": current_iteration,
             "query": query,
-            "follow_up_queries": follow_up_queries,
+            "primary_follow_up_query": primary_follow_up_query,
             "decision_factors": decision_factors,
             "research_summary": self.get_research_summary(),
         }

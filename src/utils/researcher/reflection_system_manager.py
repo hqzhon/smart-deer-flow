@@ -137,7 +137,7 @@ class ReflectionSystemManager:
             logger.info(
                 f"Reflection analysis completed: sufficient={reflection_result.is_sufficient}, "
                 f"confidence={reflection_result.confidence_score}, "
-                f"gaps={len(reflection_result.knowledge_gaps) if reflection_result.knowledge_gaps else 0}"
+                f"gaps={1 if reflection_result.primary_knowledge_gap else 0}"
             )
 
             return reflection_result
