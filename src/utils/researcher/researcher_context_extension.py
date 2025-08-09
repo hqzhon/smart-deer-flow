@@ -392,7 +392,9 @@ class ResearcherContextExtension:
                     guidance_content += (
                         "Based on analysis, consider exploring this area:\n\n"
                     )
-                    guidance_content += f"1. {reflection_result.primary_follow_up_query}\n"
+                    guidance_content += (
+                        f"1. {reflection_result.primary_follow_up_query}\n"
+                    )
 
                     if reflection_result.primary_knowledge_gap:
                         guidance_content += "\n**Identified Knowledge Gap:**\n\n"

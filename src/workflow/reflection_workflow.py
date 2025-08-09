@@ -419,7 +419,9 @@ class ReflectionWorkflow:
                     else []
                 ),
                 "suggested_queries": (
-                    [knowledge_gaps.primary_follow_up_query] if knowledge_gaps and knowledge_gaps.primary_follow_up_query else []
+                    [knowledge_gaps.primary_follow_up_query]
+                    if knowledge_gaps and knowledge_gaps.primary_follow_up_query
+                    else []
                 ),
                 "enablement_decision": enablement_decision,
             },
@@ -530,7 +532,9 @@ class ReflectionWorkflow:
                 logger.info("Reflection identified 0 knowledge gaps")
 
             if reflection_insights.primary_follow_up_query:
-                logger.info(f"Reflection generated follow-up query: {reflection_insights.primary_follow_up_query}")
+                logger.info(
+                    f"Reflection generated follow-up query: {reflection_insights.primary_follow_up_query}"
+                )
 
             confidence = reflection_insights.confidence_score
             logger.info(f"Reflection confidence score: {confidence}")

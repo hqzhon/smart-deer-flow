@@ -9,7 +9,6 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
-from src.models.planner_model import StepType
 from src.utils.performance.memory_manager import cached
 from src.report_quality.template_engine import ReportDomain
 from src.utils.system.callback_safety import global_callback_manager
@@ -52,46 +51,39 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-def continue_to_running_research_team(state: State):
+def should_continue_research(state: State) -> str:
+    """Determines the next step after the research_team has run.
+
+    Args:
+        state: The current graph state.
+
+    Returns:
+        'context_optimizer' if all research steps are completed,
+        'research_team' to continue the loop,
+        or 'planner' if there's an issue with the plan.
+    """
+    logger.info("--- DECIDING NEXT STEP ---")
     current_plan = state.get("current_plan")
+
+    # 如果没有计划或计划中没有步骤，则返回planner重新规划
     if not current_plan or not current_plan.steps:
-        # 检查是否需要规划上下文优化
-        messages = state.get("messages", [])
-        plan_iterations = state.get("plan_iterations", 0)
-
-        # 如果消息过多且有多次规划迭代，先进行上下文优化
-        if len(messages) > 10 and plan_iterations > 1:
-            return "planning_context_optimizer"
+        logger.warning("No plan or steps found, returning to planner.")
         return "planner"
+
+    # 检查是否所有步骤都已完成
     if all(step.execution_res for step in current_plan.steps):
-        return "planner"
-
-    # 找到第一个未执行的步骤并根据类型路由
-    for step in current_plan.steps:
-        if not step.execution_res:
-            if step.step_type and step.step_type == StepType.RESEARCH:
-                # Check if enhanced features are available for new research workflow
-                if ENHANCED_FEATURES_AVAILABLE:
-                    logger.debug(
-                        "Routing to enhanced research workflow: prepare_research_step"
-                    )
-                    return "prepare_research_step"
-                else:
-                    logger.debug(
-                        "Enhanced features not available, routing to legacy researcher"
-                    )
-                    return "researcher"
-            elif step.step_type and step.step_type == StepType.PROCESSING:
-                return "coder"
-            else:
-                # 如果步骤类型未知或为None，返回planner重新规划
-                logger.warning(
-                    f"Unknown step type: {step.step_type}, routing to planner"
-                )
-                return "planner"
-
-    # 如果没有找到未执行的步骤，返回planner
-    return "planner"
+        logger.info(
+            "All research steps completed. Proceeding to context optimizer for final report."
+        )
+        return "context_optimizer"  # <--- 正确：去优化上下文，然后生成报告
+    else:
+        # 如果还有未完成的步骤，则继续研究循环
+        remaining_steps = [s.title for s in current_plan.steps if not s.execution_res]
+        logger.info(
+            f"Research not yet complete. {len(remaining_steps)} steps remaining. Continuing research loop."
+        )
+        logger.debug(f"Remaining steps: {remaining_steps}")
+        return "research_team"  # <--- 正确：返回给自己，形成循环
 
 
 def _build_base_graph():
@@ -129,65 +121,14 @@ def _build_base_graph():
     builder.add_edge("planning_context_optimizer", "planner")
     builder.add_conditional_edges(
         "research_team",
-        continue_to_running_research_team,
-        [
-            "planner",
-            "researcher",
-            "coder",
-            "context_optimizer",
-            "planning_context_optimizer",
-        ],
+        should_continue_research,
+        {
+            "research_team": "research_team",
+            "context_optimizer": "context_optimizer",
+            "planner": "planner",
+        },
     )
     return builder
-
-
-def _create_optimized_node(original_func, node_name: str):
-    """Create an optimized node wrapper with performance monitoring."""
-
-    async def optimized_node(state: State, config: RunnableConfig):
-        import time
-
-        start_time = time.time()
-
-        try:
-            # Execute original function
-            result = await original_func(state, config)
-
-            # Add performance metrics
-            execution_time = time.time() - start_time
-            logger.debug(f"Node '{node_name}' executed in {execution_time:.2f}s")
-
-            # Add execution metadata to state if it's a dict
-            if isinstance(result, dict):
-                result["node_metrics"] = result.get("node_metrics", {})
-                result["node_metrics"][node_name] = {
-                    "execution_time": execution_time,
-                    "timestamp": time.time(),
-                }
-
-            return result
-
-        except Exception as e:
-            execution_time = time.time() - start_time
-            logger.error(f"Node '{node_name}' failed after {execution_time:.2f}s: {e}")
-            raise
-
-    return optimized_node
-
-
-def _enhanced_coordinator_routing(state: State) -> str:
-    """Enhanced coordinator routing with collaboration support."""
-    # Check if collaboration is enabled and needed
-    if (
-        state.get("enable_collaboration", False)
-        and state.get("collaboration_systems")
-        and state.get("user_input", "").lower().find("complex") != -1
-    ):
-        return "role_bidding"
-    elif state.get("needs_planning", True):
-        return "planner"
-    else:
-        return "research_team"
 
 
 async def _role_bidding_node(state: State, config: RunnableConfig) -> State:
@@ -483,14 +424,11 @@ def _build_enhanced_graph():
     # Research team routing (updated to use new workflow)
     builder.add_conditional_edges(
         "research_team",
-        continue_to_running_research_team,
+        should_continue_research,  # <--- 使用新的条件函数
         {
-            "planner": "planner",
-            "prepare_research_step": "prepare_research_step",  # Use new research workflow
-            "researcher": "researcher",  # Legacy fallback
-            "coder": "coder",
-            "context_optimizer": "context_optimizer",
-            "planning_context_optimizer": "planning_context_optimizer",
+            "research_team": "research_team",  # 循环
+            "context_optimizer": "context_optimizer",  # 结束研究，去报告
+            "planner": "planner",  # 计划有问题，返回规划器
         },
     )
 
