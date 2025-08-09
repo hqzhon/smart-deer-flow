@@ -216,8 +216,8 @@ class ResearcherIsolationMetrics:
             )
             total_gaps = sum(s.knowledge_gaps_identified for s in reflection_sessions)
             total_primary_queries = sum(
-            1 for s in reflection_sessions if s.primary_follow_up_query_generated
-        )
+                1 for s in reflection_sessions if s.primary_follow_up_query_generated
+            )
             total_time = sum(s.reflection_processing_time for s in reflection_sessions)
 
             return {
@@ -226,10 +226,11 @@ class ResearcherIsolationMetrics:
                     total_insights / len(reflection_sessions)
                 ),
                 "average_knowledge_gaps": total_gaps / len(reflection_sessions),
-                "primary_query_generation_rate": total_primary_queries / len(reflection_sessions),
+                "primary_query_generation_rate": total_primary_queries
+                / len(reflection_sessions),
                 "average_processing_time": total_time / len(reflection_sessions),
                 "reflection_effectiveness": (
-                    total_queries / max(1, total_gaps)
+                    total_primary_queries / max(1, total_gaps)
                 ),  # Queries generated per gap
                 "total_knowledge_gaps_identified": total_gaps,
                 "total_primary_queries_generated": total_primary_queries,
@@ -258,7 +259,9 @@ class ResearcherIsolationMetrics:
             if session.reflection_enabled:
                 self.reflection_sessions += 1
                 self.total_knowledge_gaps += session.knowledge_gaps_identified
-                self.total_primary_queries += 1 if session.primary_follow_up_query_generated else 0
+                self.total_primary_queries += (
+                    1 if session.primary_follow_up_query_generated else 0
+                )
 
                 # Update average reflection time (running average)
                 self.average_reflection_time = (

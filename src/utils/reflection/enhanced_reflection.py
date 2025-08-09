@@ -40,15 +40,11 @@ class ReflectionResult(BaseModel):
     """Structured output for reflection analysis.
 
     Based on GFLQ's Reflection model with DeerFlow-specific enhancements.
-    Enhanced to generate comprehensive reports that merge all knowledge.
+    Focuses on research sufficiency assessment and knowledge gap identification.
     """
 
     is_sufficient: bool = Field(
         description="Whether the current research results are sufficient to complete the task"
-    )
-    comprehensive_report: str = Field(
-        description="Comprehensive research report that synthesizes all findings, analysis, and insights",
-        default="",
     )
     primary_knowledge_gap: Optional[str] = Field(
         description="The most critical knowledge gap or missing information area",
@@ -278,9 +274,6 @@ class EnhancedReflectionAgent:
                     )
                     logger.debug(
                         f"Follow-up query generated: {result.primary_follow_up_query}"
-                    )
-                    logger.debug(
-                        f"Comprehensive report length: {len(result.comprehensive_report)}"
                     )
 
             except Exception as parse_error:
@@ -633,36 +626,10 @@ class EnhancedReflectionAgent:
             # First try direct JSON parsing
             parsed = json.loads(raw_content)
 
-            # Fix comprehensive_report if it's a dict instead of string
-            if isinstance(parsed.get("comprehensive_report"), dict):
-                report_dict = parsed["comprehensive_report"]
-                # Convert dict to formatted string
-                report_parts = []
-
-                if "executive_summary" in report_dict:
-                    report_parts.append(
-                        f"## Executive Summary\n{report_dict['executive_summary']}"
-                    )
-
-                if "detailed_analysis" in report_dict:
-                    analysis = report_dict["detailed_analysis"]
-                    if isinstance(analysis, dict):
-                        report_parts.append("## Detailed Analysis")
-                        for key, value in analysis.items():
-                            report_parts.append(
-                                f"### {key.replace('_', ' ').title()}\n{value}"
-                            )
-                    else:
-                        report_parts.append(f"## Detailed Analysis\n{analysis}")
-
-                if "conclusions" in report_dict:
-                    report_parts.append(f"## Conclusions\n{report_dict['conclusions']}")
-
-                # Join all parts into a single string
-                parsed["comprehensive_report"] = "\n\n".join(report_parts)
-                logger.info(
-                    f"Converted comprehensive_report from dict to string (length: {len(parsed['comprehensive_report'])})"
-                )
+            # Remove any comprehensive_report field if present
+            if "comprehensive_report" in parsed:
+                del parsed["comprehensive_report"]
+                logger.debug("Removed comprehensive_report field from parsed result")
 
             return ReflectionResult(**parsed)
         except json.JSONDecodeError:
@@ -677,7 +644,6 @@ class EnhancedReflectionAgent:
         # Try to extract partial data from truncated JSON
         extracted_data = {
             "is_sufficient": False,
-            "comprehensive_report": "",
             "knowledge_gaps": [],
             "primary_follow_up_query": None,
             "confidence_score": 0.5,
@@ -696,34 +662,7 @@ class EnhancedReflectionAgent:
                     is_sufficient_match.group(1).lower() == "true"
                 )
 
-            # Extract comprehensive_report (even if truncated)
-            report_match = re.search(
-                r'"comprehensive_report"\s*:\s*"([^"]*(?:\\.[^"]*)*)',
-                raw_content,
-                re.DOTALL,
-            )
-            if report_match:
-                # Decode unicode escapes and clean up
-                report_content = report_match.group(1)
-                try:
-                    # Handle unicode escapes
-                    if isinstance(report_content, str):
-                        report_content = report_content.encode().decode(
-                            "unicode_escape"
-                        )
-                except (UnicodeDecodeError, UnicodeError, AttributeError):
-                    pass
-                extracted_data["comprehensive_report"] = report_content
-
-                # If report seems truncated, add a note
-                if len(report_content) > 1000 and not report_content.endswith(
-                    ("。", ".", "!", "?")
-                ):
-                    extracted_data["comprehensive_report"] += (
-                        "\n\n[Note: Report may be truncated due to response length limits]"
-                        if context.locale.startswith("zh")
-                        else "\n\n[Note: Report may be truncated due to response length limits]"
-                    )
+            # Skip comprehensive_report extraction as it's no longer needed
 
             # Extract confidence_score
             confidence_match = re.search(
@@ -833,17 +772,13 @@ class EnhancedReflectionAgent:
                             extracted_data[field] = []
 
             logger.info(
-                f"Extracted partial data from truncated response: is_sufficient={extracted_data['is_sufficient']}, report_length={len(extracted_data['comprehensive_report'])}, gaps={len(extracted_data['knowledge_gaps'])}"
+                f"Extracted partial data from truncated response: is_sufficient={extracted_data['is_sufficient']}, gaps={len(extracted_data['knowledge_gaps'])}"
             )
 
         except Exception as extract_error:
             logger.error(f"Failed to extract partial data: {extract_error}")
-            # Use basic fallback
-            extracted_data["comprehensive_report"] = (
-                "Research Analysis Report\n\nUnable to generate complete comprehensive report due to technical limitations."
-                if context.locale.startswith("zh")
-                else "Research Analysis Report\n\nUnable to generate complete comprehensive report due to technical limitations."
-            )
+            # Use basic fallback - no comprehensive_report needed
+            pass
 
         return ReflectionResult(**extracted_data)
 
@@ -1006,7 +941,11 @@ class EnhancedReflectionAgent:
             else 0.0
         )
         query_generation_rate = (
-            sum(1 for _, result in self.reflection_history if result.primary_follow_up_query)
+            sum(
+                1
+                for _, result in self.reflection_history
+                if result.primary_follow_up_query
+            )
             / total_reflections
         )
 

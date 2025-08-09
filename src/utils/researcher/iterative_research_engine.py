@@ -308,7 +308,9 @@ class IterativeResearchEngine:
             )
             follow_up_queries = self.filter_valid_queries(follow_up_queries, state)
             # Take the first valid query as the primary follow-up query
-            primary_follow_up_query = follow_up_queries[0] if follow_up_queries else None
+            primary_follow_up_query = (
+                follow_up_queries[0] if follow_up_queries else None
+            )
 
         # Execute research iteration
         execution_result = {

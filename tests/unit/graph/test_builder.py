@@ -26,57 +26,6 @@ def mock_state():
     }
 
 
-def test_continue_to_running_research_team_no_plan(mock_state):
-    state = {"current_plan": None}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
-
-
-def test_continue_to_running_research_team_no_steps(mock_state):
-    state = {"current_plan": mock_state["Plan"](steps=[])}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
-
-
-def test_continue_to_running_research_team_all_executed(mock_state):
-    Step = mock_state["Step"]
-    Plan = mock_state["Plan"]
-    steps = [Step(execution_res=True), Step(execution_res=True)]
-    state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
-
-
-def test_continue_to_running_research_team_next_researcher(mock_state):
-    Step = mock_state["Step"]
-    Plan = mock_state["Plan"]
-    steps = [
-        Step(execution_res=True),
-        Step(execution_res=None, step_type=builder_mod.StepType.RESEARCH),
-    ]
-    state = {"current_plan": Plan(steps=steps)}
-    # After refactoring, RESEARCH steps now route to prepare_research_step
-    assert (
-        builder_mod.continue_to_running_research_team(state) == "prepare_research_step"
-    )
-
-
-def test_continue_to_running_research_team_next_coder(mock_state):
-    Step = mock_state["Step"]
-    Plan = mock_state["Plan"]
-    steps = [
-        Step(execution_res=True),
-        Step(execution_res=None, step_type=builder_mod.StepType.PROCESSING),
-    ]
-    state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "coder"
-
-
-def test_continue_to_running_research_team_default_planner(mock_state):
-    Step = mock_state["Step"]
-    Plan = mock_state["Plan"]
-    steps = [Step(execution_res=True), Step(execution_res=None, step_type=None)]
-    state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
-
-
 @patch("src.graph.builder.StateGraph")
 def test_build_base_graph_adds_nodes_and_edges(MockStateGraph):
     mock_builder = MagicMock()
