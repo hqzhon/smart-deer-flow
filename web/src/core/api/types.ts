@@ -92,7 +92,7 @@ export interface ReflectionInsightsEvent {
   data: {
     node: string
     insights: {
-      comprehensive_report?: string
+      // comprehensive_report field removed - reports are now generated separately
       knowledge_gaps?: string[]
       primary_follow_up_query?: string
       confidence_score?: number
