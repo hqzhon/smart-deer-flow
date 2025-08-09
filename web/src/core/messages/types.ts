@@ -26,7 +26,7 @@ export interface Message {
   resources?: Array<Resource>;
   // Structured Data
   reflectionInsights?: {
-    comprehensive_report?: string;
+    // comprehensive_report field removed - reports are now generated separately
     knowledge_gaps?: string[];
     primary_follow_up_query?: string;
     is_sufficient?: boolean;

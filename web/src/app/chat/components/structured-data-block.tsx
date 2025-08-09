@@ -77,17 +77,7 @@ function ReflectionInsightsCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {insights.comprehensive_report && (
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <FileText size={14} />
-              Comprehensive Report
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {insights.comprehensive_report}
-            </p>
-          </div>
-        )}
+        {/* comprehensive_report display removed - reports are now generated separately */}
         
         {insights.knowledge_gaps && insights.knowledge_gaps.length > 0 && (
           <div>
