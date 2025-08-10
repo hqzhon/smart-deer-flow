@@ -185,7 +185,7 @@ DeerFlow implements a modular multi-agent system architecture designed for autom
 
 ### Multi-Agent Collaboration Flow
 
-![DeerFlow Multi-Agent Architecture with Reflection](https://mdn.alipayobjects.com/one_clip/afts/img/TCFoT53erbwAAAAAR6AAAAgAoEACAQFr/original)
+![DeerFlow Multi-Agent Architecture with Reflection](./assets/architecture.png)
 
 The system employs a streamlined workflow with the following components:
 
@@ -459,19 +459,19 @@ SmartDeerFlow includes a human in the loop mechanism that allows you to review, 
 
 ## ❓ FAQ
 
-**Q: How do I configure API keys?**  
+**Q: How do I configure API keys?**
 A: Copy `.env.example` to `.env` and add your keys. See [Configuration Guide](docs/configuration_guide.md).
 
-**Q: Can I use local models?**  
+**Q: Can I use local models?**
 A: Yes, supports Ollama and other local providers via `.env` configuration.
 
-**Q: How to enable reflection mechanism?**  
+**Q: How to enable reflection mechanism?**
 A: Set `DEER_FLOW_ENABLE_REFLECTION=true` and use `--enable-reflection` flag.
 
-**Q: What search engines are supported?**  
+**Q: What search engines are supported?**
 A: Tavily, Brave, DuckDuckGo, ArXiv, and more via MCP integrations.
 
-**Q: How to contribute?**  
+**Q: How to contribute?**
 A: Fork → Make changes → Submit PR. Check contribution guidelines.
 
 ## 🌐 API Reference
@@ -537,7 +537,7 @@ This project is open source and available under the [MIT License](./LICENSE).
 
 ## 🙏 Acknowledgments
 
-**Built with:** [LangChain](https://langchain.com/) • [LangGraph](https://langchain-ai.github.io/langgraph/) • [FastAPI](https://fastapi.tiangolo.com/)  
-**Forked from:** [DeerFlow](https://github.com/bytedance/deer-flow) by ByteDance  
+**Built with:** [LangChain](https://langchain.com/) • [LangGraph](https://langchain-ai.github.io/langgraph/) • [FastAPI](https://fastapi.tiangolo.com/)
+**Forked from:** [DeerFlow](https://github.com/bytedance/deer-flow) by ByteDance
 **Thanks to:** [gemini-fullstack-langgraph-quickstart](https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart)
 **Thanks to:** All contributors and the open-source community
