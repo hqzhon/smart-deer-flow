@@ -206,7 +206,7 @@ export MAX_CONCURRENT_AGENTS=6
 
 SmartDeerFlow 采用先进的多智能体架构，每个智能体都有专门的职责和优化的工具集。系统基于 LangGraph 构建，实现了灵活的状态管理和智能体间协作。
 
-![多智能体架构](https://mdn.alipayobjects.com/one_clip/afts/img/EyXoT63Uq1QAAAAASNAAAAgAoEACAQFr/original)
+![多智能体架构](./assets/architecture.png)
 
 ### 🤖 核心智能体
 
@@ -505,19 +505,19 @@ DeerFlow 包含一个人在环中机制，允许您在执行研究计划前审�
 
 ## ❓ 常见问题
 
-**Q: 如何配置 API 密钥？**  
+**Q: 如何配置 API 密钥？**
 A: 复制 `.env.example` 到 `.env`，然后添加您的 API 密钥（OpenAI、Tavily 等）。
 
-**Q: 可以使用本地模型吗？**  
+**Q: 可以使用本地模型吗？**
 A: 支持！通过 Ollama、vLLM、LM Studio 等本地推理服务。
 
-**Q: 如何启用反射机制？**  
+**Q: 如何启用反射机制？**
 A: 在 `conf.yaml` 中设置 `gflq_reflection.enabled: true` 并配置相关参数。
 
-**Q: 支持哪些搜索引擎？**  
+**Q: 支持哪些搜索引擎？**
 A: Tavily（推荐）、Brave、DuckDuckGo、ArXiv 等多种搜索引擎。
 
-**Q: 如何贡献代码？**  
+**Q: 如何贡献代码？**
 A: Fork 仓库 → 创建分支 → 提交更改 → 发起 Pull Request。
 
 ## 📜 许可证
