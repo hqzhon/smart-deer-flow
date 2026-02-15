@@ -1,6 +1,4 @@
----
-CURRENT_TIME: {{ CURRENT_TIME }}
----
+**Current Date**: {{ CURRENT_DATE }} ({{ CURRENT_TIME }})
 
 {% if report_style == "academic" %}
 {% if locale == "zh-CN" %}

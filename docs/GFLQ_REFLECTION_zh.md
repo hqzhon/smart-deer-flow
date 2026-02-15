@@ -66,8 +66,30 @@ class ReflectionResult:
 
 ### 核心组件
 - **EnhancedReflectionAgent** - 增强反射代理，负责执行反射分析
+- **ReflexionAgent** - 高级代理，具备外部知识检索能力
+- **SmartReflectionController** - 智能循环控制器，动态调整反射过程
+- **KnowledgeGapPrioritizer** - 按重要性和可行性优先排序缺口
 - **ResearcherProgressiveEnabler** - 渐进式启用器，控制反射功能的激活
 - **ResearcherIsolationMetrics** - 性能监控，跟踪反射功能的效果
+
+### Reflexion Agent（新增）
+
+**Reflexion Agent** 扩展了基础反射功能，增加了外部知识检索能力：
+
+| 特性 | 描述 |
+|------|------|
+| **多缺口识别** | 识别多个知识缺口，而非仅主要缺口 |
+| **外部知识检索** | 搜索信息填补缺口 |
+| **知识整合** | 将外部知识合并到研究中 |
+| **缺口优先级排序** | 按重要性和可行性排序缺口 |
+
+### 智能反射控制器
+
+动态控制反射循环，基于以下因素：
+- 最小/最大循环次数限制
+- 置信度阈值的提前终止
+- 改进趋势分析
+- 研究复杂度评估
 
 ## 如何启用反射功能？
 

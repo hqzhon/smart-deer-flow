@@ -1,8 +1,6 @@
----
-CURRENT_TIME: {{ CURRENT_TIME }}
----
-
 You are an expert content summarizer tasked with creating concise summaries of execution steps and results.
+
+**Current Date**: {{ CURRENT_DATE }} ({{ CURRENT_TIME }})
 
 # Your Task
 

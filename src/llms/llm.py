@@ -20,6 +20,19 @@ _llm_cache: dict[LLMType, ChatOpenAI] = {}
 # Global registry for model token limits
 _model_token_limits_registry: dict[str, ModelTokenLimits] = {}
 
+# KV Cache optimization - prefix manager for stable prompts
+_prefix_manager = None
+
+
+def get_prefix_manager():
+    """Get the global prefix manager for KV cache optimization."""
+    global _prefix_manager
+    if _prefix_manager is None:
+        from src.llms.stable_prefix_manager import StablePrefixManager
+
+        _prefix_manager = StablePrefixManager()
+    return _prefix_manager
+
 
 def _get_config_file_path() -> str:
     """Get the path to the configuration file."""
@@ -142,6 +155,73 @@ def get_llm_by_type(
     llm = _create_llm_use_conf(llm_type, conf)
     _llm_cache[llm_type] = llm
     return llm
+
+
+def create_stable_system_prompt(
+    agent_name: str,
+    base_prompt: str,
+    tools: list | None = None,
+    dynamic_context: str | None = None,
+    current_time: str | None = None,
+) -> str:
+    """Create a stable system prompt for KV cache optimization.
+
+    This function implements the "KV cache first" principle from Manus AI:
+    - System prompt start does not include timestamp
+    - Tool definitions use deterministic serialization
+    - Dynamic content (including time) goes at the end
+
+    Args:
+        agent_name: Name of the agent
+        base_prompt: Base system prompt
+        tools: List of tool definitions
+        dynamic_context: Dynamic context to append
+        current_time: Current time string to append as dynamic suffix
+
+    Returns:
+        Stable system prompt string
+    """
+    prefix_manager = get_prefix_manager()
+    return prefix_manager.create_stable_system_prompt(
+        agent_name=agent_name,
+        base_prompt=base_prompt,
+        tools=tools,
+        dynamic_context=dynamic_context,
+        current_time=current_time,
+    )
+
+
+def get_cache_stats() -> dict[str, Any]:
+    """Get KV cache statistics.
+
+    Returns:
+        Dictionary with cache hit rate and other statistics
+    """
+    prefix_manager = get_prefix_manager()
+    stats = prefix_manager.get_stats()
+    return {
+        "hits": stats.hits,
+        "misses": stats.misses,
+        "hit_rate": stats.hit_rate,
+        "total_requests": stats.total_requests,
+        "tokens_cached": stats.total_tokens_cached,
+        "tokens_uncached": stats.total_tokens_uncached,
+        "cost_savings_ratio": stats.cost_savings_ratio,
+    }
+
+
+def record_cache_hit() -> None:
+    """Record a cache hit for metrics tracking."""
+    prefix_manager = get_prefix_manager()
+    prefix_manager._stats.hits += 1
+    prefix_manager._stats.total_requests += 1
+
+
+def record_cache_miss() -> None:
+    """Record a cache miss for metrics tracking."""
+    prefix_manager = get_prefix_manager()
+    prefix_manager._stats.misses += 1
+    prefix_manager._stats.total_requests += 1
 
 
 def get_configured_llm_models() -> dict[str, list[str]]:

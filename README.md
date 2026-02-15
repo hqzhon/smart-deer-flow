@@ -39,6 +39,7 @@
 - [🌟 Features](#-features)
 - [⚡ Performance](#-performance)
 - [🏗️ Architecture](#-architecture)
+- [🧠 Context Engineering System](#-context-engineering-system)
 - [🔄 GFLQ Reflection Integration](#-gflq-reflection-integration)
 - [📚 Examples](#-examples)
 - [🐳 Docker](#-docker)
@@ -213,38 +214,89 @@ The system employs a streamlined workflow with the following components:
    - **Coder**: Handles code analysis, execution, and technical tasks using Python REPL tool
    - Each agent operates within the LangGraph framework with optimized tool access
 
-4. **Reporter**: Final stage processor for research outputs
+5. **Reporter**: Final stage processor for research outputs
    - Aggregates findings from the research team
    - Processes and structures the collected information
    - Generates comprehensive research reports
 
-## 🔄 GFLQ Reflection Integration
+## 🧠 Context Engineering System
 
-**SmartDeerFlow** is implementing an advanced reflection mechanism based on GFLQ (Goal-Focused Learning Query) to enhance research quality and system intelligence.
+**SmartDeerFlow** implements an advanced Context Engineering system following Manus AI principles for optimal LLM context management and efficiency.
 
 ### Overview
 
-The GFLQ reflection integration introduces a self-improvement capability that allows the system to:
-- **Analyze research gaps** and identify missing information
-- **Generate follow-up queries** to fill knowledge gaps
-- **Evaluate research completeness** and suggest improvements
-- **Learn from past research patterns** to optimize future queries
+The Context Engineering system provides unified context management through multiple specialized components:
+
+| Component | Purpose | Key Principle |
+|-----------|---------|---------------|
+| **FileBasedMemory** | Filesystem as unlimited external memory | Persist context beyond token limits |
+| **AttentionManager** | Attention manipulation through restatement | Control model focus areas |
+| **KVCacheOptimizer** | KV-Cache optimization with stable prefix | Maximize cache hit rate |
+| **SmartCompressor** | Intelligent context compression | Preserve critical information |
+| **DiversityInjector** | Avoid few-shot traps | Prevent pattern fixation |
+| **ErrorRecovery** | Preserve error content for learning | Learn from failures |
 
 ### Key Features
 
-- 🎯 **Goal-Focused Analysis** - Evaluates research against specific objectives
-- 🔍 **Gap Detection** - Identifies missing information and knowledge gaps
-- 🔄 **Iterative Improvement** - Continuously refines research strategies
-- 📊 **Quality Assessment** - Measures research completeness and relevance
-- ⚡ **Fast Integration** - Experimental MVP approach for rapid deployment
+- 📁 **File-Based External Memory** - Use filesystem as unlimited context storage
+- 🎯 **Attention Manipulation** - Control model focus through strategic restatement
+- ⚡ **KV-Cache Optimization** - Stable prefix design for maximum cache efficiency
+- 🗜️ **Smart Compression** - Intelligent content compression preserving key information
+- 🎲 **Diversity Injection** - Prevent pattern fixation with controlled variation
+- 🔄 **Error Recovery** - Keep failed attempts in context for implicit learning
+- 🎭 **Tool Masking** - Constrain actions via logit masking, not removal
 
+### Architecture Principles
 
-### Benefits
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Context Engineering Manager                 │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ File Memory  │  │  Attention   │  │  KV-Cache    │      │
+│  │   (Persist)  │  │ (Manipulate) │  │  (Optimize)  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ Compressor   │  │  Diversity   │  │    Error     │      │
+│  │  (Compress)  │  │  (Variation) │  │  (Learning)  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
 
-- **Improved Research Quality** - More comprehensive and complete research results
-- **Intelligent Adaptation** - System learns and improves research strategies
-- **Reduced Manual Intervention** - Automatic gap detection and follow-up
-- **Enhanced User Experience** - More relevant and thorough research outputs
+### Configuration
+
+```python
+from src.context import ContextEngineeringManager, ContextEngineeringConfig
+
+config = ContextEngineeringConfig(
+    enable_file_memory=True,
+    enable_attention_injection=True,
+    enable_kv_cache=True,
+    enable_smart_compression=True,
+    max_context_tokens=8000,
+    attention_injection_interval=5,
+)
+
+manager = ContextEngineeringManager(config)
+```
+
+## 🔄 GFLQ Reflection Integration
+
+**SmartDeerFlow** implements an advanced reflection mechanism based on GFLQ (Goal-Focused Learning Query) with the new **Reflexion Agent**:
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Gap Identification** | Identify multiple knowledge gaps |
+| **External Knowledge Retrieval** | Search for information to fill gaps |
+| **Knowledge Integration** | Merge external knowledge into research |
+| **Smart Reflection Controller** | Adaptive reflection based on context |
+| **Gap Prioritization** | Rank gaps by importance and feasibility |
+
+### Key Benefits
+
+- 🎯 **Improved Research Quality** - More comprehensive and complete results
+- 🔄 **Intelligent Adaptation** - System learns and improves strategies
+- ⚡ **Reduced Manual Intervention** - Automatic gap detection and follow-up
 
 > **Details**: [GFLQ Reflection Integration](./docs/GFLQ_REFLECTION_en.md)
 

@@ -7,8 +7,9 @@ import os
 import traceback
 from datetime import datetime
 from typing import Annotated, Literal, List, Dict, Any, Set
+from uuid import uuid4
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.types import Command, interrupt
@@ -34,6 +35,14 @@ from src.utils.common.json_utils import repair_json_output
 
 from .types import State
 from src.models.planner_model import Plan, Step, StepType
+
+# Context Engineering imports - Manus-style context management
+from src.context import (
+    ResearchMemoryManager,
+    AttentionManager,
+    ErrorRecoveryManager,
+)
+from src.context.metrics import get_metrics_collector
 
 # ReflectionIntegrationConfig removed - using unified ReflectionSettings from src.config.models
 
@@ -902,6 +911,12 @@ def coordinator_node(
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
     """Coordinator node that communicate with customers."""
     logger.info("Coordinator talking.")
+
+    # Initialize context engineering components
+    thread_id = state.get("thread_id") or str(uuid4())
+    memory_manager = ResearchMemoryManager.get_instance()
+    attention_manager = AttentionManager.get_instance()
+
     configurable = get_configuration_from_config(config)
     messages = apply_prompt_template("coordinator", state, configurable)
 
@@ -946,19 +961,37 @@ def coordinator_node(
         )
         logger.debug(f"Coordinator response: {response}")
 
+    # Initialize research memory and goal tracker if research topic is set
+    if research_topic:
+        try:
+            memory_manager.start_research(
+                thread_id=thread_id, research_topic=research_topic, initial_plan={}
+            )
+            attention_manager.create_goal_tracker(thread_id, research_topic)
+            logger.info(f"Initialized context engineering for thread: {thread_id}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize context engineering: {e}")
+
     return Command(
         update={
             "locale": locale,
             "research_topic": research_topic,
             "resources": configurable.resources,
+            "thread_id": thread_id,
         },
         goto=goto,
     )
 
 
 def reporter_node(state: State, config: RunnableConfig):
-    """Reporter node that write a final report."""
+    """Reporter node that write a final report with context engineering integration."""
     logger.info("Reporter write final report")
+
+    # Context engineering setup
+    thread_id = state.get("thread_id", "default")
+    memory_manager = ResearchMemoryManager.get_instance()
+    metrics_collector = get_metrics_collector()
+
     configurable = get_configuration_from_config(config)
     current_plan = state.get("current_plan")
     input_ = {
@@ -1005,7 +1038,32 @@ def reporter_node(state: State, config: RunnableConfig):
     )
     logger.info(f"reporter response: {response_content}")
 
-    return {"final_report": response_content}
+    # Save report to memory and export metrics
+    try:
+        memory = memory_manager.get_memory(thread_id)
+        memory.findings.add_key_insight(f"报告已生成: {len(response_content)} 字符")
+        memory.progress.log_action("生成最终报告", "完成")
+        memory.persist()
+        logger.info(f"Saved report to memory for thread: {thread_id}")
+    except Exception as e:
+        logger.warning(f"Failed to save report to memory: {e}")
+
+    # Export context engineering metrics
+    try:
+        metrics = metrics_collector.get_metrics(thread_id)
+        metrics.calculate_rates()
+        context_metrics = metrics.to_dict()
+        logger.info(
+            f"Context engineering metrics: cache_hit_rate={metrics.cache_hit_rate:.2%}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to export metrics: {e}")
+        context_metrics = None
+
+    return {
+        "final_report": response_content,
+        "context_metrics": context_metrics,
+    }
 
 
 async def research_team_node(state: State, config: RunnableConfig):
@@ -1795,12 +1853,46 @@ async def researcher_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team", "planner"]]:
     """
-    Orchestrates the research workflow.
+    Orchestrates the research workflow with context engineering integration.
     """
     logger.info("Executing research workflow.")
+
+    # Context engineering setup
+    thread_id = state.get("thread_id", "default")
+    memory_manager = ResearchMemoryManager.get_instance()
+    attention_manager = AttentionManager.get_instance()
+    error_manager = ErrorRecoveryManager.get_instance()
+    metrics_collector = get_metrics_collector()
+
     try:
         # Create a copy of the state to avoid side effects during the process
         current_state = state.copy()
+
+        # Inject context summary from memory (Manus-style attention manipulation)
+        try:
+            context_message = memory_manager.create_context_message(current_state)
+            if context_message:
+                current_state["messages"] = list(current_state.get("messages", []))
+                current_state["messages"].append(context_message)
+                logger.debug("Injected context summary from memory")
+        except Exception as e:
+            logger.warning(f"Failed to inject context summary: {e}")
+
+        # Check and inject attention reminder if needed
+        try:
+            if attention_manager.should_inject_attention(current_state):
+                reminder = attention_manager.inject_attention_reminder(
+                    current_state, force_inject=True
+                )
+                if reminder:
+                    current_state["messages"] = list(current_state.get("messages", []))
+                    current_state["messages"].append(SystemMessage(content=reminder))
+                    metrics_collector.get_metrics(
+                        thread_id
+                    ).record_attention_injection()
+                    logger.debug("Injected attention reminder")
+        except Exception as e:
+            logger.warning(f"Failed to inject attention reminder: {e}")
 
         # Step 1: Prepare research step
         prepare_result = await prepare_research_step_node(current_state, config)
@@ -1836,6 +1928,22 @@ async def researcher_node(
                 logger.info(
                     f"Set execution_res for step '{current_step.title}' with result length: {len(research_result)}"
                 )
+
+                # Record successful step in memory
+                try:
+                    memory_manager.log_action(
+                        action=f"完成研究步骤: {current_step.title}",
+                        result="成功",
+                        thread_id=thread_id,
+                    )
+                    # Record observations
+                    observations = current_state.get("observations", [])
+                    for obs in observations[-3:]:  # Record last 3 observations
+                        memory_manager.add_observation(
+                            obs[:500], "research", thread_id=thread_id
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to record in memory: {e}")
             else:
                 logger.warning(
                     f"Could not find step '{current_step.title}' in plan to update execution_res"
@@ -1890,6 +1998,12 @@ async def researcher_node(
         # Step 5: Check if the research is complete
         completion_status = check_research_completion_node(current_state)
 
+        # Persist memory after successful research step
+        try:
+            memory_manager.get_memory(thread_id).persist()
+        except Exception as e:
+            logger.warning(f"Failed to persist memory: {e}")
+
         # **THE CRITICAL FIX IS HERE**
         # Return a Command object that contains the *full*, potentially modified state.
         # This ensures that any updates to the plan (e.g., new steps from reflection)
@@ -1904,10 +2018,22 @@ async def researcher_node(
                 "research_topic": state.get("research_topic", ""),
                 "resources": state.get("resources", []),
                 "messages": state.get("messages", []),
+                "thread_id": thread_id,
             },
         )
 
     except Exception as e:
+        # Record error for learning (Manus-style error preservation)
+        try:
+            error_manager.record_error(
+                error_type=type(e).__name__,
+                error_message=str(e),
+                context=f"Research workflow for thread: {thread_id}",
+            )
+            metrics_collector.get_metrics(thread_id).record_error(recovered=False)
+        except Exception as record_error:
+            logger.warning(f"Failed to record error: {record_error}")
+
         logger.error(f"Research workflow failed: {e}", exc_info=True)
         raise
 

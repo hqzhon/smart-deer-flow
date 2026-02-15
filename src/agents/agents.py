@@ -116,7 +116,7 @@ def apply_prompt_template_content(
         List of messages with the system prompt as the first message
     """
     from src.utils.context.context_evaluator import get_global_context_evaluator
-    from datetime import datetime
+    from datetime import datetime, timezone
     import logging
 
     logger = logging.getLogger(__name__)
@@ -171,8 +171,14 @@ def apply_prompt_template_content(
         evaluated_messages = state.get("messages", [])
 
     # Prepare state variables for template rendering
+    now = datetime.now(timezone.utc)
     state_vars = {
-        "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
+        "CURRENT_TIME": now.strftime("%a %b %d %Y %H:%M:%S %z"),
+        "CURRENT_DATE": now.strftime("%Y-%m-%d"),
+        "CURRENT_DATETIME_ISO": now.isoformat(),
+        "CURRENT_YEAR": now.year,
+        "CURRENT_MONTH": now.month,
+        "CURRENT_DAY": now.day,
         **{k: v for k, v in state.items() if k != "messages"},
     }
 

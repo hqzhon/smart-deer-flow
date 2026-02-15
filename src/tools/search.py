@@ -18,6 +18,11 @@ from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchResultsWithImages,
 )
 from src.tools.decorators import create_logged_tool
+from src.tools.time_context import (
+    get_current_time_context,
+    enhance_query_with_time,
+    is_time_sensitive_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +77,17 @@ class SmartSearchTool(BaseTool):
         return getattr(self.base_tool, "api_wrapper", None)
 
     def _run(self, query: str, **kwargs) -> str:
-        """Execute search with smart filtering."""
+        """Execute search with smart filtering and time context."""
         try:
-            # Get raw search results from the base tool
+            time_context = get_current_time_context()
+
+            if is_time_sensitive_query(query):
+                enhanced_query = enhance_query_with_time(query, time_context)
+                logger.info(
+                    f"Time-sensitive query detected. Enhanced query: '{query}' -> '{enhanced_query}'"
+                )
+                query = enhanced_query
+
             raw_results = self.base_tool._run(query, **kwargs)
 
             # If smart filtering is disabled, return raw results

@@ -122,6 +122,56 @@ class ReflectionSettings(BaseModel):
     )
 
 
+class ContextEngineeringSettings(BaseModel):
+    """Context engineering configuration settings - Manus-style context management."""
+
+    enabled: bool = Field(
+        default=True, description="Enable context engineering features."
+    )
+
+    memory_base_dir: str = Field(
+        default=".deer-flow-memory",
+        description="Base directory for file-based memory storage.",
+    )
+
+    auto_persist: bool = Field(
+        default=True, description="Automatically persist memory to disk."
+    )
+
+    attention_injection_interval: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Number of messages between attention reminder injections.",
+    )
+
+    max_error_history: int = Field(
+        default=100,
+        ge=10,
+        le=1000,
+        description="Maximum number of errors to keep in history.",
+    )
+
+    enable_compression: bool = Field(
+        default=True, description="Enable context compression when approaching limits."
+    )
+
+    compression_threshold: float = Field(
+        default=0.9,
+        ge=0.5,
+        le=1.0,
+        description="Token usage threshold to trigger compression.",
+    )
+
+    kv_cache_tracking: bool = Field(
+        default=True, description="Enable KV cache hit rate tracking."
+    )
+
+    goal_drift_detection: bool = Field(
+        default=True, description="Enable goal drift detection warnings."
+    )
+
+
 class FollowUpMergerSettings(BaseModel):
     """Follow-up query result merging configuration settings"""
 
@@ -408,6 +458,9 @@ class AppSettings(BaseSettings):
     agents: AgentSettings = Field(default_factory=AgentSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
     reflection: ReflectionSettings = Field(default_factory=ReflectionSettings)
+    context_engineering: ContextEngineeringSettings = Field(
+        default_factory=ContextEngineeringSettings
+    )
     followup_merger: FollowUpMergerSettings = Field(
         default_factory=FollowUpMergerSettings
     )

@@ -57,6 +57,14 @@ from src.server.config_request import ConfigResponse
 from src.llms.llm import get_configured_llm_models
 from src.tools.tts import VolcengineTTS
 
+# Context Engineering imports - Manus-style context management
+from src.context import (
+    ResearchMemoryManager,
+    AttentionManager,
+    ErrorRecoveryManager,
+)
+from src.context.metrics import MetricsCollector
+
 logger = logging.getLogger(__name__)
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
@@ -159,6 +167,16 @@ async def lifespan(app: FastAPI):
             },
         },
     )
+
+    # Initialize Context Engineering components (Manus-style)
+    try:
+        _ = ResearchMemoryManager.get_instance()
+        _ = AttentionManager.get_instance()
+        _ = ErrorRecoveryManager.get_instance()
+        _ = MetricsCollector.get_instance()
+        logger.info("Context engineering components initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize context engineering components: {e}")
 
     # Start batch processor (enhanced or basic based on config)
     if config.enable_advanced_optimization:
@@ -1148,6 +1166,56 @@ async def config():
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
     )
+
+
+# Context Engineering API endpoints - Manus-style context management
+@app.get("/api/context/memory/{thread_id}")
+async def get_context_memory(thread_id: str):
+    """Get research memory state for a thread."""
+    try:
+        memory_manager = ResearchMemoryManager.get_instance()
+        memory = memory_manager.get_memory(thread_id)
+        return memory.export_state()
+    except Exception as e:
+        logger.error(f"Error getting context memory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/context/memory/{thread_id}")
+async def clear_context_memory(thread_id: str):
+    """Clear research memory for a thread."""
+    try:
+        memory_manager = ResearchMemoryManager.get_instance()
+        success = memory_manager.delete_session(thread_id)
+        return {"status": "cleared" if success else "not_found"}
+    except Exception as e:
+        logger.error(f"Error clearing context memory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/context/metrics/{thread_id}")
+async def get_context_metrics(thread_id: str):
+    """Get context engineering metrics for a thread."""
+    try:
+        metrics_collector = MetricsCollector.get_instance()
+        metrics = metrics_collector.get_metrics(thread_id)
+        metrics.calculate_rates()
+        return metrics.to_dict()
+    except Exception as e:
+        logger.error(f"Error getting context metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/context/sessions")
+async def list_context_sessions():
+    """List all research sessions."""
+    try:
+        memory_manager = ResearchMemoryManager.get_instance()
+        sessions = memory_manager.list_sessions()
+        return {"sessions": sessions, "count": len(sessions)}
+    except Exception as e:
+        logger.error(f"Error listing context sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/metrics")

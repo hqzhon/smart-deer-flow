@@ -66,8 +66,30 @@ class ReflectionResult:
 
 ### Core Components
 - **EnhancedReflectionAgent** - Enhanced reflection agent responsible for executing reflection analysis
+- **ReflexionAgent** - Advanced agent with external knowledge retrieval capability
+- **SmartReflectionController** - Intelligent loop control with dynamic adjustment
+- **KnowledgeGapPrioritizer** - Prioritizes gaps by importance and feasibility
 - **ResearcherProgressiveEnabler** - Progressive enabler controlling reflection feature activation
 - **ResearcherIsolationMetrics** - Performance monitoring tracking reflection feature effectiveness
+
+### Reflexion Agent (New)
+
+The **Reflexion Agent** extends basic reflection with external knowledge retrieval:
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Gap Identification** | Identifies multiple knowledge gaps, not just primary |
+| **External Knowledge Retrieval** | Searches for information to fill gaps |
+| **Knowledge Integration** | Merges external knowledge into research |
+| **Gap Prioritization** | Ranks gaps by importance and feasibility |
+
+### Smart Reflection Controller
+
+Controls reflection loops dynamically based on:
+- Minimum/maximum loop constraints
+- Confidence threshold for early termination
+- Improvement trend analysis
+- Research complexity estimation
 
 ## How to Enable the Reflection Feature?
 

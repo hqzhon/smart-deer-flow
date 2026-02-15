@@ -3,7 +3,7 @@
 
 import os
 import dataclasses
-from datetime import datetime
+from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langgraph.prebuilt.chat_agent_executor import AgentState
 
@@ -138,8 +138,14 @@ def apply_prompt_template(
         evaluated_messages = state.get("messages", [])
 
     # Convert state to dict for template rendering, but exclude messages to avoid duplication
+    now = datetime.now(timezone.utc)
     state_vars = {
-        "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
+        "CURRENT_TIME": now.strftime("%a %b %d %Y %H:%M:%S %z"),
+        "CURRENT_DATE": now.strftime("%Y-%m-%d"),
+        "CURRENT_DATETIME_ISO": now.isoformat(),
+        "CURRENT_YEAR": now.year,
+        "CURRENT_MONTH": now.month,
+        "CURRENT_DAY": now.day,
         **{
             k: v for k, v in state.items() if k != "messages"
         },  # CRITICAL: Exclude messages from state_vars

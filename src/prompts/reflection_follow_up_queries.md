@@ -1,8 +1,6 @@
----
-CURRENT_TIME: {{ CURRENT_TIME }}
----
-
 You are an expert research analyst tasked with generating specific follow-up queries to address knowledge gaps in ongoing research.
+
+**Current Date**: {{ CURRENT_DATE }} ({{ CURRENT_TIME }})
 
 # Your Task
 

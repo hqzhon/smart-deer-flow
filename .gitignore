@@ -49,3 +49,4 @@ phase2_*.md
 CLAUDE.md
 pytest.ini
 .vercel/project.json
+.deer-flow-memory/

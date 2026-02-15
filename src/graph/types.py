@@ -55,6 +55,23 @@ class ReflectionState(BaseModel):
     )
 
 
+class ContextEngineeringState(BaseModel):
+    """Context engineering state for Manus-style context management."""
+
+    thread_id: str = Field(default="", description="Session thread identifier")
+    memory_initialized: bool = Field(
+        default=False, description="Whether memory is initialized"
+    )
+    attention_injections: int = Field(
+        default=0, description="Number of attention reminders injected"
+    )
+    error_count: int = Field(default=0, description="Number of errors encountered")
+    cache_hits: int = Field(default=0, description="Number of cache hits")
+    cache_misses: int = Field(default=0, description="Number of cache misses")
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
 class State(MessagesState):
     """State for the agent system, extends MessagesState with modular reflection state."""
 
@@ -74,6 +91,13 @@ class State(MessagesState):
     agent_configurable: Optional[Any] = (
         None  # Store configurable object for research components
     )
+
+    # Context Engineering State - for Manus-style context management
+    thread_id: str = ""
+    context_memory: Optional[Dict[str, Any]] = None
+    goal_tracker: Optional[Dict[str, Any]] = None
+    error_history: List[Dict[str, Any]] = []
+    context_metrics: Optional[Dict[str, Any]] = None
 
     # Modular Reflection State - initialized in properties
     # reflection: ReflectionState - handled via properties

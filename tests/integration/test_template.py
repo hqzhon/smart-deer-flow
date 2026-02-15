@@ -33,7 +33,10 @@ def test_apply_prompt_template():
     assert isinstance(messages, list)
     assert len(messages) > 1
     assert messages[0]["role"] == "system"
-    assert "CURRENT_TIME" in messages[0]["content"]
+    assert (
+        "Current Date" in messages[0]["content"]
+        or "CURRENT_DATE" in messages[0]["content"]
+    )
     assert messages[1]["role"] == "user"
     assert messages[1]["content"] == "test message"
 
@@ -101,10 +104,8 @@ def test_current_time_format():
     messages = apply_prompt_template("coder", test_state)
     system_content = messages[0]["content"]
 
-    # Time format should be like: Mon Jan 01 2024 12:34:56 +0000
-    assert any(
-        line.strip().startswith("CURRENT_TIME:") for line in system_content.split("\n")
-    )
+    # Time format should be like: **Current Date**: 2024-01-01 (Mon Jan 01 2024 12:34:56 +0000)
+    assert "Current Date" in system_content or "CURRENT_DATE" in system_content
 
 
 def test_apply_prompt_template_reporter():

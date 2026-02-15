@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..template import apply_prompt_template
@@ -44,12 +44,18 @@ class ReflectionPromptManager:
         # Set language environment
         locale = "zh-CN" if language == Language.ZH_CN else "en-US"
 
-        # Prepare template variables
+        # Prepare template variables with timezone-aware datetime
+        now = datetime.now(timezone.utc)
         template_vars = {
-            "CURRENT_TIME": datetime.now().isoformat(),
+            "CURRENT_TIME": now.strftime("%a %b %d %Y %H:%M:%S %z"),
+            "CURRENT_DATE": now.strftime("%Y-%m-%d"),
+            "CURRENT_DATETIME_ISO": now.isoformat(),
+            "CURRENT_YEAR": now.year,
+            "CURRENT_MONTH": now.month,
+            "CURRENT_DAY": now.day,
             "locale": locale,
             "research_topic": research_topic,
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "current_date": now.strftime("%Y-%m-%d"),
             "current_step_index": current_step_index,
             "total_steps": total_steps,
             "current_reflection_loop": current_reflection_loop,
@@ -91,12 +97,18 @@ class ReflectionPromptManager:
         # Set language environment
         locale = "zh-CN" if language == Language.ZH_CN else "en-US"
 
-        # Prepare template variables
+        # Prepare template variables with timezone-aware datetime
+        now = datetime.now(timezone.utc)
         template_vars = {
-            "CURRENT_TIME": datetime.now().isoformat(),
+            "CURRENT_TIME": now.strftime("%a %b %d %Y %H:%M:%S %z"),
+            "CURRENT_DATE": now.strftime("%Y-%m-%d"),
+            "CURRENT_DATETIME_ISO": now.isoformat(),
+            "CURRENT_YEAR": now.year,
+            "CURRENT_MONTH": now.month,
+            "CURRENT_DAY": now.day,
             "locale": locale,
             "research_topic": research_topic,
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "current_date": now.strftime("%Y-%m-%d"),
             "primary_knowledge_gap": primary_knowledge_gap,
             "priority_areas": priority_areas,
         }
