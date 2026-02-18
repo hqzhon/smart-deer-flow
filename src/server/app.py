@@ -56,6 +56,11 @@ from src.server.rag_request import (
 from src.server.config_request import ConfigResponse
 from src.llms.llm import get_configured_llm_models
 from src.tools.tts import VolcengineTTS
+from src.server.session_routes import router as session_router
+from src.server.browser_routes import router as browser_router
+from src.server.analysis_routes import router as analysis_router
+from src.server.sandbox_routes import router as sandbox_router
+from src.server.metrics_routes import router as metrics_router
 
 # Context Engineering imports - Manus-style context management
 from src.context import (
@@ -283,6 +288,13 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Include routers
+app.include_router(session_router)
+app.include_router(browser_router)
+app.include_router(analysis_router)
+app.include_router(sandbox_router)
+app.include_router(metrics_router)
 
 graph = build_graph(True)
 

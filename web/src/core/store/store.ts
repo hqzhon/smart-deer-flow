@@ -173,7 +173,7 @@ export async function sendMessage(
         }
       }
     }
-  } catch (error) {
+  } catch {
     toast("An error occurred while generating the response. Please try again.");
     // Update message status.
     if (messageId != null) {

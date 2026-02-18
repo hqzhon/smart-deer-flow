@@ -299,6 +299,70 @@ class AdvancedContextConfig(BaseModel):
     debug_mode: bool = False
 
 
+class SandboxSettings(BaseModel):
+    """Sandbox configuration settings."""
+
+    enabled: bool = Field(default=False, description="Enable sandbox execution")
+    image: str = Field(default="python:3.12-slim", description="Docker image")
+    work_dir: str = Field(default="/workspace", description="Working directory")
+    memory_limit: str = Field(default="512m", description="Memory limit")
+    cpu_limit: float = Field(default=1.0, ge=0.1, le=4.0, description="CPU limit")
+    timeout: int = Field(default=300, ge=10, description="Default timeout in seconds")
+    network_enabled: bool = Field(default=False, description="Network access")
+    max_sandboxes: int = Field(
+        default=100, ge=1, description="Maximum concurrent sandboxes"
+    )
+    idle_timeout: int = Field(
+        default=3600, ge=60, description="Idle timeout in seconds"
+    )
+
+
+class DaytonaSettings(BaseModel):
+    """Daytona cloud sandbox configuration settings."""
+
+    enabled: bool = Field(default=False, description="Enable Daytona cloud sandbox")
+    api_key: Optional[str] = Field(default=None, description="Daytona API key")
+    server_url: Optional[str] = Field(default=None, description="Daytona server URL")
+    target: Optional[str] = Field(default=None, description="Daytona target")
+    sandbox_image: str = Field(
+        default="whitezxj/sandbox:0.1.0", description="Sandbox image name"
+    )
+    vnc_password: str = Field(default="deerflow", description="VNC password")
+    cpu: int = Field(default=2, ge=1, le=8, description="CPU cores")
+    memory: int = Field(default=4, ge=1, le=16, description="Memory in GB")
+    disk: int = Field(default=5, ge=1, le=50, description="Disk in GB")
+    auto_stop_interval: int = Field(
+        default=15, description="Auto stop interval in minutes"
+    )
+    auto_archive_interval: int = Field(
+        default=1440, description="Auto archive interval in minutes"
+    )
+
+
+class BrowserSettings(BaseModel):
+    """Browser automation configuration settings."""
+
+    enabled: bool = Field(default=False, description="Enable browser automation")
+    headless: bool = Field(default=True, description="Run browser in headless mode")
+    disable_security: bool = Field(
+        default=False, description="Disable browser security features"
+    )
+    viewport_width: int = Field(
+        default=1920, ge=800, description="Browser viewport width"
+    )
+    viewport_height: int = Field(
+        default=1080, ge=600, description="Browser viewport height"
+    )
+    user_agent: Optional[str] = Field(
+        default=None, description="Custom user agent string"
+    )
+    proxy_server: Optional[str] = Field(default=None, description="Proxy server URL")
+    timeout: int = Field(
+        default=30000, ge=1000, description="Default page load timeout in ms"
+    )
+    max_tabs: int = Field(default=10, ge=1, description="Maximum number of tabs")
+
+
 class MCPSettings(BaseModel):
     """MCP (Model Context Protocol) settings."""
 
@@ -443,6 +507,8 @@ class AgentLLMSettings(BaseModel):
     ppt_composer: LLMType = "basic"
     prose_writer: LLMType = "basic"
     prompt_enhancer: LLMType = "basic"
+    browser: LLMType = "basic"
+    data_analysis: LLMType = "basic"
 
 
 class AppSettings(BaseSettings):
@@ -470,6 +536,9 @@ class AppSettings(BaseSettings):
         default_factory=AdvancedContextConfig
     )
     mcp: MCPSettings = Field(default_factory=MCPSettings)
+    sandbox: SandboxSettings = Field(default_factory=SandboxSettings)
+    daytona: DaytonaSettings = Field(default_factory=DaytonaSettings)
+    browser: BrowserSettings = Field(default_factory=BrowserSettings)
     tools: ToolSettings = Field(default_factory=ToolSettings)
     performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
     agent_llm_map: AgentLLMSettings = Field(default_factory=AgentLLMSettings)
@@ -526,6 +595,18 @@ class AppSettings(BaseSettings):
     def get_mcp_config(self) -> MCPSettings:
         """Get MCP configuration."""
         return self.mcp
+
+    def get_sandbox_config(self) -> SandboxSettings:
+        """Get sandbox configuration."""
+        return self.sandbox
+
+    def get_daytona_config(self) -> DaytonaSettings:
+        """Get Daytona configuration."""
+        return self.daytona
+
+    def get_browser_config(self) -> BrowserSettings:
+        """Get browser configuration."""
+        return self.browser
 
     def get_tool_config(self) -> ToolSettings:
         """Get tool configuration."""
