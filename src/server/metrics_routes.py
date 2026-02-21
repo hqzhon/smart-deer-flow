@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
+from src.utils.common.format_utils import format_bytes
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
@@ -130,11 +132,11 @@ async def get_system_metrics():
         return SystemMetrics(
             cpu_usage=cpu_usage,
             memory_usage=memory.percent,
-            memory_used=_format_bytes(memory.used),
-            memory_total=_format_bytes(memory.total),
+            memory_used=format_bytes(memory.used),
+            memory_total=format_bytes(memory.total),
             disk_usage=disk.percent,
-            disk_used=_format_bytes(disk.used),
-            disk_total=_format_bytes(disk.total),
+            disk_used=format_bytes(disk.used),
+            disk_total=format_bytes(disk.total),
             network_connections=network_connections,
             process_count=len(psutil.pids()),
             load_average=list(os.getloadavg()) if hasattr(os, "getloadavg") else [],
@@ -377,12 +379,3 @@ def _trim_metrics_store(max_size: int = 1000):
     for key in _metrics_store:
         if len(_metrics_store[key]) > max_size:
             _metrics_store[key] = _metrics_store[key][-max_size:]
-
-
-def _format_bytes(size: int) -> str:
-    """Format bytes to human readable string."""
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size < 1024:
-            return f"{size:.1f}{unit}"
-        size /= 1024
-    return f"{size:.1f}PB"

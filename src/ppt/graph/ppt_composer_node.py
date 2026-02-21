@@ -5,7 +5,7 @@ import logging
 import os
 import uuid
 
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.config.config_loader import get_settings
 from src.llms.llm import get_llm_by_type

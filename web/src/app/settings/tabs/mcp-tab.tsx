@@ -91,7 +91,7 @@ export const MCPTab: Tab = ({ settings, onChange }) => {
           {servers.map((server) => {
             const isNew =
               server.createdAt &&
-              server.createdAt > Date.now() - 1000 * 60 * 60 * 1;
+              new Date(server.createdAt).getTime() > Date.now() - 1000 * 60 * 60 * 1;
             return (
               <motion.li
                 className={
@@ -190,12 +190,12 @@ function mergeServers(
   const serverMap = new Map(existing.map((server) => [server.name, server]));
 
   for (const addedServer of added) {
-    addedServer.createdAt = Date.now();
-    addedServer.updatedAt = Date.now();
+    addedServer.createdAt = new Date().toISOString();
+    addedServer.updatedAt = new Date().toISOString();
     serverMap.set(addedServer.name, addedServer);
   }
 
   const result = Array.from(serverMap.values());
-  result.sort((a, b) => b.createdAt - a.createdAt);
+  result.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   return result;
 }

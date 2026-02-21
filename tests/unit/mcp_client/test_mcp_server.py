@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from src.mcp.server import MCPServer, MCPServerSettings
+from src.mcp_integration.server import MCPServer, MCPServerSettings
 
 
 class TestMCPServerSettings:

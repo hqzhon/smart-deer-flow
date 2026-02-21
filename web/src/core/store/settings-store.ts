@@ -102,18 +102,14 @@ export const getChatStreamSettings = () => {
         let server: SimpleMCPServerMetadata;
         if (transport === "stdio") {
           server = {
-            name: cur.name,
-            transport,
-            env,
-            command: cur.command,
+            command: cur.command ?? "",
             args: cur.args,
+            env,
           };
         } else {
           server = {
-            name: cur.name,
-            transport,
+            url: cur.url ?? "",
             env,
-            url: cur.url,
           };
         }
         return {

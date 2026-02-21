@@ -2,6 +2,17 @@ export function autoFixMarkdown(markdown: string): string {
   return autoCloseTrailingLink(markdown);
 }
 
+export function extractTitleFromMarkdown(markdown: string): string | null {
+  const lines = markdown.split('\n');
+  for (const line of lines) {
+    const match = line.match(/^#\s+(.+)$/);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
 function autoCloseTrailingLink(markdown: string): string {
   // Fix unclosed Markdown links or images, but preserve code blocks
   let fixedMarkdown: string = markdown;

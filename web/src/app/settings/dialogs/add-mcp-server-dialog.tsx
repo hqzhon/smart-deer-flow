@@ -81,24 +81,20 @@ export function AddMCPServerDialog({
     abortControllerRef.current = new AbortController();
     const config = MCPConfigSchema.parse(JSON.parse(input));
     setInput(JSON.stringify(config, null, 2));
-    const addingServers: SimpleMCPServerMetadata[] = [];
+    const addingServers: { name: string; config: SimpleMCPServerMetadata }[] = [];
     for (const [key, server] of Object.entries(config.mcpServers)) {
       if ("command" in server) {
         const metadata: SimpleStdioMCPServerMetadata = {
-          transport: "stdio",
-          name: key,
           command: server.command,
           args: server.args,
           env: server.env,
         };
-        addingServers.push(metadata);
+        addingServers.push({ name: key, config: metadata });
       } else if ("url" in server) {
         const metadata: SimpleSSEMCPServerMetadata = {
-          transport: "sse",
-          name: key,
           url: server.url,
         };
-        addingServers.push(metadata);
+        addingServers.push({ name: key, config: metadata });
       }
     }
     setProcessing(true);
@@ -107,10 +103,10 @@ export function AddMCPServerDialog({
     let processingServer: string | null = null;
     try {
       setError(null);
-      for (const server of addingServers) {
-        processingServer = server.name;
-        const metadata = await queryMCPServerMetadata(server, abortControllerRef.current.signal);
-        results.push({ ...metadata, name: server.name, enabled: true });
+      for (const { name, config } of addingServers) {
+        processingServer = name;
+        const metadata = await queryMCPServerMetadata(config, abortControllerRef.current.signal);
+        results.push({ ...metadata, name, enabled: true });
       }
       if (results.length > 0) {
         onAdd?.(results);

@@ -13,6 +13,8 @@ import "./src/env.js";
 const config = {
   output: "standalone",
 
+  typedRoutes: false,
+
   turbopack: {
     rules: {
       "*.md": {
@@ -62,7 +64,6 @@ const config = {
     webpackBuildWorker: true,
     parallelServerCompiles: true,
     parallelServerBuildTraces: true,
-    typedRoutes: false,
   },
 
   images: {

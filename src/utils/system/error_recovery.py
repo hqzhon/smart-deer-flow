@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Enhanced error recovery mechanism
-Provides intelligent error recovery strategies including circuit breaker pattern, adaptive retry and degradation handling
+Enhanced error recovery mechanism with circuit breaker pattern
+Provides intelligent error recovery strategies including circuit breaker, adaptive retry and degradation handling
 """
 
 import logging
@@ -148,8 +148,8 @@ class CircuitBreaker:
         logger.info("Circuit breaker reset")
 
 
-class ErrorRecoveryManager:
-    """Error recovery manager"""
+class CircuitBreakerManager:
+    """Circuit breaker manager with retry and degradation support"""
 
     def __init__(self, config: RecoveryConfig = None):
         self.config = config or RecoveryConfig()
@@ -300,22 +300,22 @@ class ErrorRecoveryManager:
             circuit_breaker.reset()
 
 
-# Global error recovery manager
-global_recovery_manager = ErrorRecoveryManager()
+# Global circuit breaker manager
+global_circuit_breaker_manager = CircuitBreakerManager()
 
 
-def with_error_recovery(
+def with_circuit_breaker(
     service_name: str,
     strategy: RecoveryStrategy = RecoveryStrategy.EXPONENTIAL_BACKOFF,
     config: RecoveryConfig = None,
 ):
-    """Error recovery decorator"""
+    """Circuit breaker decorator"""
 
     def decorator(func: Callable) -> Callable:
         # Register service
-        recovery_manager = global_recovery_manager
+        recovery_manager = global_circuit_breaker_manager
         if config:
-            recovery_manager = ErrorRecoveryManager(config)
+            recovery_manager = CircuitBreakerManager(config)
 
         recovery_manager.set_recovery_strategy(service_name, strategy)
 

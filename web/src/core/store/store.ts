@@ -140,6 +140,71 @@ export async function sendMessage(
         continue;
       }
       
+      // Handle interrupt events - merge to the last planner message
+      if (type === "interrupt") {
+        const messages = Array.from(useStore.getState().messages.values());
+        const lastPlannerMessage = [...messages].reverse().find(m => m.agent === 'planner');
+        if (lastPlannerMessage) {
+          const updatedMessage = mergeMessage(lastPlannerMessage, event);
+          updateMessage(updatedMessage);
+        }
+        continue;
+      }
+      
+      // Handle reasoning_chunk events - merge to the last planner message
+      if (type === "reasoning_chunk") {
+        const messages = Array.from(useStore.getState().messages.values());
+        const lastPlannerMessage = [...messages].reverse().find(m => m.agent === 'planner');
+        if (lastPlannerMessage && data.reasoning_content) {
+          const updatedMessage = {
+            ...lastPlannerMessage,
+            reasoningContent: (lastPlannerMessage.reasoningContent || "") + data.reasoning_content,
+            reasoningContentChunks: [
+              ...(lastPlannerMessage.reasoningContentChunks || []),
+              data.reasoning_content
+            ],
+          };
+          updateMessage(updatedMessage);
+        }
+        continue;
+      }
+      
+      // Handle streaming content_chunk events from planner - merge to the last planner message
+      if (type === "message_chunk" && data.agent === "planner" && data.content) {
+        const messages = Array.from(useStore.getState().messages.values());
+        const lastPlannerMessage = [...messages].reverse().find(m => m.agent === 'planner');
+        
+        // If no planner message exists, create one
+        if (!lastPlannerMessage) {
+          const newMessage: Message = {
+            id: `planner_${data.thread_id}`,
+            threadId: data.thread_id,
+            agent: "planner",
+            role: "assistant",
+            content: data.content,
+            contentChunks: [data.content],
+            reasoningContent: "",
+            reasoningContentChunks: [],
+            isStreaming: true,
+            interruptFeedback,
+          };
+          appendMessage(newMessage);
+        } else {
+          // Update existing planner message
+          const updatedMessage = {
+            ...lastPlannerMessage,
+            content: (lastPlannerMessage.content || "") + data.content,
+            contentChunks: [
+              ...(lastPlannerMessage.contentChunks || []),
+              data.content
+            ],
+            isStreaming: true,
+          };
+          updateMessage(updatedMessage);
+        }
+        continue;
+      }
+      
       // Handle regular message events that have id
       if ('id' in data) {
         // Skip messages with unknown agent to prevent errors
@@ -149,6 +214,33 @@ export async function sendMessage(
         
         messageId = data.id;
         let message: Message | undefined;
+        
+        // For planner messages, check if we already have a streaming planner message
+        // If so, update it instead of creating a new one
+        if (data.agent === 'planner') {
+          const messages = Array.from(useStore.getState().messages.values());
+          const existingPlannerMessage = [...messages].reverse().find(m => m.agent === 'planner' && m.isStreaming);
+          if (existingPlannerMessage) {
+            // Update the existing streaming planner message
+            const updatedMessage: Message = {
+              ...existingPlannerMessage,
+              isStreaming: !data.finish_reason,
+              finishReason: data.finish_reason,
+            };
+            if ('content' in data && data.content) {
+              updatedMessage.content = data.content;
+            }
+            if ('reasoning_content' in data && data.reasoning_content) {
+              updatedMessage.reasoningContent = data.reasoning_content;
+            }
+            if ('options' in data && Array.isArray(data.options)) {
+              updatedMessage.options = data.options;
+            }
+            updateMessage(updatedMessage);
+            continue;
+          }
+        }
+        
         if (type === "tool_call_result") {
           message = findMessageByToolCallId(data.tool_call_id);
         } else if (!existsMessage(messageId)) {
@@ -382,7 +474,7 @@ export function useMessageIds() {
 export function useLastInterruptMessage() {
   return useStore(
     useShallow((state) => {
-      if (state.messageIds.length >= 2) {
+      if (state.messageIds.length >= 1) {
         const lastMessage = state.messages.get(
           state.messageIds[state.messageIds.length - 1]!,
         );
@@ -396,12 +488,12 @@ export function useLastInterruptMessage() {
 export function useLastFeedbackMessageId() {
   const waitingForFeedbackMessageId = useStore(
     useShallow((state) => {
-      if (state.messageIds.length >= 2) {
+      if (state.messageIds.length >= 1) {
         const lastMessage = state.messages.get(
           state.messageIds[state.messageIds.length - 1]!,
         );
         if (lastMessage && lastMessage.finishReason === "interrupt") {
-          return state.messageIds[state.messageIds.length - 2];
+          return lastMessage.id;
         }
       }
       return null;

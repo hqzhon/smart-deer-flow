@@ -25,7 +25,7 @@ import {
 } from "~/components/ui/accordion";
 import { Skeleton } from "~/components/ui/skeleton";
 import { AgentConfigManager } from "~/core/config/agents";
-import { findMCPTool } from "~/core/mcp";
+import { findMCPTool, useSettings } from "~/core/mcp";
 import type { ToolCallRuntime } from "~/core/messages";
 import { useMessage, useStore } from "~/core/store";
 import { parseJSON } from "~/core/utils";
@@ -421,7 +421,8 @@ function PythonToolCallResult({ result }: { result: string }) {
 }
 
 function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
-  const tool = useMemo(() => findMCPTool(toolCall.name), [toolCall.name]);
+  const mcpSettings = useSettings("mcp");
+  const tool = useMemo(() => findMCPTool(mcpSettings.servers, toolCall.name), [mcpSettings.servers, toolCall.name]);
   const { resolvedTheme } = useTheme();
   return (
     <section className="mt-4 pl-4">
@@ -429,7 +430,7 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger>
-              <Tooltip title={tool?.description}>
+              <Tooltip title={tool?.tool.description}>
                 <div className="flex items-center font-medium italic">
                   <PencilRuler size={16} className={"mr-2"} />
                   <RainbowText

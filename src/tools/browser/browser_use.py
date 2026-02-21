@@ -301,8 +301,7 @@ class BrowserUseTool(BaseTool):
         if not target_selector:
             return ToolResult(error="Either index or selector is required")
 
-        options = await self._page.evaluate(
-            f"""
+        options = await self._page.evaluate(f"""
             () => {{
                 const select = document.querySelector('{target_selector}');
                 if (!select) return null;
@@ -312,8 +311,7 @@ class BrowserUseTool(BaseTool):
                     index: opt.index
                 }}));
             }}
-        """
-        )
+        """)
         return ToolResult(output=f"Dropdown options: {json.dumps(options, indent=2)}")
 
     async def _select_dropdown_option(

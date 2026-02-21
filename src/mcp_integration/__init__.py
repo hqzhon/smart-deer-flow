@@ -1,12 +1,12 @@
-from src.mcp.client import MCPClients, MCPServerConfig, MCPClientToolProxy
-from src.mcp.enhanced_client import (
+from src.mcp_integration.client import MCPClients, MCPServerConfig, MCPClientToolProxy
+from src.mcp_integration.enhanced_client import (
     MCPClients as EnhancedMCPClients,
     MCPServerConfig as EnhancedMCPServerConfig,
     ConnectionState,
     MCPConnectionInfo,
 )
-from src.mcp.server import MCPServer, MCPServerSettings
-from src.mcp.tool import MCPClientTool
+from src.mcp_integration.server import MCPServer, MCPServerSettings
+from src.mcp_integration.tool import MCPClientTool
 
 __all__ = [
     "MCPClients",

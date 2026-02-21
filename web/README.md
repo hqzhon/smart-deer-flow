@@ -4,13 +4,13 @@
 
 > Originated from Open Source, give back to Open Source.
 
-This is the web UI for [`DeerFlow`](https://github.com/bytedance/deer-flow).
+This is the web UI for [`DeerFlow`](https://github.com/hqzhon/smart-deer-flow).
 
 ## Quick Start
 
 ### Prerequisites
 
-- [`DeerFlow`](https://github.com/bytedance/deer-flow)
+- [`DeerFlow`](https://github.com/hqzhon/smart-deer-flow)
 - Node.js (v22.14.0+)
 - pnpm (v10.6.2+) as package manager
 

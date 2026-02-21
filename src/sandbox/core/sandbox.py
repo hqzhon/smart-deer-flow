@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.sandbox.core.exceptions import SandboxTimeoutError
+from src.sandbox.exceptions import SandboxTimeoutError
 from src.sandbox.core.terminal import AsyncDockerizedTerminal
 
 

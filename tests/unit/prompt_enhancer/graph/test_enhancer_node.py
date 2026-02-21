@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.prompt_enhancer.graph.enhancer_node import prompt_enhancer_node
 from src.prompt_enhancer.graph.state import PromptEnhancerState

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from src.utils.common.format_utils import format_bytes
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sandbox", tags=["sandbox"])
@@ -381,8 +383,8 @@ async def _collect_sandbox_metrics(sandbox) -> SandboxMetrics:
             return SandboxMetrics(
                 cpu_usage=round(cpu_usage, 2),
                 memory_usage=round(memory_percent, 2),
-                memory_used=_format_bytes(memory_usage),
-                memory_total=_format_bytes(memory_limit),
+                memory_used=format_bytes(memory_usage),
+                memory_total=format_bytes(memory_limit),
                 uptime=0,
                 process_count=0,
             )
@@ -400,12 +402,3 @@ async def _collect_sandbox_metrics_by_id(sandbox_id: str) -> SandboxMetrics:
         return await _collect_sandbox_metrics(sandbox)
     except Exception:
         return SandboxMetrics()
-
-
-def _format_bytes(size: int) -> str:
-    """Format bytes to human readable string."""
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if size < 1024:
-            return f"{size:.1f}{unit}"
-        size /= 1024
-    return f"{size:.1f}PB"

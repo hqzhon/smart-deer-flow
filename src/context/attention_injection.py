@@ -217,7 +217,9 @@ class AttentionInjector:
 """
 
         if injection_point == InjectionPoint.ON_ERROR:
-            base += "\n\n⚠️ **注意**: 遇到错误。请在解决问题的同时，重新聚焦于原始目标。"
+            base += (
+                "\n\n⚠️ **注意**: 遇到错误。请在解决问题的同时，重新聚焦于原始目标。"
+            )
         elif injection_point == InjectionPoint.BEFORE_REPORT:
             base += (
                 "\n\n📝 **注意**: 正在准备最终报告。请确保所有发现都直接回应原始目标。"

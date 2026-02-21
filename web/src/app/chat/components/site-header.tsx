@@ -35,7 +35,7 @@ export function SiteHeader() {
             asChild
             className="group relative z-10"
           >
-            <Link href="https://github.com/bytedance/deer-flow" target="_blank">
+            <Link href="https://github.com/hqzhon/smart-deer-flow" target="_blank">
               <GitHubLogoIcon className="size-4" />
               Star on GitHub
               {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY &&

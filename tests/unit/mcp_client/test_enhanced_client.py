@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from src.mcp.enhanced_client import (
+from src.mcp_integration.enhanced_client import (
     MCPClients,
     MCPServerConfig,
     MCPConnectionInfo,

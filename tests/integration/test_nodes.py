@@ -245,10 +245,12 @@ def patch_plan_model_validate():
 
 @pytest.fixture
 def patch_ai_message():
-    AIMessage = namedtuple("AIMessage", ["content", "name"])
+    AIMessage = namedtuple("AIMessage", ["content", "name", "additional_kwargs"])
     with patch(
         "src.graph.nodes.AIMessage",
-        side_effect=lambda content, name: AIMessage(content, name),
+        side_effect=lambda content, name, additional_kwargs=None: AIMessage(
+            content, name, additional_kwargs or {}
+        ),
     ) as mock:
         yield mock
 
@@ -267,7 +269,9 @@ def test_planner_node_basic_has_enough_context(
         patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
@@ -310,7 +314,9 @@ def test_planner_node_basic_not_enough_context(
         patch("src.graph.nodes.get_settings") as mock_get_settings,
         patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
@@ -345,9 +351,11 @@ def test_planner_node_stream_mode_has_enough_context(
     # AGENT_LLM_MAP["planner"] != "basic"
     with (
         patch("src.graph.nodes.get_settings") as mock_get_settings,
-        patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
+        patch("src.llms.llm.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "gpt-4o"
         mock_get_settings.return_value = mock_settings
@@ -356,12 +364,14 @@ def test_planner_node_stream_mode_has_enough_context(
         # Simulate streaming chunks
         chunk = MagicMock()
         chunk.content = json.dumps(mock_plan)
+        chunk.additional_kwargs = {}
         mock_llm.stream.return_value = [chunk]
         mock_get_llm.return_value = mock_llm
 
         # Mock safe_llm_call to return a mock stream response
         mock_stream_response = MagicMock()
         mock_stream_response.content = json.dumps(mock_plan)
+        mock_stream_response.additional_kwargs = {}
         mock_safe_llm_call.return_value = mock_stream_response
 
         result = planner_node(mock_state_planner, MagicMock())
@@ -389,9 +399,11 @@ def test_planner_node_stream_mode_not_enough_context(
     }
     with (
         patch("src.graph.nodes.get_settings") as mock_get_settings,
-        patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
+        patch("src.llms.llm.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "gpt-4o"
         mock_get_settings.return_value = mock_settings
@@ -399,12 +411,14 @@ def test_planner_node_stream_mode_not_enough_context(
         mock_llm = MagicMock()
         chunk = MagicMock()
         chunk.content = json.dumps(plan)
+        chunk.additional_kwargs = {}
         mock_llm.stream.return_value = [chunk]
         mock_get_llm.return_value = mock_llm
 
         # Mock safe_llm_call to return a mock stream response
         mock_stream_response = MagicMock()
         mock_stream_response.content = json.dumps(plan)
+        mock_stream_response.additional_kwargs = {}
         mock_safe_llm_call.return_value = mock_stream_response
 
         result = planner_node(mock_state_planner, MagicMock())
@@ -414,15 +428,19 @@ def test_planner_node_stream_mode_not_enough_context(
         assert isinstance(result.update["current_plan"], str)
 
 
-def test_planner_node_plan_iterations_exceeded(mock_state_planner):
+def test_planner_node_plan_iterations_exceeded(
+    mock_state_planner, patch_config_from_runnable_config_planner
+):
     # plan_iterations >= max_plan_iterations
     state = dict(mock_state_planner)
     state["plan_iterations"] = 5
     with (
         patch("src.graph.nodes.get_settings") as mock_get_settings,
-        patch("src.graph.nodes.get_llm_by_type", return_value=MagicMock()),
+        patch("src.llms.llm.get_llm_by_type", return_value=MagicMock()),
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
@@ -436,17 +454,21 @@ def test_planner_node_plan_iterations_exceeded(mock_state_planner):
         assert result.goto == "reporter"
 
 
-def test_planner_node_json_decode_error_first_iteration(mock_state_planner):
+def test_planner_node_json_decode_error_first_iteration(
+    mock_state_planner, patch_config_from_runnable_config_planner
+):
     # Simulate JSONDecodeError on first iteration
     with (
         patch("src.graph.nodes.get_settings") as mock_get_settings,
-        patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
+        patch("src.llms.llm.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
         patch(
             "src.graph.nodes.json.loads",
             side_effect=json.JSONDecodeError("err", "doc", 0),
         ),
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
@@ -466,19 +488,23 @@ def test_planner_node_json_decode_error_first_iteration(mock_state_planner):
         assert result.goto == "__end__"
 
 
-def test_planner_node_json_decode_error_second_iteration(mock_state_planner):
+def test_planner_node_json_decode_error_second_iteration(
+    mock_state_planner, patch_config_from_runnable_config_planner
+):
     # Simulate JSONDecodeError on second iteration
     state = dict(mock_state_planner)
     state["plan_iterations"] = 1
     with (
         patch("src.graph.nodes.get_settings") as mock_get_settings,
-        patch("src.graph.nodes.get_llm_by_type") as mock_get_llm,
+        patch("src.llms.llm.get_llm_by_type") as mock_get_llm,
         patch("src.graph.nodes.safe_llm_call") as mock_safe_llm_call,
+        patch("src.graph.nodes.get_stream_writer") as mock_get_writer,
         patch(
             "src.graph.nodes.json.loads",
             side_effect=json.JSONDecodeError("err", "doc", 0),
         ),
     ):
+        mock_get_writer.return_value = MagicMock()
         mock_settings = MagicMock()
         mock_settings.agent_llm_map.planner = "basic"
         mock_get_settings.return_value = mock_settings
@@ -495,7 +521,7 @@ def test_planner_node_json_decode_error_second_iteration(mock_state_planner):
 
         result = planner_node(state, MagicMock())
         assert isinstance(result, Command)
-        assert result.goto == "reporter"
+        assert result.goto == "context_optimizer"
 
 
 # Patch Plan.model_validate and repair_json_output globally for these tests

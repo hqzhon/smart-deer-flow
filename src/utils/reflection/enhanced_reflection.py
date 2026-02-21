@@ -11,8 +11,9 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from src.config.config_loader import get_settings
+from src.utils.reflection.models import ReflectionResult
 from src.utils.reflection.reflection_prompt_manager import ReflectionPromptManager
 from src.report_quality.i18n import Language
 from langchain_core.messages import HumanMessage
@@ -34,95 +35,6 @@ class ReflectionConfig(BaseModel):
 
 
 logger = logging.getLogger(__name__)
-
-
-class ReflectionResult(BaseModel):
-    """Structured output for reflection analysis.
-
-    Based on GFLQ's Reflection model with DeerFlow-specific enhancements.
-    Focuses on research sufficiency assessment and knowledge gap identification.
-    """
-
-    is_sufficient: bool = Field(
-        description="Whether the current research results are sufficient to complete the task"
-    )
-    primary_knowledge_gap: Optional[str] = Field(
-        description="The most critical knowledge gap or missing information area",
-        default=None,
-    )
-    primary_follow_up_query: Optional[str] = Field(
-        description="The most important follow-up query to address the primary knowledge gap",
-        default=None,
-    )
-    confidence_score: Optional[float] = Field(
-        description="Confidence score for the sufficiency assessment (0.0-1.0)",
-        ge=0.0,
-        le=1.0,
-        default=None,
-    )
-    quality_assessment: Dict[str, Any] = Field(
-        description="Quality assessment metrics", default_factory=dict
-    )
-    recommendations: List[str] = Field(
-        description="Actionable recommendations for improving research",
-        default_factory=list,
-    )
-    priority_areas: List[str] = Field(
-        description="Priority areas that need immediate attention", default_factory=list
-    )
-
-    @field_validator("recommendations", mode="before")
-    @classmethod
-    def validate_recommendations(cls, v):
-        """Ensure recommendations is always a list of strings."""
-        if not v:
-            return []
-
-        result = []
-        for item in v:
-            # Skip slice objects and other invalid types
-            if isinstance(item, slice):
-                logger.warning(f"Skipping slice object in recommendations: {item}")
-                continue
-
-            if isinstance(item, str):
-                if item.strip() and "slice(" not in item and not item.startswith("<"):
-                    result.append(item)
-                else:
-                    logger.warning(
-                        f"Skipping invalid string in recommendations: '{item}'"
-                    )
-            elif isinstance(item, dict):
-                # Extract relevant field or convert to string
-                if "recommendation" in item:
-                    rec_str = str(item["recommendation"])
-                    if rec_str.strip() and "slice(" not in rec_str:
-                        result.append(rec_str)
-                elif "description" in item:
-                    desc_str = str(item["description"])
-                    if desc_str.strip() and "slice(" not in desc_str:
-                        result.append(desc_str)
-                else:
-                    item_str = str(item)
-                    if (
-                        item_str.strip()
-                        and "slice(" not in item_str
-                        and not item_str.startswith("<")
-                    ):
-                        result.append(item_str)
-            else:
-                item_str = str(item)
-                if (
-                    item_str.strip()
-                    and "slice(" not in item_str
-                    and not item_str.startswith("<")
-                ):
-                    result.append(item_str)
-                else:
-                    logger.warning(
-                        f"Skipping invalid item in recommendations: '{item_str}'"
-                    )
-        return result
 
 
 @dataclass

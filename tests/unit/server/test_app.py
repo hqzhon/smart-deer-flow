@@ -475,15 +475,14 @@ class TestAstreamWorkflowGenerator:
     @patch("src.server.app.graph")
     @pytest.mark.asyncio
     async def test_astream_workflow_generator_interrupt_event(self, mock_graph):
-        # Mock interrupt data
         mock_interrupt = MagicMock()
-        mock_interrupt.ns = ["interrupt_id"]
+        mock_interrupt.id = "interrupt_id"
         mock_interrupt.value = "Plan requires approval"
 
         interrupt_data = {"__interrupt__": [mock_interrupt]}
 
         async def mock_astream(*args, **kwargs):
-            yield ("agent1", "step1", interrupt_data)
+            yield ("agent1", "updates", interrupt_data)
 
         mock_graph.astream = mock_astream
 

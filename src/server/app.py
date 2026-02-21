@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage
+from langchain_core.messages import AIMessageChunk, ToolMessage, BaseMessage, AIMessage
 from langgraph.types import Command
 from src.utils.decorators import safe_background_task
 
@@ -735,7 +735,7 @@ async def _astream_workflow_generator(
                         "resources": resources,  # Ensure a copy is also in configurable
                     },
                 },
-                stream_mode=["messages", "updates"],
+                stream_mode=["messages", "updates", "custom"],
                 subgraphs=True,
             ):
                 # Handle updates stream - structured data from nodes
@@ -747,7 +747,7 @@ async def _astream_workflow_generator(
                                 "interrupt",
                                 {
                                     "thread_id": thread_id,
-                                    "id": event_data["__interrupt__"][0].ns[0],
+                                    "id": event_data["__interrupt__"][0].id,
                                     "role": "assistant",
                                     "content": event_data["__interrupt__"][0].value,
                                     "finish_reason": "interrupt",
@@ -760,11 +760,13 @@ async def _astream_workflow_generator(
                             continue
 
                         # Extract node name from agent tuple
-                        node_name = agent[0].split(":")[0] if agent else "unknown"
+                        node_name = (
+                            agent[0].split(":")[0] if len(agent) > 0 else "unknown"
+                        )
 
                         # Create structured event for updates
                         # Convert agent to serializable format to avoid AIMessage serialization issues
-                        serializable_agent = str(agent) if agent else "unknown"
+                        serializable_agent = str(agent) if len(agent) > 0 else "unknown"
 
                         # Ensure event_data is JSON serializable by converting any complex objects to strings
                         try:
@@ -817,6 +819,34 @@ async def _astream_workflow_generator(
                         yield _make_event("node_update", update_event)
                     continue
 
+                # Handle custom stream - streaming data from nodes using writer
+                if stream_type == "custom":
+                    if isinstance(event_data, dict):
+                        agent_name = event_data.get("agent", "unknown")
+                        if "content_chunk" in event_data:
+                            yield _make_event(
+                                "message_chunk",
+                                {
+                                    "thread_id": thread_id,
+                                    "agent": agent_name,
+                                    "id": f"stream_{thread_id}_{time.time()}",
+                                    "role": "assistant",
+                                    "content": event_data["content_chunk"],
+                                },
+                            )
+                        elif "reasoning_chunk" in event_data:
+                            yield _make_event(
+                                "reasoning_chunk",
+                                {
+                                    "thread_id": thread_id,
+                                    "agent": agent_name,
+                                    "id": f"reasoning_{thread_id}_{time.time()}",
+                                    "role": "assistant",
+                                    "reasoning_content": event_data["reasoning_chunk"],
+                                },
+                            )
+                    continue
+
                 # Handle messages stream - existing logic
                 if stream_type == "messages":
                     message_chunk, message_metadata = cast(
@@ -831,7 +861,9 @@ async def _astream_workflow_generator(
                     ):
                         message_agent = message_chunk.name
                     else:
-                        message_agent = agent[0].split(":")[0]
+                        message_agent = (
+                            agent[0].split(":")[0] if len(agent) > 0 else "unknown"
+                        )
                     event_stream_message: dict[str, any] = {
                         "thread_id": thread_id,
                         "agent": message_agent,
@@ -873,6 +905,10 @@ async def _astream_workflow_generator(
                         else:
                             # AI Message - Raw message tokens
                             yield _make_event("message_chunk", event_stream_message)
+                    elif isinstance(message_chunk, AIMessage):
+                        # AI Message - Complete message (not a chunk)
+                        # This handles messages from nodes that return complete AIMessage
+                        yield _make_event("message_chunk", event_stream_message)
             # Successfully completed, break out of retry loop
             return
         except Exception as e:

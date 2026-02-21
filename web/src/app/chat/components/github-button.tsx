@@ -26,7 +26,7 @@ export function GitHubButton() {
       className="group relative z-10"
     >
       <Link 
-        href="https://github.com/bytedance/deer-flow" 
+        href="https://github.com/hqzhon/smart-deer-flow" 
         target="_blank"
         className="inline-flex items-center justify-center gap-2"
       >

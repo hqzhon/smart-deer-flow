@@ -194,7 +194,7 @@ export function MessagesBlock({ className }: { className?: string }) {
                 own question, please{" "}
                 <a
                   className="underline"
-                  href="https://github.com/bytedance/deer-flow"
+                  href="https://github.com/hqzhon/smart-deer-flow"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

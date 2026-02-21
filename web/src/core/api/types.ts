@@ -76,6 +76,17 @@ export interface InterruptEvent
     }
   > {}
 
+export interface ReasoningChunkEvent {
+  type: "reasoning_chunk";
+  data: {
+    id: string;
+    thread_id: string;
+    agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter" | "unknown";
+    role: "assistant";
+    reasoning_content: string;
+  };
+}
+
 export interface ErrorEvent {
   type: "error";
   data: {
@@ -143,6 +154,7 @@ export type ChatEvent =
   | ToolCallChunksEvent
   | ToolCallResultEvent
   | InterruptEvent
+  | ReasoningChunkEvent
   | ErrorEvent
   | ReflectionInsightsEvent
   | IsolationMetricsEvent

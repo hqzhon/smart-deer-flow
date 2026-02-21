@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, AsyncMock
 
-from src.mcp.client import MCPServerConfig, MCPClientToolProxy, MCPClients
+from src.mcp_integration.client import MCPServerConfig, MCPClientToolProxy, MCPClients
 
 
 class TestMCPServerConfig:

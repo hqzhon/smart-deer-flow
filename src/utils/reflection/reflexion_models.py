@@ -12,6 +12,8 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 
+from src.utils.reflection.models import BaseReflectionResult
+
 
 class KnowledgeGapCategory(str, Enum):
     """Categories of knowledge gaps."""
@@ -85,10 +87,13 @@ class ExternalKnowledge(BaseModel):
         return self.content[:max_length] + "..."
 
 
-class ReflexionResult(BaseModel):
-    """Result from Reflexion analysis with external knowledge integration."""
+class ReflexionResult(BaseReflectionResult):
+    """Result from Reflexion analysis with external knowledge integration.
 
-    is_sufficient: bool = Field(description="Whether current research is sufficient")
+    Extends BaseReflectionResult with Reflexion-specific fields for
+    knowledge gaps and external knowledge integration.
+    """
+
     knowledge_gaps: List[KnowledgeGap] = Field(
         default_factory=list,
         description="Identified knowledge gaps, sorted by priority",
@@ -103,16 +108,6 @@ class ReflexionResult(BaseModel):
     integrated_response: Optional[str] = Field(
         default=None,
         description="Integrated response combining initial and external knowledge",
-    )
-    confidence_score: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in the sufficiency assessment",
-    )
-    quality_assessment: Dict[str, float] = Field(
-        default_factory=dict,
-        description="Quality metrics: completeness, accuracy, depth, relevance",
     )
     recommendations: List[str] = Field(
         default_factory=list, description="Recommendations for further research"

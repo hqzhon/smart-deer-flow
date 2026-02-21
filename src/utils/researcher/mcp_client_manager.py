@@ -110,7 +110,7 @@ class MCPClientManager:
 
         try:
             # Dynamically import MCP client
-            from src.mcp.multi_server_client import MultiServerMCPClient
+            from langchain_mcp_adapters.client import MultiServerMCPClient
 
             logger.info(f"Creating MCP client with {len(mcp_servers)} servers")
 

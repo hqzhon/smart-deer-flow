@@ -12,7 +12,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-from src.utils.reflection.enhanced_reflection import ReflectionResult
+from src.utils.reflection.models import ReflectionResult
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)

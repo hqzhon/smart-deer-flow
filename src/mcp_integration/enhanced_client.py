@@ -2,13 +2,15 @@ import asyncio
 import logging
 import re
 import time
-from contextlib import AsyncExitStack
 from enum import Enum
 from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, Field
 
-from src.tools.tool_collection import ToolCollection
+from src.mcp_integration.client import (
+    MCPClients as BaseMCPClients,
+    MCPClientToolProxy,
+)
 from src.tools.tool_result import ToolResult
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ class ConnectionState(str, Enum):
 
 
 class MCPServerConfig(BaseModel):
-    """MCP server configuration"""
+    """MCP server configuration with enhanced features"""
 
     transport: str = Field(..., description="Transport type: sse or stdio")
     url: Optional[str] = Field(default=None, description="SSE URL")
@@ -51,57 +53,28 @@ class MCPConnectionInfo(BaseModel):
     tools_count: int = 0
 
 
-class MCPClientToolProxy:
-    """Proxy for MCP tools"""
-
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        parameters: dict,
-        session: Any,
-        server_id: str,
-        original_name: str,
-    ):
-        self.name = name
-        self.description = description
-        self.parameters = parameters
-        self.session = session
-        self.server_id = server_id
-        self.original_name = original_name
-
-    def get_schema(self) -> dict:
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            },
-        }
+class EnhancedMCPClientToolProxy(MCPClientToolProxy):
+    """Enhanced proxy for MCP tools with connection state tracking"""
 
     async def execute(self, **kwargs) -> ToolResult:
         if not self.session:
-            return ToolResult(success=False, message="Not connected to MCP server")
+            return ToolResult(error="Not connected to MCP server")
 
         try:
             result = await self.session.call_tool(self.original_name, kwargs)
             content_str = ", ".join(
                 item.text for item in result.content if hasattr(item, "text")
             )
-            return ToolResult(message=content_str or "No output returned.")
+            return ToolResult(output=content_str or "No output returned.")
         except Exception as e:
-            return ToolResult(success=False, message=f"Error executing tool: {str(e)}")
+            return ToolResult(error=f"Error executing tool: {str(e)}")
 
 
-class MCPClients(ToolCollection):
+class MCPClients(BaseMCPClients):
     """Enhanced MCP client with connection management and auto-reconnect"""
 
     def __init__(self):
         super().__init__()
-        self._tool_proxies: dict[str, MCPClientToolProxy] = {}
-        self.sessions: dict[str, Any] = {}
-        self.exit_stacks: dict[str, AsyncExitStack] = {}
         self._connection_info: dict[str, MCPConnectionInfo] = {}
         self._configs: dict[str, MCPServerConfig] = {}
         self._on_tools_changed: Optional[Callable[[list[str]], None]] = None
@@ -158,6 +131,8 @@ class MCPClients(ToolCollection):
         self._update_state(server_id, ConnectionState.CONNECTING)
 
         try:
+            from contextlib import AsyncExitStack
+
             exit_stack = AsyncExitStack()
             self.exit_stacks[server_id] = exit_stack
 
@@ -212,6 +187,8 @@ class MCPClients(ToolCollection):
         self._update_state(server_id, ConnectionState.CONNECTING)
 
         try:
+            from contextlib import AsyncExitStack
+
             exit_stack = AsyncExitStack()
             self.exit_stacks[server_id] = exit_stack
 
@@ -250,7 +227,7 @@ class MCPClients(ToolCollection):
             tool_name = f"mcp_{server_id}_{original_name}"
             tool_name = self._sanitize_tool_name(tool_name)
 
-            proxy = MCPClientToolProxy(
+            proxy = EnhancedMCPClientToolProxy(
                 name=tool_name,
                 description=tool.description,
                 parameters=tool.inputSchema,
@@ -271,16 +248,6 @@ class MCPClients(ToolCollection):
 
         if self._on_tools_changed:
             self._on_tools_changed(list(self._tool_proxies.keys()))
-
-    def _sanitize_tool_name(self, name: str) -> str:
-        sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-        sanitized = re.sub(r"_+", "_", sanitized)
-        sanitized = sanitized.strip("_")
-
-        if len(sanitized) > 64:
-            sanitized = sanitized[:64]
-
-        return sanitized
 
     def _extract_server_id(self, url: str) -> str:
         match = re.search(r"://([^/:]+)", url)
@@ -351,38 +318,10 @@ class MCPClients(ToolCollection):
                 self._reconnect_tasks[server_id].cancel()
                 del self._reconnect_tasks[server_id]
 
-            if server_id in self.sessions:
-                try:
-                    exit_stack = self.exit_stacks.get(server_id)
+            if server_id in self._connection_info:
+                self._connection_info[server_id].state = ConnectionState.DISCONNECTED
 
-                    if exit_stack:
-                        try:
-                            await exit_stack.aclose()
-                        except RuntimeError:
-                            pass
-
-                    self.sessions.pop(server_id, None)
-                    self.exit_stacks.pop(server_id, None)
-
-                    self._tool_proxies = {
-                        k: v
-                        for k, v in self._tool_proxies.items()
-                        if v.server_id != server_id
-                    }
-
-                    if server_id in self._connection_info:
-                        self._connection_info[server_id].state = (
-                            ConnectionState.DISCONNECTED
-                        )
-
-                    logger.info(f"Disconnected from MCP server {server_id}")
-                except Exception as e:
-                    logger.error(f"Error disconnecting from server {server_id}: {e}")
-        else:
-            for sid in sorted(list(self.sessions.keys())):
-                await self.disconnect(sid)
-            self._tool_proxies = {}
-            logger.info("Disconnected from all MCP servers")
+        await super().disconnect(server_id)
 
     async def refresh_tools(self, server_id: str = "") -> list[str]:
         if server_id:
@@ -400,7 +339,7 @@ class MCPClients(ToolCollection):
     ) -> ToolResult:
         proxy = self._tool_proxies.get(name)
         if not proxy:
-            return ToolResult(success=False, message=f"Tool {name} not found")
+            return ToolResult(error=f"Tool {name} not found")
 
         server_id = proxy.server_id
         if server_id in self._connection_info:
@@ -408,7 +347,7 @@ class MCPClients(ToolCollection):
 
         result = await proxy.execute(**(tool_input or {}))
 
-        if not result.success and server_id in self._configs:
+        if result.error and server_id in self._configs:
             config = self._configs[server_id]
             if config.reconnect_enabled and server_id in self._connection_info:
                 info = self._connection_info[server_id]
@@ -419,12 +358,6 @@ class MCPClients(ToolCollection):
                         )
 
         return result
-
-    def get_tool_names(self) -> list[str]:
-        return list(self._tool_proxies.keys())
-
-    def get_tool(self, name: str) -> MCPClientToolProxy | None:
-        return self._tool_proxies.get(name)
 
     def get_connection_info(self, server_id: str = "") -> dict[str, MCPConnectionInfo]:
         if server_id:

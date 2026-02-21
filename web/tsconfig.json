@@ -23,7 +23,8 @@
 
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@/*": ["./src/*"]
     },
 
     "tsBuildInfoFile": ".next/cache/tsconfig.tsbuildinfo"

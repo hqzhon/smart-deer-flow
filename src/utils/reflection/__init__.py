@@ -8,11 +8,11 @@ This module provides:
 - Workflow integration for automatic step generation
 """
 
+from .models import ReflectionResult, BaseReflectionResult
 from .reflection_prompt_manager import ReflectionPromptManager
 from .enhanced_reflection import (
     EnhancedReflectionAgent,
     ReflectionContext,
-    ReflectionResult,
     ReflectionConfig,
 )
 from .reflexion_models import (
@@ -37,10 +37,11 @@ from .reflection_integration import (
 )
 
 __all__ = [
+    "BaseReflectionResult",
+    "ReflectionResult",
     "ReflectionPromptManager",
     "EnhancedReflectionAgent",
     "ReflectionContext",
-    "ReflectionResult",
     "ReflectionConfig",
     "ReflexionResult",
     "KnowledgeGap",

@@ -1,43 +1,56 @@
-// Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
-// SPDX-License-Identifier: MIT
+export interface MCPServerConfig extends Record<string, unknown> {
+  enabled: boolean;
+  description: string;
+}
+
+export interface MCPConfig {
+  mcp_servers: Record<string, MCPServerConfig>;
+}
 
 export interface MCPToolMetadata {
   name: string;
-  description: string;
+  description?: string;
   inputSchema?: Record<string, unknown>;
 }
 
-export interface GenericMCPServerMetadata<T extends string> {
+export interface MCPServerMetadata {
   name: string;
-  transport: T;
-  enabled: boolean;
-  env?: Record<string, string>;
+  description?: string;
   tools: MCPToolMetadata[];
-  createdAt: number;
-  updatedAt: number;
+  enabled?: boolean;
+  transport?: "stdio" | "sse";
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface StdioMCPServerMetadata
-  extends GenericMCPServerMetadata<"stdio"> {
-  transport: "stdio";
+export type SimpleStdioMCPServerMetadata = {
   command: string;
   args?: string[];
-}
-export type SimpleStdioMCPServerMetadata = Omit<
-  StdioMCPServerMetadata,
-  "enabled" | "tools" | "createdAt" | "updatedAt"
->;
+  env?: Record<string, string>;
+};
 
-export interface SSEMCPServerMetadata extends GenericMCPServerMetadata<"sse"> {
-  transport: "sse";
+export type SimpleSSEMCPServerMetadata = {
   url: string;
-}
-export type SimpleSSEMCPServerMetadata = Omit<
-  SSEMCPServerMetadata,
-  "enabled" | "tools" | "createdAt" | "updatedAt"
->;
+  env?: Record<string, string>;
+};
 
-export type MCPServerMetadata = StdioMCPServerMetadata | SSEMCPServerMetadata;
 export type SimpleMCPServerMetadata =
   | SimpleStdioMCPServerMetadata
   | SimpleSSEMCPServerMetadata;
+
+export function findMCPTool(
+  servers: MCPServerMetadata[],
+  toolName: string,
+): { server: MCPServerMetadata; tool: MCPToolMetadata } | undefined {
+  for (const server of servers) {
+    const tool = server.tools.find((t) => t.name === toolName);
+    if (tool) {
+      return { server, tool };
+    }
+  }
+  return undefined;
+}

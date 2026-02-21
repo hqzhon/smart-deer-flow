@@ -13,6 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.types import Command, interrupt
+from langgraph.config import get_stream_writer
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 # Delayed import to avoid circular import
@@ -383,6 +384,7 @@ def planner_node(
 ) -> Command[Literal["human_feedback", "reporter"]]:
     """Planner node that generate the full plan with Phase 5 reflection integration."""
     logger.info("Planner generating full plan with enhanced reflection integration")
+    writer = get_stream_writer()
     configurable = get_configuration_from_config(config)
 
     # Phase 1 Simplification: Initialize unified config for planner
@@ -644,6 +646,7 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
     # Context evaluation will be handled automatically by safe_llm_call
 
     full_response = ""
+    response_additional_kwargs = {}
     if use_structured_output:
         response = safe_llm_call(
             llm.invoke,
@@ -654,7 +657,6 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         if hasattr(response, "model_dump_json"):
             full_response = response.model_dump_json(indent=4, exclude_none=True)
         else:
-            # if the response is not a structured output, return the default plan
             full_response = '{"steps": [{"title": "Research Task", "description": "Continue with general research due to content limitations."}]}'
     else:
 
@@ -666,9 +668,25 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
                 context="Stream LLM response",
             )
             content = ""
+            reasoning_content = ""
             for chunk in response:
                 content += chunk.content
-            return type("StreamResponse", (), {"content": content})()
+                if chunk.content:
+                    writer({"content_chunk": chunk.content, "agent": "planner"})
+                if hasattr(chunk, "additional_kwargs") and chunk.additional_kwargs.get(
+                    "reasoning_content"
+                ):
+                    rc = chunk.additional_kwargs["reasoning_content"]
+                    reasoning_content += rc
+                    writer({"reasoning_chunk": rc, "agent": "planner"})
+            additional_kwargs = (
+                {"reasoning_content": reasoning_content} if reasoning_content else {}
+            )
+            return type(
+                "StreamResponse",
+                (),
+                {"content": content, "additional_kwargs": additional_kwargs},
+            )()
 
         response = safe_llm_call(
             stream_llm,
@@ -677,6 +695,9 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
         )
         full_response = (
             response.content if hasattr(response, "content") else str(response)
+        )
+        response_additional_kwargs = (
+            response.additional_kwargs if hasattr(response, "additional_kwargs") else {}
         )
     logger.debug(f"Current state messages: {state['messages']}")
     logger.info(f"Planner response: {full_response}")
@@ -759,7 +780,13 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
         return Command(
             update={
-                "messages": [AIMessage(content=full_response, name="planner")],
+                "messages": [
+                    AIMessage(
+                        content=full_response,
+                        name="planner",
+                        additional_kwargs=response_additional_kwargs,
+                    )
+                ],
                 "current_plan": new_plan,
                 "reflection_metadata": reflection_metadata,
                 "plan_iterations": plan_iterations + 1,
@@ -795,7 +822,13 @@ REFLECTION INSIGHTS FROM PREVIOUS RESEARCH:
 
     return Command(
         update={
-            "messages": [AIMessage(content=full_response, name="planner")],
+            "messages": [
+                AIMessage(
+                    content=full_response,
+                    name="planner",
+                    additional_kwargs=response_additional_kwargs,
+                )
+            ],
             "current_plan": full_response,
             "reflection_metadata": reflection_metadata,
             "plan_iterations": plan_iterations + 1,
@@ -1061,6 +1094,7 @@ def reporter_node(state: State, config: RunnableConfig):
         context_metrics = None
 
     return {
+        "messages": [AIMessage(content=response_content, name="reporter")],
         "final_report": response_content,
         "context_metrics": context_metrics,
     }

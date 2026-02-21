@@ -4,7 +4,7 @@ import socket
 import time
 from typing import Any
 
-from src.sandbox.core.exceptions import SandboxTimeoutError
+from src.sandbox.exceptions import SandboxTimeoutError
 
 
 class AsyncDockerizedTerminal:
